@@ -1,0 +1,110 @@
+package pe.moneyflow.app
+
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Category
+import androidx.compose.material.icons.rounded.CreditCard
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.navigation.NavController
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import pe.moneyflow.feature.addedit.addEditScreen
+import pe.moneyflow.feature.addedit.navigateToAddEdit
+import pe.moneyflow.feature.categories.CategoriesRoute
+import pe.moneyflow.feature.categories.categoriesScreen
+import pe.moneyflow.feature.dashboard.DashboardRoute
+import pe.moneyflow.feature.dashboard.dashboardScreen
+import pe.moneyflow.feature.paymentmethods.PaymentMethodsRoute
+import pe.moneyflow.feature.paymentmethods.paymentMethodsScreen
+import pe.moneyflow.feature.transactions.TransactionsRoute
+import pe.moneyflow.feature.transactions.transactionsScreen
+
+private enum class TopLevelDestination(
+    val route: Any,
+    val label: String,
+    val icon: ImageVector,
+) {
+    DASHBOARD(DashboardRoute, "Inicio", Icons.Rounded.Home),
+    TRANSACTIONS(TransactionsRoute, "Movimientos", Icons.Rounded.ReceiptLong),
+    CATEGORIES(CategoriesRoute, "Categorías", Icons.Rounded.Category),
+    PAYMENTS(PaymentMethodsRoute, "Métodos", Icons.Rounded.CreditCard),
+}
+
+@Composable
+fun MoneyFlowApp() {
+    val navController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = backStackEntry?.destination
+    val isTopLevel = TopLevelDestination.entries.any { currentDestination.isRouteInHierarchy(it.route) }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            if (isTopLevel) {
+                NavigationBar {
+                    TopLevelDestination.entries.forEach { destination ->
+                        NavigationBarItem(
+                            selected = currentDestination.isRouteInHierarchy(destination.route),
+                            onClick = { navController.navigateToTopLevel(destination.route) },
+                            icon = { Icon(destination.icon, contentDescription = destination.label) },
+                            label = { Text(destination.label) },
+                        )
+                    }
+                }
+            }
+        },
+        floatingActionButton = {
+            if (isTopLevel) {
+                FloatingActionButton(onClick = { navController.navigateToAddEdit() }) {
+                    Icon(Icons.Rounded.Add, contentDescription = "Agregar movimiento")
+                }
+            }
+        },
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = DashboardRoute,
+            modifier = Modifier.padding(innerPadding),
+        ) {
+            dashboardScreen(
+                onSeeAllTransactions = { navController.navigateToTopLevel(TransactionsRoute) },
+                onTransactionClick = { id -> navController.navigateToAddEdit(id) },
+            )
+            transactionsScreen(
+                onTransactionClick = { id -> navController.navigateToAddEdit(id) },
+            )
+            categoriesScreen()
+            paymentMethodsScreen()
+            addEditScreen(onDone = { navController.popBackStack() })
+        }
+    }
+}
+
+private fun NavDestination?.isRouteInHierarchy(route: Any): Boolean =
+    this?.hierarchy?.any { it.hasRoute(route::class) } == true
+
+private fun NavController.navigateToTopLevel(route: Any) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}

@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Wallet body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,40 L76,40 A8,8 0 0 1 84,48 L84,68 A8,8 0 0 1 76,76 L32,76 A8,8 0 0 1 24,68 L24,48 A8,8 0 0 1 32,40 Z" />
+    <!-- Card pocket (shows the indigo background through the cut) -->
+    <path
+        android:fillColor="#4F46E5"
+        android:pathData="M84,55 L67,55 A6.5,6.5 0 0 0 67,68 L84,68 Z" />
+    <!-- Clasp dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M72,61.5 m-3,0 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0" />
+</vector>
