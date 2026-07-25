@@ -16,6 +16,8 @@ data class Transaction(
     val categoryId: String? = null,
     val paymentMethodId: String? = null,
     val accountId: String? = null,
+    /** For a [TransactionType.TRANSFER]: the destination account money moves into. */
+    val transferAccountId: String? = null,
     val type: TransactionType = TransactionType.EXPENSE,
     val status: TransactionStatus = TransactionStatus.PAID,
     val priority: Priority = Priority.NORMAL,

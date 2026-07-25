@@ -29,10 +29,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlinx.serialization.Serializable
+import pe.moneyflow.feature.accounts.AccountsRoute
+import pe.moneyflow.feature.accounts.accountsScreen
 import pe.moneyflow.feature.addedit.addEditScreen
 import pe.moneyflow.feature.addedit.navigateToAddEdit
 import pe.moneyflow.feature.analytics.AnalyticsRoute
 import pe.moneyflow.feature.analytics.analyticsScreen
+import pe.moneyflow.feature.currency.CurrencyRoute
+import pe.moneyflow.feature.currency.currencyScreen
 import pe.moneyflow.feature.budgets.BudgetsRoute
 import pe.moneyflow.feature.budgets.budgetsScreen
 import pe.moneyflow.feature.categories.CategoriesRoute
@@ -43,6 +47,8 @@ import pe.moneyflow.feature.paymentmethods.PaymentMethodsRoute
 import pe.moneyflow.feature.paymentmethods.paymentMethodsScreen
 import pe.moneyflow.feature.recurring.RecurringRoute
 import pe.moneyflow.feature.recurring.recurringScreen
+import pe.moneyflow.feature.savings.SavingsRoute
+import pe.moneyflow.feature.savings.savingsScreen
 import pe.moneyflow.feature.transactions.TransactionsRoute
 import pe.moneyflow.feature.transactions.transactionsScreen
 import pe.moneyflow.feature.upcoming.UpcomingRoute
@@ -112,16 +118,22 @@ fun MoneyFlowApp() {
             )
             composable<MoreRoute> {
                 MoreScreen(
+                    onOpenAccounts = { navController.navigate(AccountsRoute) },
+                    onOpenSavings = { navController.navigate(SavingsRoute) },
                     onOpenCategories = { navController.navigate(CategoriesRoute) },
                     onOpenPaymentMethods = { navController.navigate(PaymentMethodsRoute) },
                     onOpenRecurring = { navController.navigate(RecurringRoute) },
                     onOpenAnalytics = { navController.navigate(AnalyticsRoute) },
+                    onOpenCurrency = { navController.navigate(CurrencyRoute) },
                 )
             }
+            accountsScreen(onBack = { navController.popBackStack() })
+            savingsScreen(onBack = { navController.popBackStack() })
             categoriesScreen(onBack = { navController.popBackStack() })
             paymentMethodsScreen(onBack = { navController.popBackStack() })
             recurringScreen(onBack = { navController.popBackStack() })
             analyticsScreen(onBack = { navController.popBackStack() })
+            currencyScreen(onBack = { navController.popBackStack() })
             addEditScreen(onDone = { navController.popBackStack() })
         }
     }

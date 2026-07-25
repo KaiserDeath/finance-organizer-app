@@ -13,11 +13,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CreditCard
+import androidx.compose.material.icons.rounded.CurrencyExchange
 import androidx.compose.material.icons.rounded.EventRepeat
+import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,10 +36,13 @@ import pe.moneyflow.core.designsystem.theme.Spacing
 
 @Composable
 fun MoreScreen(
+    onOpenAccounts: () -> Unit,
+    onOpenSavings: () -> Unit,
     onOpenCategories: () -> Unit,
     onOpenPaymentMethods: () -> Unit,
     onOpenRecurring: () -> Unit,
     onOpenAnalytics: () -> Unit,
+    onOpenCurrency: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -61,6 +67,26 @@ fun MoreScreen(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = Spacing.xs),
             ) {
+                MoreRow(
+                    icon = Icons.Rounded.AccountBalanceWallet,
+                    title = "Cuentas",
+                    subtitle = "Saldos, transferencias y patrimonio neto",
+                    onClick = onOpenAccounts,
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(start = 68.dp),
+                )
+                MoreRow(
+                    icon = Icons.Rounded.Savings,
+                    title = "Ahorros",
+                    subtitle = "Metas de ahorro y aportes",
+                    onClick = onOpenSavings,
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(start = 68.dp),
+                )
                 MoreRow(
                     icon = Icons.Rounded.Category,
                     title = "Categorías",
@@ -96,6 +122,16 @@ fun MoreScreen(
                     title = "Análisis y reportes",
                     subtitle = "Tendencias, comparativas y exportar CSV",
                     onClick = onOpenAnalytics,
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(start = 68.dp),
+                )
+                MoreRow(
+                    icon = Icons.Rounded.CurrencyExchange,
+                    title = "Monedas",
+                    subtitle = "Moneda base y tipos de cambio",
+                    onClick = onOpenCurrency,
                 )
             }
         }

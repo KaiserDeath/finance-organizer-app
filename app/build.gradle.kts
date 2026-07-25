@@ -47,6 +47,9 @@ dependencies {
     implementation(project(":feature:upcoming"))
     implementation(project(":feature:recurring"))
     implementation(project(":feature:analytics"))
+    implementation(project(":feature:accounts"))
+    implementation(project(":feature:savings"))
+    implementation(project(":feature:currency"))
 
     // Android / Compose
     implementation(libs.androidx.core.ktx)

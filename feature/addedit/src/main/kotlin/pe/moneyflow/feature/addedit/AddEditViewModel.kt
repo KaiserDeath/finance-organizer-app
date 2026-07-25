@@ -12,10 +12,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import pe.moneyflow.core.common.Money
+import pe.moneyflow.core.domain.repository.AccountRepository
 import pe.moneyflow.core.domain.repository.CategoryRepository
 import pe.moneyflow.core.domain.repository.PaymentMethodRepository
 import pe.moneyflow.core.domain.usecase.GetTransactionUseCase
 import pe.moneyflow.core.domain.usecase.SaveTransactionUseCase
+import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.CategoryType
 import pe.moneyflow.core.model.PaymentMethod
@@ -37,10 +39,12 @@ data class AddEditUiState(
     val priority: Priority = Priority.NORMAL,
     val categoryId: String? = null,
     val paymentMethodId: String? = null,
+    val accountId: String? = null,
     val date: LocalDate = LocalDate.now(),
     val notes: String = "",
     val allCategories: List<Category> = emptyList(),
     val paymentMethods: List<PaymentMethod> = emptyList(),
+    val accounts: List<Account> = emptyList(),
     val saved: Boolean = false,
 ) {
     /** When the transaction is still pending, [date] is its due date rather than a paid date. */
@@ -60,6 +64,7 @@ class AddEditViewModel @Inject constructor(
     private val getTransaction: GetTransactionUseCase,
     private val categoryRepository: CategoryRepository,
     private val paymentMethodRepository: PaymentMethodRepository,
+    private val accountRepository: AccountRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -75,13 +80,16 @@ class AddEditViewModel @Inject constructor(
         viewModelScope.launch {
             val categories = categoryRepository.observeAll().first()
             val methods = paymentMethodRepository.observeAll().first()
+            val accounts = accountRepository.observeAll().first()
             _uiState.update { current ->
                 current.copy(
                     allCategories = categories,
                     paymentMethods = methods,
+                    accounts = accounts,
                     paymentMethodId = current.paymentMethodId
                         ?: methods.firstOrNull { it.isDefault }?.id
                         ?: methods.firstOrNull()?.id,
+                    accountId = current.accountId ?: accounts.firstOrNull()?.id,
                 )
             }
             editingId?.let { loadTransaction(it) } ?: applyDefaultCategory()
@@ -107,6 +115,7 @@ class AddEditViewModel @Inject constructor(
                 priority = tx.priority,
                 categoryId = tx.categoryId,
                 paymentMethodId = tx.paymentMethodId ?: it.paymentMethodId,
+                accountId = tx.accountId ?: it.accountId,
                 date = tx.actualDate ?: tx.estimatedDate ?: LocalDate.now(),
                 notes = tx.notes.orEmpty(),
             )
@@ -127,6 +136,8 @@ class AddEditViewModel @Inject constructor(
     fun onCategorySelect(id: String) = _uiState.update { it.copy(categoryId = id) }
 
     fun onPaymentMethodSelect(id: String) = _uiState.update { it.copy(paymentMethodId = id) }
+
+    fun onAccountSelect(id: String) = _uiState.update { it.copy(accountId = id) }
 
     fun onStatusChange(status: TransactionStatus) = _uiState.update { it.copy(status = status) }
 
@@ -150,6 +161,7 @@ class AddEditViewModel @Inject constructor(
             amountMinor = amount,
             categoryId = state.categoryId,
             paymentMethodId = state.paymentMethodId,
+            accountId = state.accountId,
             type = state.type,
             status = state.status,
             priority = state.priority,

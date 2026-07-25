@@ -12,14 +12,18 @@ import pe.moneyflow.core.common.IoDispatcher
 import pe.moneyflow.core.data.repository.AccountRepositoryImpl
 import pe.moneyflow.core.data.repository.BudgetRepositoryImpl
 import pe.moneyflow.core.data.repository.CategoryRepositoryImpl
+import pe.moneyflow.core.data.repository.ExchangeRateRepositoryImpl
 import pe.moneyflow.core.data.repository.PaymentMethodRepositoryImpl
 import pe.moneyflow.core.data.repository.RecurringExpenseRepositoryImpl
+import pe.moneyflow.core.data.repository.SavingsGoalRepositoryImpl
 import pe.moneyflow.core.data.repository.TransactionRepositoryImpl
 import pe.moneyflow.core.domain.repository.AccountRepository
 import pe.moneyflow.core.domain.repository.BudgetRepository
 import pe.moneyflow.core.domain.repository.CategoryRepository
+import pe.moneyflow.core.domain.repository.ExchangeRateRepository
 import pe.moneyflow.core.domain.repository.PaymentMethodRepository
 import pe.moneyflow.core.domain.repository.RecurringExpenseRepository
+import pe.moneyflow.core.domain.repository.SavingsGoalRepository
 import pe.moneyflow.core.domain.repository.TransactionRepository
 import java.time.Clock
 import javax.inject.Singleton
@@ -53,6 +57,14 @@ abstract class RepositoryModule {
     abstract fun bindRecurringExpenseRepository(
         impl: RecurringExpenseRepositoryImpl,
     ): RecurringExpenseRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSavingsGoalRepository(impl: SavingsGoalRepositoryImpl): SavingsGoalRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindExchangeRateRepository(impl: ExchangeRateRepositoryImpl): ExchangeRateRepository
 }
 
 @Module

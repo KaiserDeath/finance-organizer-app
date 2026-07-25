@@ -112,5 +112,20 @@ internal object SeedData {
                 ),
             )
         }
+
+        // Approximate starting exchange rates against PEN. Users can edit or add their own.
+        // 1 unit of `base` = `rate` units of `quote`.
+        val todayEpochDay = java.time.LocalDate.now().toEpochDay()
+        exchangeRates.forEach { (base, quote, rate) ->
+            db.execSQL(
+                "INSERT INTO exchange_rates (id, base, quote, rate, asOf) VALUES (?, ?, ?, ?, ?)",
+                arrayOf(UUID.randomUUID().toString(), base, quote, rate, todayEpochDay),
+            )
+        }
     }
+
+    private val exchangeRates = listOf(
+        Triple("USD", "PEN", 3.75),
+        Triple("EUR", "PEN", 4.05),
+    )
 }

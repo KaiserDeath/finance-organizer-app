@@ -11,20 +11,26 @@ import pe.moneyflow.core.data.mapper.toEntity
 import pe.moneyflow.core.database.dao.AccountDao
 import pe.moneyflow.core.database.dao.BudgetDao
 import pe.moneyflow.core.database.dao.CategoryDao
+import pe.moneyflow.core.database.dao.ExchangeRateDao
 import pe.moneyflow.core.database.dao.PaymentMethodDao
 import pe.moneyflow.core.database.dao.RecurringExpenseDao
+import pe.moneyflow.core.database.dao.SavingsGoalDao
 import pe.moneyflow.core.database.dao.TransactionDao
 import pe.moneyflow.core.domain.repository.AccountRepository
 import pe.moneyflow.core.domain.repository.BudgetRepository
 import pe.moneyflow.core.domain.repository.CategoryRepository
+import pe.moneyflow.core.domain.repository.ExchangeRateRepository
 import pe.moneyflow.core.domain.repository.PaymentMethodRepository
 import pe.moneyflow.core.domain.repository.RecurringExpenseRepository
+import pe.moneyflow.core.domain.repository.SavingsGoalRepository
 import pe.moneyflow.core.domain.repository.TransactionRepository
 import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.Budget
 import pe.moneyflow.core.model.Category
+import pe.moneyflow.core.model.ExchangeRate
 import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.RecurringExpense
+import pe.moneyflow.core.model.SavingsGoal
 import pe.moneyflow.core.model.Transaction
 import java.time.LocalDate
 import javax.inject.Inject
@@ -135,6 +141,39 @@ class BudgetRepositoryImpl @Inject constructor(
 
     override suspend fun upsert(budget: Budget) =
         withContext(ioDispatcher) { dao.upsert(budget.toEntity()) }
+
+    override suspend fun delete(id: String) =
+        withContext(ioDispatcher) { dao.deleteById(id) }
+}
+
+class SavingsGoalRepositoryImpl @Inject constructor(
+    private val dao: SavingsGoalDao,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+) : SavingsGoalRepository {
+
+    override fun observeAll(): Flow<List<SavingsGoal>> =
+        dao.observeAll().map { list -> list.map { it.toDomain() } }.flowOn(ioDispatcher)
+
+    override suspend fun getById(id: String): SavingsGoal? =
+        withContext(ioDispatcher) { dao.getById(id)?.toDomain() }
+
+    override suspend fun upsert(goal: SavingsGoal) =
+        withContext(ioDispatcher) { dao.upsert(goal.toEntity()) }
+
+    override suspend fun delete(id: String) =
+        withContext(ioDispatcher) { dao.deleteById(id) }
+}
+
+class ExchangeRateRepositoryImpl @Inject constructor(
+    private val dao: ExchangeRateDao,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+) : ExchangeRateRepository {
+
+    override fun observeAll(): Flow<List<ExchangeRate>> =
+        dao.observeAll().map { list -> list.map { it.toDomain() } }.flowOn(ioDispatcher)
+
+    override suspend fun upsert(rate: ExchangeRate) =
+        withContext(ioDispatcher) { dao.upsert(rate.toEntity()) }
 
     override suspend fun delete(id: String) =
         withContext(ioDispatcher) { dao.deleteById(id) }

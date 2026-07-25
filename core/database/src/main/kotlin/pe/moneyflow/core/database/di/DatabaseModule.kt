@@ -14,8 +14,10 @@ import pe.moneyflow.core.database.SeedData
 import pe.moneyflow.core.database.dao.AccountDao
 import pe.moneyflow.core.database.dao.BudgetDao
 import pe.moneyflow.core.database.dao.CategoryDao
+import pe.moneyflow.core.database.dao.ExchangeRateDao
 import pe.moneyflow.core.database.dao.PaymentMethodDao
 import pe.moneyflow.core.database.dao.RecurringExpenseDao
+import pe.moneyflow.core.database.dao.SavingsGoalDao
 import pe.moneyflow.core.database.dao.TransactionDao
 import javax.inject.Singleton
 
@@ -60,4 +62,10 @@ object DatabaseModule {
     @Provides
     fun provideRecurringExpenseDao(db: MoneyFlowDatabase): RecurringExpenseDao =
         db.recurringExpenseDao()
+
+    @Provides
+    fun provideSavingsGoalDao(db: MoneyFlowDatabase): SavingsGoalDao = db.savingsGoalDao()
+
+    @Provides
+    fun provideExchangeRateDao(db: MoneyFlowDatabase): ExchangeRateDao = db.exchangeRateDao()
 }

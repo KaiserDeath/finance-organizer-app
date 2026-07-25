@@ -3,8 +3,10 @@ package pe.moneyflow.core.data.mapper
 import pe.moneyflow.core.database.entity.AccountEntity
 import pe.moneyflow.core.database.entity.BudgetEntity
 import pe.moneyflow.core.database.entity.CategoryEntity
+import pe.moneyflow.core.database.entity.ExchangeRateEntity
 import pe.moneyflow.core.database.entity.PaymentMethodEntity
 import pe.moneyflow.core.database.entity.RecurringExpenseEntity
+import pe.moneyflow.core.database.entity.SavingsGoalEntity
 import pe.moneyflow.core.database.entity.TransactionEntity
 import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.AccountType
@@ -12,11 +14,13 @@ import pe.moneyflow.core.model.Budget
 import pe.moneyflow.core.model.BudgetPeriod
 import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.CategoryType
+import pe.moneyflow.core.model.ExchangeRate
 import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.PaymentMethodType
 import pe.moneyflow.core.model.Priority
 import pe.moneyflow.core.model.RecurrenceFrequency
 import pe.moneyflow.core.model.RecurringExpense
+import pe.moneyflow.core.model.SavingsGoal
 import pe.moneyflow.core.model.Transaction
 import pe.moneyflow.core.model.TransactionStatus
 import pe.moneyflow.core.model.TransactionType
@@ -36,6 +40,7 @@ fun TransactionEntity.toDomain(): Transaction = Transaction(
     categoryId = categoryId,
     paymentMethodId = paymentMethodId,
     accountId = accountId,
+    transferAccountId = transferAccountId,
     type = enumOr(type, TransactionType.EXPENSE),
     status = enumOr(status, TransactionStatus.PAID),
     priority = enumOr(priority, Priority.NORMAL),
@@ -59,6 +64,7 @@ fun Transaction.toEntity(): TransactionEntity = TransactionEntity(
     categoryId = categoryId,
     paymentMethodId = paymentMethodId,
     accountId = accountId,
+    transferAccountId = transferAccountId,
     type = type.name,
     status = status.name,
     priority = priority.name,
@@ -213,4 +219,46 @@ fun RecurringExpense.toEntity(): RecurringExpenseEntity = RecurringExpenseEntity
     endDate = endDate,
     autoCreate = autoCreate,
     lastGeneratedDate = lastGeneratedDate,
+)
+
+// --- SavingsGoal ---
+
+fun SavingsGoalEntity.toDomain(): SavingsGoal = SavingsGoal(
+    id = id,
+    name = name,
+    targetAmountMinor = targetAmountMinor,
+    currentAmountMinor = currentAmountMinor,
+    targetDate = targetDate,
+    accountId = accountId,
+    colorHex = colorHex,
+    iconKey = iconKey,
+)
+
+fun SavingsGoal.toEntity(): SavingsGoalEntity = SavingsGoalEntity(
+    id = id,
+    name = name,
+    targetAmountMinor = targetAmountMinor,
+    currentAmountMinor = currentAmountMinor,
+    targetDate = targetDate,
+    accountId = accountId,
+    colorHex = colorHex,
+    iconKey = iconKey,
+)
+
+// --- ExchangeRate ---
+
+fun ExchangeRateEntity.toDomain(): ExchangeRate = ExchangeRate(
+    id = id,
+    base = base,
+    quote = quote,
+    rate = rate,
+    asOf = asOf,
+)
+
+fun ExchangeRate.toEntity(): ExchangeRateEntity = ExchangeRateEntity(
+    id = id,
+    base = base,
+    quote = quote,
+    rate = rate,
+    asOf = asOf,
 )

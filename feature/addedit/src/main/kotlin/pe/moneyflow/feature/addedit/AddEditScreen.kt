@@ -183,6 +183,20 @@ fun AddEditScreen(
                 }
             }
 
+            // Account (drives account balances & net worth)
+            if (uiState.accounts.isNotEmpty()) {
+                FieldLabel("Cuenta")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    uiState.accounts.forEach { account ->
+                        FilterChip(
+                            selected = uiState.accountId == account.id,
+                            onClick = { viewModel.onAccountSelect(account.id) },
+                            label = { Text(account.name) },
+                        )
+                    }
+                }
+            }
+
             // Priority
             FieldLabel("Prioridad")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
