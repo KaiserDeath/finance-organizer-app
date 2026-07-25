@@ -12,8 +12,10 @@ import dagger.hilt.components.SingletonComponent
 import pe.moneyflow.core.database.MoneyFlowDatabase
 import pe.moneyflow.core.database.SeedData
 import pe.moneyflow.core.database.dao.AccountDao
+import pe.moneyflow.core.database.dao.BudgetDao
 import pe.moneyflow.core.database.dao.CategoryDao
 import pe.moneyflow.core.database.dao.PaymentMethodDao
+import pe.moneyflow.core.database.dao.RecurringExpenseDao
 import pe.moneyflow.core.database.dao.TransactionDao
 import javax.inject.Singleton
 
@@ -36,6 +38,8 @@ object DatabaseModule {
                 SeedData.seed(db)
             }
         })
+        // Pre-release schema is still evolving; drop and reseed rather than ship migrations yet.
+        .fallbackToDestructiveMigration()
         .build()
 
     @Provides
@@ -49,4 +53,11 @@ object DatabaseModule {
 
     @Provides
     fun provideAccountDao(db: MoneyFlowDatabase): AccountDao = db.accountDao()
+
+    @Provides
+    fun provideBudgetDao(db: MoneyFlowDatabase): BudgetDao = db.budgetDao()
+
+    @Provides
+    fun provideRecurringExpenseDao(db: MoneyFlowDatabase): RecurringExpenseDao =
+        db.recurringExpenseDao()
 }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.AlertDialog
@@ -34,6 +35,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,8 +66,10 @@ private val IconChoices = listOf(
     "payments", "gift", "savings", "category",
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoriesScreen(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CategoriesViewModel = hiltViewModel(),
 ) {
@@ -76,6 +80,16 @@ fun CategoriesScreen(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            TopAppBar(
+                title = { Text("Categorías") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
                 Icon(Icons.Rounded.Add, contentDescription = "Nueva categoría")
@@ -92,15 +106,6 @@ fun CategoriesScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
-            item {
-                Text(
-                    text = "Categorías",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(vertical = Spacing.sm),
-                )
-            }
-
             if (uiState.expense.isNotEmpty()) {
                 item { SectionHeader(title = "Gastos", modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.sm)) }
                 items(uiState.expense, key = { it.id }) { category ->

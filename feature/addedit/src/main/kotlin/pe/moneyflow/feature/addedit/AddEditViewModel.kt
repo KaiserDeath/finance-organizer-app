@@ -19,6 +19,7 @@ import pe.moneyflow.core.domain.usecase.SaveTransactionUseCase
 import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.CategoryType
 import pe.moneyflow.core.model.PaymentMethod
+import pe.moneyflow.core.model.Priority
 import pe.moneyflow.core.model.Transaction
 import pe.moneyflow.core.model.TransactionStatus
 import pe.moneyflow.core.model.TransactionType
@@ -32,6 +33,8 @@ data class AddEditUiState(
     val title: String = "",
     val amountText: String = "",
     val type: TransactionType = TransactionType.EXPENSE,
+    val status: TransactionStatus = TransactionStatus.PAID,
+    val priority: Priority = Priority.NORMAL,
     val categoryId: String? = null,
     val paymentMethodId: String? = null,
     val date: LocalDate = LocalDate.now(),
@@ -40,6 +43,8 @@ data class AddEditUiState(
     val paymentMethods: List<PaymentMethod> = emptyList(),
     val saved: Boolean = false,
 ) {
+    /** When the transaction is still pending, [date] is its due date rather than a paid date. */
+    val isPending: Boolean get() = status == TransactionStatus.PENDING
     val categories: List<Category>
         get() = allCategories.filter {
             it.type == if (type == TransactionType.INCOME) CategoryType.INCOME else CategoryType.EXPENSE
@@ -98,6 +103,8 @@ class AddEditViewModel @Inject constructor(
                 title = tx.title,
                 amountText = Money.formatPlain(tx.amountMinor),
                 type = tx.type,
+                status = tx.status,
+                priority = tx.priority,
                 categoryId = tx.categoryId,
                 paymentMethodId = tx.paymentMethodId ?: it.paymentMethodId,
                 date = tx.actualDate ?: tx.estimatedDate ?: LocalDate.now(),
@@ -121,6 +128,10 @@ class AddEditViewModel @Inject constructor(
 
     fun onPaymentMethodSelect(id: String) = _uiState.update { it.copy(paymentMethodId = id) }
 
+    fun onStatusChange(status: TransactionStatus) = _uiState.update { it.copy(status = status) }
+
+    fun onPriorityChange(priority: Priority) = _uiState.update { it.copy(priority = priority) }
+
     fun onDateChange(date: LocalDate) = _uiState.update { it.copy(date = date) }
 
     fun onNotesChange(value: String) = _uiState.update { it.copy(notes = value) }
@@ -130,6 +141,9 @@ class AddEditViewModel @Inject constructor(
         val amount = Money.parseToMinor(state.amountText) ?: return
         if (!state.canSave) return
 
+        // A pending payment stores its date as the estimate (due date) with no actual date yet;
+        // a paid one records the actual date.
+        val isPending = state.status == TransactionStatus.PENDING
         val transaction = Transaction(
             id = editingId ?: UUID.randomUUID().toString(),
             title = state.title.trim(),
@@ -137,8 +151,9 @@ class AddEditViewModel @Inject constructor(
             categoryId = state.categoryId,
             paymentMethodId = state.paymentMethodId,
             type = state.type,
-            status = TransactionStatus.PAID,
-            actualDate = state.date,
+            status = state.status,
+            priority = state.priority,
+            actualDate = if (isPending) null else state.date,
             estimatedDate = state.date,
             notes = state.notes.trim().ifBlank { null },
             createdAt = createdAt,

@@ -51,6 +51,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.Spacing
+import pe.moneyflow.core.model.Priority
+import pe.moneyflow.core.model.TransactionStatus
 import pe.moneyflow.core.model.TransactionType
 import pe.moneyflow.core.ui.util.toFullLabel
 import java.time.Instant
@@ -113,6 +115,21 @@ fun AddEditScreen(
                 }
             }
 
+            // Status: paid now vs pending (an upcoming payment)
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                val statuses = listOf(
+                    TransactionStatus.PAID to "Pagado",
+                    TransactionStatus.PENDING to "Pendiente",
+                )
+                statuses.forEachIndexed { index, (value, label) ->
+                    SegmentedButton(
+                        selected = uiState.status == value,
+                        onClick = { viewModel.onStatusChange(value) },
+                        shape = SegmentedButtonDefaults.itemShape(index, statuses.size),
+                    ) { Text(label) }
+                }
+            }
+
             // Amount
             OutlinedTextField(
                 value = uiState.amountText,
@@ -166,8 +183,25 @@ fun AddEditScreen(
                 }
             }
 
+            // Priority
+            FieldLabel("Prioridad")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                val priorities = listOf(
+                    Priority.LOW to "Baja",
+                    Priority.NORMAL to "Normal",
+                    Priority.HIGH to "Alta",
+                )
+                priorities.forEach { (value, label) ->
+                    FilterChip(
+                        selected = uiState.priority == value,
+                        onClick = { viewModel.onPriorityChange(value) },
+                        label = { Text(label) },
+                    )
+                }
+            }
+
             // Date
-            FieldLabel("Fecha")
+            FieldLabel(if (uiState.isPending) "Fecha de vencimiento" else "Fecha")
             OutlinedButton(
                 onClick = { showDatePicker = true },
                 modifier = Modifier.fillMaxWidth().height(52.dp),

@@ -10,12 +10,16 @@ import kotlinx.coroutines.Dispatchers
 import pe.moneyflow.core.common.DefaultDispatcher
 import pe.moneyflow.core.common.IoDispatcher
 import pe.moneyflow.core.data.repository.AccountRepositoryImpl
+import pe.moneyflow.core.data.repository.BudgetRepositoryImpl
 import pe.moneyflow.core.data.repository.CategoryRepositoryImpl
 import pe.moneyflow.core.data.repository.PaymentMethodRepositoryImpl
+import pe.moneyflow.core.data.repository.RecurringExpenseRepositoryImpl
 import pe.moneyflow.core.data.repository.TransactionRepositoryImpl
 import pe.moneyflow.core.domain.repository.AccountRepository
+import pe.moneyflow.core.domain.repository.BudgetRepository
 import pe.moneyflow.core.domain.repository.CategoryRepository
 import pe.moneyflow.core.domain.repository.PaymentMethodRepository
+import pe.moneyflow.core.domain.repository.RecurringExpenseRepository
 import pe.moneyflow.core.domain.repository.TransactionRepository
 import java.time.Clock
 import javax.inject.Singleton
@@ -39,6 +43,16 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAccountRepository(impl: AccountRepositoryImpl): AccountRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindBudgetRepository(impl: BudgetRepositoryImpl): BudgetRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRecurringExpenseRepository(
+        impl: RecurringExpenseRepositoryImpl,
+    ): RecurringExpenseRepository
 }
 
 @Module

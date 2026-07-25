@@ -29,35 +29,35 @@ gradlePlugin {
     plugins {
         register("androidApplication") {
             id = "moneyflow.android.application"
-            implementationClass = "AndroidApplicationConventionPlugin"
+            implementationClass = "pe.moneyflow.buildlogic.AndroidApplicationConventionPlugin"
         }
         register("androidApplicationCompose") {
             id = "moneyflow.android.application.compose"
-            implementationClass = "AndroidApplicationComposeConventionPlugin"
+            implementationClass = "pe.moneyflow.buildlogic.AndroidApplicationComposeConventionPlugin"
         }
         register("androidLibrary") {
             id = "moneyflow.android.library"
-            implementationClass = "AndroidLibraryConventionPlugin"
+            implementationClass = "pe.moneyflow.buildlogic.AndroidLibraryConventionPlugin"
         }
         register("androidLibraryCompose") {
             id = "moneyflow.android.library.compose"
-            implementationClass = "AndroidLibraryComposeConventionPlugin"
+            implementationClass = "pe.moneyflow.buildlogic.AndroidLibraryComposeConventionPlugin"
         }
         register("androidFeature") {
             id = "moneyflow.android.feature"
-            implementationClass = "AndroidFeatureConventionPlugin"
+            implementationClass = "pe.moneyflow.buildlogic.AndroidFeatureConventionPlugin"
         }
         register("androidHilt") {
             id = "moneyflow.android.hilt"
-            implementationClass = "AndroidHiltConventionPlugin"
+            implementationClass = "pe.moneyflow.buildlogic.AndroidHiltConventionPlugin"
         }
         register("androidRoom") {
             id = "moneyflow.android.room"
-            implementationClass = "AndroidRoomConventionPlugin"
+            implementationClass = "pe.moneyflow.buildlogic.AndroidRoomConventionPlugin"
         }
         register("jvmLibrary") {
             id = "moneyflow.jvm.library"
-            implementationClass = "JvmLibraryConventionPlugin"
+            implementationClass = "pe.moneyflow.buildlogic.JvmLibraryConventionPlugin"
         }
     }
 }

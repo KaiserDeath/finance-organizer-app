@@ -7,8 +7,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object CategoriesRoute
 
-fun NavGraphBuilder.categoriesScreen() {
+fun NavGraphBuilder.categoriesScreen(onBack: () -> Unit) {
     composable<CategoriesRoute> {
-        CategoriesScreen()
+        CategoriesScreen(onBack = onBack)
     }
 }

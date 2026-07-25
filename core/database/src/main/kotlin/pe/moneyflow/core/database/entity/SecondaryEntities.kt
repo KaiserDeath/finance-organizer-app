@@ -76,6 +76,7 @@ data class RecurringExpenseEntity(
     val categoryId: String?,
     val paymentMethodId: String?,
     val accountId: String?,
+    val type: String,
     val frequency: String,
     val interval: Int,
     val nextRunDate: LocalDate,

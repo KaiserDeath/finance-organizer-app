@@ -9,16 +9,22 @@ import pe.moneyflow.core.common.IoDispatcher
 import pe.moneyflow.core.data.mapper.toDomain
 import pe.moneyflow.core.data.mapper.toEntity
 import pe.moneyflow.core.database.dao.AccountDao
+import pe.moneyflow.core.database.dao.BudgetDao
 import pe.moneyflow.core.database.dao.CategoryDao
 import pe.moneyflow.core.database.dao.PaymentMethodDao
+import pe.moneyflow.core.database.dao.RecurringExpenseDao
 import pe.moneyflow.core.database.dao.TransactionDao
 import pe.moneyflow.core.domain.repository.AccountRepository
+import pe.moneyflow.core.domain.repository.BudgetRepository
 import pe.moneyflow.core.domain.repository.CategoryRepository
 import pe.moneyflow.core.domain.repository.PaymentMethodRepository
+import pe.moneyflow.core.domain.repository.RecurringExpenseRepository
 import pe.moneyflow.core.domain.repository.TransactionRepository
 import pe.moneyflow.core.model.Account
+import pe.moneyflow.core.model.Budget
 import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.PaymentMethod
+import pe.moneyflow.core.model.RecurringExpense
 import pe.moneyflow.core.model.Transaction
 import java.time.LocalDate
 import javax.inject.Inject
@@ -80,6 +86,27 @@ class PaymentMethodRepositoryImpl @Inject constructor(
         withContext(ioDispatcher) { dao.deleteById(id) }
 }
 
+class RecurringExpenseRepositoryImpl @Inject constructor(
+    private val dao: RecurringExpenseDao,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+) : RecurringExpenseRepository {
+
+    override fun observeAll(): Flow<List<RecurringExpense>> =
+        dao.observeAll().map { list -> list.map { it.toDomain() } }.flowOn(ioDispatcher)
+
+    override suspend fun getDue(date: LocalDate): List<RecurringExpense> =
+        withContext(ioDispatcher) { dao.getDue(date).map { it.toDomain() } }
+
+    override suspend fun getById(id: String): RecurringExpense? =
+        withContext(ioDispatcher) { dao.getById(id)?.toDomain() }
+
+    override suspend fun upsert(recurring: RecurringExpense) =
+        withContext(ioDispatcher) { dao.upsert(recurring.toEntity()) }
+
+    override suspend fun delete(id: String) =
+        withContext(ioDispatcher) { dao.deleteById(id) }
+}
+
 class AccountRepositoryImpl @Inject constructor(
     private val dao: AccountDao,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -93,4 +120,22 @@ class AccountRepositoryImpl @Inject constructor(
 
     override suspend fun upsert(account: Account) =
         withContext(ioDispatcher) { dao.upsert(account.toEntity()) }
+}
+
+class BudgetRepositoryImpl @Inject constructor(
+    private val dao: BudgetDao,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+) : BudgetRepository {
+
+    override fun observeAll(): Flow<List<Budget>> =
+        dao.observeAll().map { list -> list.map { it.toDomain() } }.flowOn(ioDispatcher)
+
+    override suspend fun getById(id: String): Budget? =
+        withContext(ioDispatcher) { dao.getById(id)?.toDomain() }
+
+    override suspend fun upsert(budget: Budget) =
+        withContext(ioDispatcher) { dao.upsert(budget.toEntity()) }
+
+    override suspend fun delete(id: String) =
+        withContext(ioDispatcher) { dao.deleteById(id) }
 }

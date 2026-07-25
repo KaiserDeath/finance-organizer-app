@@ -3,10 +3,11 @@ package pe.moneyflow.app
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Category
-import androidx.compose.material.icons.rounded.CreditCard
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -24,18 +25,31 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.serialization.Serializable
 import pe.moneyflow.feature.addedit.addEditScreen
 import pe.moneyflow.feature.addedit.navigateToAddEdit
+import pe.moneyflow.feature.analytics.AnalyticsRoute
+import pe.moneyflow.feature.analytics.analyticsScreen
+import pe.moneyflow.feature.budgets.BudgetsRoute
+import pe.moneyflow.feature.budgets.budgetsScreen
 import pe.moneyflow.feature.categories.CategoriesRoute
 import pe.moneyflow.feature.categories.categoriesScreen
 import pe.moneyflow.feature.dashboard.DashboardRoute
 import pe.moneyflow.feature.dashboard.dashboardScreen
 import pe.moneyflow.feature.paymentmethods.PaymentMethodsRoute
 import pe.moneyflow.feature.paymentmethods.paymentMethodsScreen
+import pe.moneyflow.feature.recurring.RecurringRoute
+import pe.moneyflow.feature.recurring.recurringScreen
 import pe.moneyflow.feature.transactions.TransactionsRoute
 import pe.moneyflow.feature.transactions.transactionsScreen
+import pe.moneyflow.feature.upcoming.UpcomingRoute
+import pe.moneyflow.feature.upcoming.upcomingScreen
+
+@Serializable
+data object MoreRoute
 
 private enum class TopLevelDestination(
     val route: Any,
@@ -44,8 +58,9 @@ private enum class TopLevelDestination(
 ) {
     DASHBOARD(DashboardRoute, "Inicio", Icons.Rounded.Home),
     TRANSACTIONS(TransactionsRoute, "Movimientos", Icons.Rounded.ReceiptLong),
-    CATEGORIES(CategoriesRoute, "Categorías", Icons.Rounded.Category),
-    PAYMENTS(PaymentMethodsRoute, "Métodos", Icons.Rounded.CreditCard),
+    BUDGETS(BudgetsRoute, "Presupuestos", Icons.Rounded.Savings),
+    UPCOMING(UpcomingRoute, "Próximos", Icons.Rounded.CalendarMonth),
+    MORE(MoreRoute, "Más", Icons.Rounded.Menu),
 }
 
 @Composable
@@ -91,8 +106,22 @@ fun MoneyFlowApp() {
             transactionsScreen(
                 onTransactionClick = { id -> navController.navigateToAddEdit(id) },
             )
-            categoriesScreen()
-            paymentMethodsScreen()
+            budgetsScreen()
+            upcomingScreen(
+                onPaymentClick = { id -> navController.navigateToAddEdit(id) },
+            )
+            composable<MoreRoute> {
+                MoreScreen(
+                    onOpenCategories = { navController.navigate(CategoriesRoute) },
+                    onOpenPaymentMethods = { navController.navigate(PaymentMethodsRoute) },
+                    onOpenRecurring = { navController.navigate(RecurringRoute) },
+                    onOpenAnalytics = { navController.navigate(AnalyticsRoute) },
+                )
+            }
+            categoriesScreen(onBack = { navController.popBackStack() })
+            paymentMethodsScreen(onBack = { navController.popBackStack() })
+            recurringScreen(onBack = { navController.popBackStack() })
+            analyticsScreen(onBack = { navController.popBackStack() })
             addEditScreen(onDone = { navController.popBackStack() })
         }
     }

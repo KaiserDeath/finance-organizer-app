@@ -4,8 +4,10 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import pe.moneyflow.core.database.dao.AccountDao
+import pe.moneyflow.core.database.dao.BudgetDao
 import pe.moneyflow.core.database.dao.CategoryDao
 import pe.moneyflow.core.database.dao.PaymentMethodDao
+import pe.moneyflow.core.database.dao.RecurringExpenseDao
 import pe.moneyflow.core.database.dao.TransactionDao
 import pe.moneyflow.core.database.entity.AccountEntity
 import pe.moneyflow.core.database.entity.AttachmentEntity
@@ -39,7 +41,7 @@ import pe.moneyflow.core.database.entity.TransactionTagCrossRef
         ExchangeRateEntity::class,
         AttachmentEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -48,6 +50,8 @@ abstract class MoneyFlowDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun paymentMethodDao(): PaymentMethodDao
     abstract fun accountDao(): AccountDao
+    abstract fun budgetDao(): BudgetDao
+    abstract fun recurringExpenseDao(): RecurringExpenseDao
 
     companion object {
         const val NAME = "moneyflow.db"

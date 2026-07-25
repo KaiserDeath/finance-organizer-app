@@ -7,8 +7,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object PaymentMethodsRoute
 
-fun NavGraphBuilder.paymentMethodsScreen() {
+fun NavGraphBuilder.paymentMethodsScreen(onBack: () -> Unit) {
     composable<PaymentMethodsRoute> {
-        PaymentMethodsScreen()
+        PaymentMethodsScreen(onBack = onBack)
     }
 }

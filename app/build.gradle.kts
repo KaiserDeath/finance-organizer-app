@@ -2,6 +2,7 @@ plugins {
     id("moneyflow.android.application")
     id("moneyflow.android.application.compose")
     id("moneyflow.android.hilt")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -42,6 +43,10 @@ dependencies {
     implementation(project(":feature:addedit"))
     implementation(project(":feature:categories"))
     implementation(project(":feature:paymentmethods"))
+    implementation(project(":feature:budgets"))
+    implementation(project(":feature:upcoming"))
+    implementation(project(":feature:recurring"))
+    implementation(project(":feature:analytics"))
 
     // Android / Compose
     implementation(libs.androidx.core.ktx)
@@ -52,6 +57,11 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.kotlinx.serialization.json)
+
+    // WorkManager + Hilt worker injection (Phase 2b: recurring generation & reminders)
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
