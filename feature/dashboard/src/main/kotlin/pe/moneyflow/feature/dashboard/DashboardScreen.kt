@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
@@ -185,11 +186,36 @@ private fun HeroBalanceCard(data: DashboardData) {
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
         )
+        // Keep the number neutral for legibility on the tinted card; signal a deficit with a
+        // small chip instead of an alarming all-red figure.
         Text(
             text = Money.format(balanceMinor, data.currencyCode),
             style = MaterialTheme.typography.displayMedium,
-            color = if (balanceMinor < 0) NegativeRed else MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onSurface,
         )
+        if (balanceMinor < 0) {
+            Spacer(Modifier.height(Spacing.sm))
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(NegativeRed.copy(alpha = 0.14f))
+                    .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Warning,
+                    contentDescription = null,
+                    tint = NegativeRed,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.size(Spacing.xs))
+                Text(
+                    text = "Gastaste más de lo que ingresaste",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = NegativeRed,
+                )
+            }
+        }
         Spacer(Modifier.height(Spacing.md))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xl)) {
             HeroStat(
