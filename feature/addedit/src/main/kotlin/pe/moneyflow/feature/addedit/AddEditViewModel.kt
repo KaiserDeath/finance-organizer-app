@@ -141,8 +141,8 @@ class AddEditViewModel @Inject constructor(
 
     fun onStatusChange(status: TransactionStatus) = _uiState.update { it.copy(status = status) }
 
-    fun onPriorityChange(priority: Priority) = _uiState.update { it.copy(priority = priority) }
-
+    // Priority is intentionally not user-editable in the logging flow — it stays at its default
+    // (or its loaded value when editing) and is preserved through save.
     fun onDateChange(date: LocalDate) = _uiState.update { it.copy(date = date) }
 
     fun onNotesChange(value: String) = _uiState.update { it.copy(notes = value) }
