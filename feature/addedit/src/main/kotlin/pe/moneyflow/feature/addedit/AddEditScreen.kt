@@ -1,5 +1,7 @@
 package pe.moneyflow.feature.addedit
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -31,6 +34,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -42,16 +47,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.Spacing
-import pe.moneyflow.core.model.Priority
 import pe.moneyflow.core.model.TransactionStatus
 import pe.moneyflow.core.model.TransactionType
 import pe.moneyflow.core.ui.util.toFullLabel
@@ -67,15 +79,43 @@ fun AddEditScreen(
     viewModel: AddEditViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptics = LocalHapticFeedback.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
+    // On save: a tactile confirmation + a brief "guardado" cue, then return.
     LaunchedEffect(uiState.saved) {
-        if (uiState.saved) onDone()
+        if (uiState.saved) {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            launch { snackbarHostState.showSnackbar("Movimiento guardado") }
+            delay(500)
+            onDone()
+        }
     }
 
     var showDatePicker by remember { mutableStateOf(false) }
+    var showDetails by remember { mutableStateOf(false) }
+    val amountFocus = remember { FocusRequester() }
+
+    // Auto-focus the amount field on a fresh entry so logging starts on the numeric keypad.
+    val isEditing by rememberUpdatedState(uiState.isEditing)
+    LaunchedEffect(Unit) {
+        if (!isEditing) runCatching { amountFocus.requestFocus() }
+    }
+
+    // When editing something that used the advanced fields, reveal them so nothing is hidden.
+    LaunchedEffect(uiState.isEditing, uiState.status, uiState.notes, uiState.date) {
+        if (uiState.isEditing &&
+            (uiState.status == TransactionStatus.PENDING ||
+                uiState.notes.isNotBlank() ||
+                uiState.date != LocalDate.now())
+        ) {
+            showDetails = true
+        }
+    }
 
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(if (uiState.isEditing) "Editar movimiento" else "Nuevo movimiento") },
@@ -115,22 +155,7 @@ fun AddEditScreen(
                 }
             }
 
-            // Status: paid now vs pending (an upcoming payment)
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                val statuses = listOf(
-                    TransactionStatus.PAID to "Pagado",
-                    TransactionStatus.PENDING to "Pendiente",
-                )
-                statuses.forEachIndexed { index, (value, label) ->
-                    SegmentedButton(
-                        selected = uiState.status == value,
-                        onClick = { viewModel.onStatusChange(value) },
-                        shape = SegmentedButtonDefaults.itemShape(index, statuses.size),
-                    ) { Text(label) }
-                }
-            }
-
-            // Amount
+            // Amount — the first thing to fill, so it holds focus on open.
             OutlinedTextField(
                 value = uiState.amountText,
                 onValueChange = viewModel::onAmountChange,
@@ -139,7 +164,9 @@ fun AddEditScreen(
                 singleLine = true,
                 textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(amountFocus),
             )
 
             // Title
@@ -183,56 +210,78 @@ fun AddEditScreen(
                 }
             }
 
-            // Account (drives account balances & net worth)
-            if (uiState.accounts.isNotEmpty()) {
-                FieldLabel("Cuenta")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    uiState.accounts.forEach { account ->
-                        FilterChip(
-                            selected = uiState.accountId == account.id,
-                            onClick = { viewModel.onAccountSelect(account.id) },
-                            label = { Text(account.name) },
-                        )
-                    }
-                }
+            // Everything below is optional for a quick expense — tuck it behind a disclosure so the
+            // common path (amount → description → category → method) stays short.
+            val chevronRotation by animateFloatAsState(
+                targetValue = if (showDetails) 180f else 0f,
+                label = "details-chevron",
+            )
+            TextButton(
+                onClick = { showDetails = !showDetails },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (showDetails) "Menos detalles" else "Más detalles")
+                Spacer(Modifier.width(Spacing.xs))
+                Icon(
+                    Icons.Rounded.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier.rotate(chevronRotation),
+                )
             }
 
-            // Priority
-            FieldLabel("Prioridad")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                val priorities = listOf(
-                    Priority.LOW to "Baja",
-                    Priority.NORMAL to "Normal",
-                    Priority.HIGH to "Alta",
-                )
-                priorities.forEach { (value, label) ->
-                    FilterChip(
-                        selected = uiState.priority == value,
-                        onClick = { viewModel.onPriorityChange(value) },
-                        label = { Text(label) },
+            AnimatedVisibility(visible = showDetails) {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+                    // Status: paid now vs pending (an upcoming payment)
+                    FieldLabel("Estado")
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        val statuses = listOf(
+                            TransactionStatus.PAID to "Pagado",
+                            TransactionStatus.PENDING to "Pendiente",
+                        )
+                        statuses.forEachIndexed { index, (value, label) ->
+                            SegmentedButton(
+                                selected = uiState.status == value,
+                                onClick = { viewModel.onStatusChange(value) },
+                                shape = SegmentedButtonDefaults.itemShape(index, statuses.size),
+                            ) { Text(label) }
+                        }
+                    }
+
+                    // Account (drives account balances & net worth)
+                    if (uiState.accounts.isNotEmpty()) {
+                        FieldLabel("Cuenta")
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            uiState.accounts.forEach { account ->
+                                FilterChip(
+                                    selected = uiState.accountId == account.id,
+                                    onClick = { viewModel.onAccountSelect(account.id) },
+                                    label = { Text(account.name) },
+                                )
+                            }
+                        }
+                    }
+
+                    // Date
+                    FieldLabel(if (uiState.isPending) "Fecha de vencimiento" else "Fecha")
+                    OutlinedButton(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    ) {
+                        Icon(Icons.Rounded.CalendarToday, contentDescription = null)
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(uiState.date.toFullLabel())
+                    }
+
+                    // Notes
+                    OutlinedTextField(
+                        value = uiState.notes,
+                        onValueChange = viewModel::onNotesChange,
+                        label = { Text("Notas (opcional)") },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
-
-            // Date
-            FieldLabel(if (uiState.isPending) "Fecha de vencimiento" else "Fecha")
-            OutlinedButton(
-                onClick = { showDatePicker = true },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) {
-                Icon(Icons.Rounded.CalendarToday, contentDescription = null)
-                Spacer(Modifier.width(Spacing.sm))
-                Text(uiState.date.toFullLabel())
-            }
-
-            // Notes
-            OutlinedTextField(
-                value = uiState.notes,
-                onValueChange = viewModel::onNotesChange,
-                label = { Text("Notas (opcional)") },
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth(),
-            )
 
             Button(
                 onClick = viewModel::save,

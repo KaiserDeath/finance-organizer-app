@@ -43,6 +43,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -271,9 +273,11 @@ private fun SwipeableTransaction(
     onClick: () -> Unit,
     onDelete: (Transaction) -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 onDelete(transaction)
                 true
             } else {

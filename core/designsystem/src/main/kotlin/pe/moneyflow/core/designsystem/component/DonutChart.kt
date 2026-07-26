@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -31,10 +33,16 @@ fun DonutChart(
     strokeWidth: Dp = 24.dp,
     gapDegrees: Float = 3f,
     trackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    contentDescription: String? = null,
     centerContent: @Composable () -> Unit = {},
 ) {
     val strokePx = with(LocalDensity.current) { strokeWidth.toPx() }
-    Box(modifier = modifier.size(diameter), contentAlignment = Alignment.Center) {
+    val chartModifier = if (contentDescription != null) {
+        modifier.size(diameter).semantics { this.contentDescription = contentDescription }
+    } else {
+        modifier.size(diameter)
+    }
+    Box(modifier = chartModifier, contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.size(diameter)) {
             val stroke = Stroke(width = strokePx, cap = StrokeCap.Round)
             val inset = strokePx / 2f
