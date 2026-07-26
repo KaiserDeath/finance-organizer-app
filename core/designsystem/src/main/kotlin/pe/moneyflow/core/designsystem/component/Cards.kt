@@ -17,9 +17,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import pe.moneyflow.core.designsystem.theme.HeroTintDark
+import pe.moneyflow.core.designsystem.theme.HeroTintLight
 import pe.moneyflow.core.designsystem.theme.Spacing
 
 /** Rounded, softly-elevated surface used as the base container across the app. */
@@ -27,6 +31,7 @@ import pe.moneyflow.core.designsystem.theme.Spacing
 fun MoneyCard(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.surface,
+    shadowElevation: Dp = 2.dp,
     contentPadding: androidx.compose.foundation.layout.PaddingValues =
         androidx.compose.foundation.layout.PaddingValues(Spacing.lg),
     content: @Composable ColumnScope.() -> Unit,
@@ -36,7 +41,7 @@ fun MoneyCard(
         shape = MaterialTheme.shapes.large,
         color = color,
         tonalElevation = 1.dp,
-        shadowElevation = 2.dp,
+        shadowElevation = shadowElevation,
     ) {
         Column(modifier = Modifier.padding(contentPadding), content = content)
     }
@@ -48,10 +53,13 @@ fun GlassCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    // Resolve light/dark by the actual surface luminance so this stays correct under both a
+    // forced theme and Material You dynamic color — but the tint itself is a fixed brand color.
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     Surface(
         modifier = modifier,
         shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+        color = if (isDark) HeroTintDark else HeroTintLight,
         tonalElevation = 0.dp,
         shadowElevation = 6.dp,
     ) {
@@ -67,8 +75,9 @@ fun StatTile(
     icon: ImageVector,
     accent: Color,
     modifier: Modifier = Modifier,
+    shadowElevation: Dp = 2.dp,
 ) {
-    MoneyCard(modifier = modifier) {
+    MoneyCard(modifier = modifier, shadowElevation = shadowElevation) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier

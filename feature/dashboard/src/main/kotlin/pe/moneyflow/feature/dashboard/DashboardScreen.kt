@@ -45,7 +45,6 @@ import pe.moneyflow.core.designsystem.component.ShimmerBox
 import pe.moneyflow.core.designsystem.component.StatTile
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.CategoryPalette
-import pe.moneyflow.core.designsystem.theme.DeficitRed
 import pe.moneyflow.core.designsystem.theme.NegativeRed
 import pe.moneyflow.core.designsystem.theme.PositiveGreen
 import pe.moneyflow.core.designsystem.theme.Spacing
@@ -132,7 +131,7 @@ private fun DashboardContent(
 
         if (data.recent.isEmpty()) {
             item {
-                MoneyCard(modifier = Modifier.fillMaxWidth()) {
+                MoneyCard(modifier = Modifier.fillMaxWidth(), shadowElevation = 0.dp) {
                     EmptyState(
                         icon = Icons.Rounded.ReceiptLong,
                         title = "Aún no hay gastos",
@@ -145,6 +144,7 @@ private fun DashboardContent(
             item {
                 MoneyCard(
                     modifier = Modifier.fillMaxWidth(),
+                    shadowElevation = 0.dp,
                     contentPadding = PaddingValues(vertical = Spacing.xs),
                 ) {
                     data.recent.forEach { tx ->
@@ -179,45 +179,34 @@ private fun DashboardHeader() {
 
 @Composable
 private fun HeroBalanceCard(data: DashboardData) {
-    val balanceMinor = data.monthIncomeMinor - data.monthSpentMinor
+    // Expense-first: the headline number is what you've spent this month. Income is a secondary
+    // detail that only surfaces when you've actually recorded some.
+    val hasIncome = data.monthIncomeMinor > 0
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = "Balance del mes",
+            text = "Gastado este mes",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
         )
-        // Keep the number neutral for legibility on the tinted card; signal a deficit with a
-        // small chip instead of an alarming all-red figure.
         Text(
-            text = Money.format(balanceMinor, data.currencyCode),
+            text = Money.format(data.monthSpentMinor, data.currencyCode),
             style = MaterialTheme.typography.displayMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        if (balanceMinor < 0) {
-            Spacer(Modifier.height(Spacing.sm))
-            Text(
-                text = "Déficit este mes",
-                style = MaterialTheme.typography.labelLarge,
-                color = DeficitRed,
-            )
-            Text(
-                text = "Gastaste ${Money.format(-balanceMinor, data.currencyCode)} más de lo ingresado.",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-            )
-        }
-        Spacer(Modifier.height(Spacing.md))
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xl)) {
-            HeroStat(
-                label = "Ingresos",
-                value = Money.format(data.monthIncomeMinor, data.currencyCode),
-                valueColor = PositiveGreen,
-            )
-            HeroStat(
-                label = "Gastado",
-                value = Money.format(data.monthSpentMinor, data.currencyCode),
-                valueColor = MaterialTheme.colorScheme.onSurface,
-            )
+        if (hasIncome) {
+            Spacer(Modifier.height(Spacing.lg))
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xl)) {
+                HeroStat(
+                    label = "Ingresos",
+                    value = Money.format(data.monthIncomeMinor, data.currencyCode),
+                    valueColor = PositiveGreen,
+                )
+                HeroStat(
+                    label = "Balance",
+                    value = Money.format(data.monthIncomeMinor - data.monthSpentMinor, data.currencyCode),
+                    valueColor = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
     }
 }
@@ -237,7 +226,7 @@ private fun UpcomingNudgeCard(
         else -> "${nudge.dueSoonCount} pago(s) por vencer"
     }
 
-    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+    MoneyCard(modifier = Modifier.fillMaxWidth(), shadowElevation = 0.dp) {
         Row(
             modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
             verticalAlignment = Alignment.CenterVertically,
@@ -284,7 +273,7 @@ private fun InsightCard(insight: Insight, onClick: () -> Unit) {
         InsightSeverity.POSITIVE -> PositiveGreen
         InsightSeverity.INFO -> MaterialTheme.colorScheme.primary
     }
-    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+    MoneyCard(modifier = Modifier.fillMaxWidth(), shadowElevation = 0.dp) {
         Row(
             modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
             verticalAlignment = Alignment.CenterVertically,
@@ -351,6 +340,7 @@ private fun StatRow(data: DashboardData) {
             icon = Icons.Rounded.CalendarToday,
             accent = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f),
+            shadowElevation = 0.dp,
         )
         StatTile(
             label = "Movimientos",
@@ -358,13 +348,14 @@ private fun StatRow(data: DashboardData) {
             icon = Icons.Rounded.TrendingUp,
             accent = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.weight(1f),
+            shadowElevation = 0.dp,
         )
     }
 }
 
 @Composable
 private fun CategoryBreakdownCard(data: DashboardData) {
-    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+    MoneyCard(modifier = Modifier.fillMaxWidth(), shadowElevation = 0.dp) {
         SectionHeader(title = "Por categoría", modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(Spacing.lg))
         Row(verticalAlignment = Alignment.CenterVertically) {
