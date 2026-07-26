@@ -45,6 +45,8 @@ import pe.moneyflow.feature.categories.CategoriesRoute
 import pe.moneyflow.feature.categories.categoriesScreen
 import pe.moneyflow.feature.dashboard.DashboardRoute
 import pe.moneyflow.feature.dashboard.dashboardScreen
+import pe.moneyflow.feature.insights.InsightsRoute
+import pe.moneyflow.feature.insights.insightsScreen
 import pe.moneyflow.feature.paymentmethods.PaymentMethodsRoute
 import pe.moneyflow.feature.paymentmethods.paymentMethodsScreen
 import pe.moneyflow.feature.recurring.RecurringRoute
@@ -126,6 +128,7 @@ fun MoneyFlowApp() {
             )
             composable<MoreRoute> {
                 MoreScreen(
+                    onOpenInsights = { navController.navigate(InsightsRoute) },
                     onOpenAccounts = { navController.navigate(AccountsRoute) },
                     onOpenSavings = { navController.navigate(SavingsRoute) },
                     onOpenCategories = { navController.navigate(CategoriesRoute) },
@@ -137,6 +140,7 @@ fun MoneyFlowApp() {
                     onOpenSecurity = { navController.navigate(SecurityRoute) },
                 )
             }
+            insightsScreen(onBack = { navController.popBackStack() })
             accountsScreen(onBack = { navController.popBackStack() })
             savingsScreen(onBack = { navController.popBackStack() })
             categoriesScreen(onBack = { navController.popBackStack() })

@@ -26,7 +26,9 @@ import pe.moneyflow.core.domain.repository.ExchangeRateRepository
 import pe.moneyflow.core.domain.repository.PaymentMethodRepository
 import pe.moneyflow.core.domain.repository.RecurringExpenseRepository
 import pe.moneyflow.core.domain.repository.SavingsGoalRepository
+import pe.moneyflow.core.domain.repository.SmartInsights
 import pe.moneyflow.core.domain.repository.TransactionRepository
+import pe.moneyflow.core.domain.usecase.RuleBasedSmartInsights
 import java.time.Clock
 import javax.inject.Singleton
 
@@ -71,6 +73,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindBackupRepository(impl: BackupRepositoryImpl): BackupRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSmartInsights(impl: RuleBasedSmartInsights): SmartInsights
 }
 
 @Module

@@ -89,7 +89,9 @@ search. "Plin" has no standalone app (it lives inside partner bank apps), so it 
 - **Phase 4** — Accounts, income, transfers, savings goals, net worth, multi-currency.
 - **Phase 5** — Biometric/PIN lock, backup/restore (JSON), onboarding, full search/filters,
   home-screen widget (Glance) ✅.
-- **Phase 6** — Smart/AI insights behind the `SmartInsights` interface (rule-based first, LLM later).
+- **Phase 6** — Smart insights behind the `SmartInsights` interface (rule-based engine: cash-flow,
+  spending spikes, top category, upcoming/overdue bills) ✅. LLM-backed variant can implement the
+  same seam later.
 
 ## Testing
 

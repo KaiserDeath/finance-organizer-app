@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.CurrencyExchange
 import androidx.compose.material.icons.rounded.EventRepeat
+import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.HorizontalDivider
@@ -38,6 +39,7 @@ import pe.moneyflow.core.designsystem.theme.Spacing
 
 @Composable
 fun MoreScreen(
+    onOpenInsights: () -> Unit,
     onOpenAccounts: () -> Unit,
     onOpenSavings: () -> Unit,
     onOpenCategories: () -> Unit,
@@ -71,6 +73,16 @@ fun MoreScreen(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = Spacing.xs),
             ) {
+                MoreRow(
+                    icon = Icons.Rounded.Lightbulb,
+                    title = "Sugerencias",
+                    subtitle = "Ideas inteligentes sobre tus finanzas",
+                    onClick = onOpenInsights,
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(start = 68.dp),
+                )
                 MoreRow(
                     icon = Icons.Rounded.AccountBalanceWallet,
                     title = "Cuentas",
