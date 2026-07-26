@@ -156,6 +156,7 @@ fun AccountsScreen(
                     iconKey = form.iconKey,
                     alsoCreatePaymentMethod = form.alsoCreatePaymentMethod,
                     paymentMethodType = form.paymentMethodType,
+                    deepLinkPackage = form.deepLinkPackage,
                 )
                 showAddDialog = false
             },
@@ -272,6 +273,7 @@ private data class NewAccountForm(
     val iconKey: String?,
     val alsoCreatePaymentMethod: Boolean,
     val paymentMethodType: PaymentMethodType?,
+    val deepLinkPackage: String?,
 )
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -289,6 +291,7 @@ private fun AddAccountSheet(
     var presetColorHex by remember { mutableStateOf<String?>(null) }
     var presetIconKey by remember { mutableStateOf<String?>(null) }
     var presetPmType by remember { mutableStateOf<PaymentMethodType?>(null) }
+    var presetDeepLink by remember { mutableStateOf<String?>(null) }
     var alsoCreatePaymentMethod by remember { mutableStateOf(true) }
 
     val openingMinor = Money.parseToMinor(openingText) ?: 0L
@@ -326,6 +329,7 @@ private fun AddAccountSheet(
                             presetColorHex = preset.colorHex
                             presetIconKey = preset.iconKey
                             presetPmType = preset.paymentMethodType
+                            presetDeepLink = preset.deepLinkPackage
                         },
                         label = { Text(preset.name) },
                         leadingIcon = {
@@ -358,6 +362,7 @@ private fun AddAccountSheet(
                             presetColorHex = null
                             presetIconKey = null
                             presetPmType = null
+                            presetDeepLink = null
                         },
                         label = { Text(AccountPresets.of(option).label) },
                     )
@@ -417,6 +422,7 @@ private fun AddAccountSheet(
                             iconKey = presetIconKey,
                             alsoCreatePaymentMethod = alsoCreatePaymentMethod,
                             paymentMethodType = presetPmType,
+                            deepLinkPackage = presetDeepLink,
                         ),
                     )
                 },

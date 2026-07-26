@@ -56,6 +56,7 @@ class AccountsViewModel @Inject constructor(
         iconKey: String? = null,
         alsoCreatePaymentMethod: Boolean = false,
         paymentMethodType: PaymentMethodType? = null,
+        deepLinkPackage: String? = null,
     ) {
         if (name.isBlank()) return
         val typePreset = AccountPresets.of(type)
@@ -84,6 +85,7 @@ class AccountsViewModel @Inject constructor(
                         iconKey = resolvedIcon,
                         colorHex = resolvedColor,
                         accountId = accountId,
+                        deepLinkPackage = deepLinkPackage,
                     ),
                 )
             }

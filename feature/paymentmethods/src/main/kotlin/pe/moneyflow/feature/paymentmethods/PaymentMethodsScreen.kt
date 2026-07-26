@@ -346,6 +346,7 @@ private fun AddEditPaymentMethodSheet(
                                 type = preset.paymentMethodType
                                 colorHex = preset.colorHex
                                 iconKey = preset.iconKey
+                                deepLink = preset.deepLinkPackage ?: ""
                             },
                             label = { Text(preset.name) },
                             leadingIcon = {

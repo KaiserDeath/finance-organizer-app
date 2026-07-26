@@ -16,16 +16,22 @@ data class FinancePreset(
     val paymentMethodType: PaymentMethodType,
     val iconKey: String,
     val colorHex: String,
+    /**
+     * Play Store package id of the method's official Android app, used to deep-link into it. Null
+     * for options with no dedicated app (Efectivo, generic card, and Plin — which lives inside the
+     * bank apps rather than shipping its own). Verified against Google Play, July 2026.
+     */
+    val deepLinkPackage: String? = null,
 )
 
 object FinancePresets {
     val all: List<FinancePreset> = listOf(
         FinancePreset("Efectivo", AccountType.CASH, PaymentMethodType.CASH, "cash", "#66BB6A"),
-        FinancePreset("BCP", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#EA6A1E"),
-        FinancePreset("BBVA", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#1464A5"),
-        FinancePreset("Interbank", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#00A94F"),
-        FinancePreset("Scotiabank", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#D5122B"),
-        FinancePreset("Yape", AccountType.EWALLET, PaymentMethodType.EWALLET, "wallet", "#742284"),
+        FinancePreset("BCP", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#EA6A1E", "com.bcp.bank.bcp"),
+        FinancePreset("BBVA", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#1464A5", "com.bbva.nxt_peru"),
+        FinancePreset("Interbank", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#00A94F", "pe.com.interbank.mobilebanking"),
+        FinancePreset("Scotiabank", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#D5122B", "pe.com.scotiabank.blpm.android.client"),
+        FinancePreset("Yape", AccountType.EWALLET, PaymentMethodType.EWALLET, "wallet", "#742284", "com.bcp.innovacxion.yapeapp"),
         FinancePreset("Plin", AccountType.EWALLET, PaymentMethodType.EWALLET, "wallet", "#00B7C4"),
         FinancePreset("Tarjeta de crédito", AccountType.CREDIT_CARD, PaymentMethodType.CARD, "card", "#EF5350"),
     )
