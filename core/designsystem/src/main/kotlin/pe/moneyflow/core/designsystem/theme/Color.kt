@@ -55,6 +55,12 @@ internal val DarkColors = darkColorScheme(
 val PositiveGreen = Color(0xFF16A34A)
 val NegativeRed = Color(0xFFDC2626)
 
+/**
+ * A muted, desaturated red for small warning labels sitting on *tinted* surfaces (e.g. the
+ * indigo hero card), where the full-strength [NegativeRed] clashes and over-alarms.
+ */
+val DeficitRed = Color(0xFFC0564E)
+
 /** Fallback palette used to color category slices/chips when a stored hex is missing. */
 val CategoryPalette = listOf(
     Color(0xFF4F46E5), Color(0xFF0EA5A5), Color(0xFFF59E0B), Color(0xFFEC4899),

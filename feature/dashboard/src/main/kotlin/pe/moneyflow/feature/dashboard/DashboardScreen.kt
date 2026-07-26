@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
@@ -46,6 +45,7 @@ import pe.moneyflow.core.designsystem.component.ShimmerBox
 import pe.moneyflow.core.designsystem.component.StatTile
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.CategoryPalette
+import pe.moneyflow.core.designsystem.theme.DeficitRed
 import pe.moneyflow.core.designsystem.theme.NegativeRed
 import pe.moneyflow.core.designsystem.theme.PositiveGreen
 import pe.moneyflow.core.designsystem.theme.Spacing
@@ -195,26 +195,16 @@ private fun HeroBalanceCard(data: DashboardData) {
         )
         if (balanceMinor < 0) {
             Spacer(Modifier.height(Spacing.sm))
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(NegativeRed.copy(alpha = 0.14f))
-                    .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Warning,
-                    contentDescription = null,
-                    tint = NegativeRed,
-                    modifier = Modifier.size(14.dp),
-                )
-                Spacer(Modifier.size(Spacing.xs))
-                Text(
-                    text = "Gastaste más de lo que ingresaste",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = NegativeRed,
-                )
-            }
+            Text(
+                text = "Déficit este mes",
+                style = MaterialTheme.typography.labelLarge,
+                color = DeficitRed,
+            )
+            Text(
+                text = "Gastaste ${Money.format(-balanceMinor, data.currencyCode)} más de lo ingresado.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            )
         }
         Spacer(Modifier.height(Spacing.md))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xl)) {
