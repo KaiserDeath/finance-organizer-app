@@ -75,7 +75,7 @@ import kotlin.math.abs
 
 @Composable
 fun AnalyticsScreen(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: AnalyticsViewModel = hiltViewModel(),
 ) {
@@ -125,7 +125,7 @@ private inline fun runShare(context: android.content.Context, block: () -> Unit)
 @Composable
 private fun AnalyticsContent(
     state: AnalyticsUiState,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onExportCsv: () -> Unit,
     onExportPdf: () -> Unit,
     modifier: Modifier = Modifier,
@@ -140,8 +140,10 @@ private fun AnalyticsContent(
             TopAppBar(
                 title = { Text("Análisis y reportes") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
+                        }
                     }
                 },
             )

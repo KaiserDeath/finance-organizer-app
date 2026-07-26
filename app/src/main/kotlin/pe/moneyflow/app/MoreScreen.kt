@@ -2,6 +2,7 @@ package pe.moneyflow.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,8 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
-import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Backup
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.rounded.CurrencyExchange
 import androidx.compose.material.icons.rounded.EventRepeat
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -37,6 +39,18 @@ import androidx.compose.ui.unit.dp
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.theme.Spacing
 
+private data class MoreItem(
+    val icon: ImageVector,
+    val title: String,
+    val subtitle: String,
+    val onClick: () -> Unit,
+)
+
+private data class MoreSection(
+    val label: String,
+    val items: List<MoreItem>,
+)
+
 @Composable
 fun MoreScreen(
     onOpenInsights: () -> Unit,
@@ -45,12 +59,97 @@ fun MoreScreen(
     onOpenCategories: () -> Unit,
     onOpenPaymentMethods: () -> Unit,
     onOpenRecurring: () -> Unit,
-    onOpenAnalytics: () -> Unit,
+    onOpenBudgets: () -> Unit,
     onOpenCurrency: () -> Unit,
+    onOpenAppearance: () -> Unit,
     onOpenBackup: () -> Unit,
     onOpenSecurity: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val sections = listOf(
+        MoreSection(
+            label = "Tu dinero",
+            items = listOf(
+                MoreItem(
+                    Icons.Rounded.Lightbulb,
+                    "Sugerencias",
+                    "Ideas inteligentes sobre tus finanzas",
+                    onOpenInsights,
+                ),
+                MoreItem(
+                    Icons.Rounded.AccountBalanceWallet,
+                    "Cuentas",
+                    "Saldos, transferencias y patrimonio neto",
+                    onOpenAccounts,
+                ),
+                MoreItem(
+                    Icons.Rounded.Savings,
+                    "Ahorros",
+                    "Metas de ahorro y aportes",
+                    onOpenSavings,
+                ),
+                MoreItem(
+                    Icons.Rounded.AccountBalance,
+                    "Presupuestos",
+                    "Límites de gasto por categoría",
+                    onOpenBudgets,
+                ),
+            ),
+        ),
+        MoreSection(
+            label = "Organización",
+            items = listOf(
+                MoreItem(
+                    Icons.Rounded.Category,
+                    "Categorías",
+                    "Crea y organiza tus categorías",
+                    onOpenCategories,
+                ),
+                MoreItem(
+                    Icons.Rounded.CreditCard,
+                    "Métodos de pago",
+                    "Tarjetas, Yape, Plin y bancos",
+                    onOpenPaymentMethods,
+                ),
+                MoreItem(
+                    Icons.Rounded.EventRepeat,
+                    "Pagos recurrentes",
+                    "Plantillas que se generan solas",
+                    onOpenRecurring,
+                ),
+                MoreItem(
+                    Icons.Rounded.CurrencyExchange,
+                    "Monedas",
+                    "Moneda base y tipos de cambio",
+                    onOpenCurrency,
+                ),
+            ),
+        ),
+        MoreSection(
+            label = "Ajustes",
+            items = listOf(
+                MoreItem(
+                    Icons.Rounded.Palette,
+                    "Apariencia",
+                    "Tema, modo oscuro y color dinámico",
+                    onOpenAppearance,
+                ),
+                MoreItem(
+                    Icons.Rounded.Lock,
+                    "Seguridad",
+                    "Bloqueo con PIN y biometría",
+                    onOpenSecurity,
+                ),
+                MoreItem(
+                    Icons.Rounded.Backup,
+                    "Copia de seguridad",
+                    "Exporta o restaura tus datos",
+                    onOpenBackup,
+                ),
+            ),
+        ),
+    )
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -59,7 +158,7 @@ fun MoreScreen(
             top = Spacing.md,
             bottom = 96.dp,
         ),
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
         item {
             Text(
@@ -68,107 +167,35 @@ fun MoreScreen(
                 color = MaterialTheme.colorScheme.onSurface,
             )
         }
-        item {
-            MoneyCard(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = Spacing.xs),
-            ) {
-                MoreRow(
-                    icon = Icons.Rounded.Lightbulb,
-                    title = "Sugerencias",
-                    subtitle = "Ideas inteligentes sobre tus finanzas",
-                    onClick = onOpenInsights,
-                )
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.padding(start = 68.dp),
-                )
-                MoreRow(
-                    icon = Icons.Rounded.AccountBalanceWallet,
-                    title = "Cuentas",
-                    subtitle = "Saldos, transferencias y patrimonio neto",
-                    onClick = onOpenAccounts,
-                )
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.padding(start = 68.dp),
-                )
-                MoreRow(
-                    icon = Icons.Rounded.Savings,
-                    title = "Ahorros",
-                    subtitle = "Metas de ahorro y aportes",
-                    onClick = onOpenSavings,
-                )
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.padding(start = 68.dp),
-                )
-                MoreRow(
-                    icon = Icons.Rounded.Category,
-                    title = "Categorías",
-                    subtitle = "Crea y organiza tus categorías",
-                    onClick = onOpenCategories,
-                )
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.padding(start = 68.dp),
-                )
-                MoreRow(
-                    icon = Icons.Rounded.CreditCard,
-                    title = "Métodos de pago",
-                    subtitle = "Tarjetas, Yape, Plin y bancos",
-                    onClick = onOpenPaymentMethods,
-                )
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.padding(start = 68.dp),
-                )
-                MoreRow(
-                    icon = Icons.Rounded.EventRepeat,
-                    title = "Pagos recurrentes",
-                    subtitle = "Plantillas que se generan solas",
-                    onClick = onOpenRecurring,
-                )
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.padding(start = 68.dp),
-                )
-                MoreRow(
-                    icon = Icons.Rounded.BarChart,
-                    title = "Análisis y reportes",
-                    subtitle = "Tendencias, comparativas y exportar CSV",
-                    onClick = onOpenAnalytics,
-                )
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.padding(start = 68.dp),
-                )
-                MoreRow(
-                    icon = Icons.Rounded.CurrencyExchange,
-                    title = "Monedas",
-                    subtitle = "Moneda base y tipos de cambio",
-                    onClick = onOpenCurrency,
-                )
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.padding(start = 68.dp),
-                )
-                MoreRow(
-                    icon = Icons.Rounded.Lock,
-                    title = "Seguridad",
-                    subtitle = "Bloqueo con PIN y biometría",
-                    onClick = onOpenSecurity,
-                )
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.padding(start = 68.dp),
-                )
-                MoreRow(
-                    icon = Icons.Rounded.Backup,
-                    title = "Copia de seguridad",
-                    subtitle = "Exporta o restaura tus datos",
-                    onClick = onOpenBackup,
-                )
+        sections.forEach { section ->
+            item(key = section.label) {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Text(
+                        text = section.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = Spacing.xs),
+                    )
+                    MoneyCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = Spacing.xs),
+                    ) {
+                        section.items.forEachIndexed { index, item ->
+                            MoreRow(
+                                icon = item.icon,
+                                title = item.title,
+                                subtitle = item.subtitle,
+                                onClick = item.onClick,
+                            )
+                            if (index < section.items.lastIndex) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                    modifier = Modifier.padding(start = 68.dp),
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

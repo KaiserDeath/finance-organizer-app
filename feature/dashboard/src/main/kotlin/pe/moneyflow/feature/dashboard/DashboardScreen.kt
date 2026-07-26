@@ -1,6 +1,7 @@
 package pe.moneyflow.feature.dashboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,14 +10,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +44,7 @@ import pe.moneyflow.core.designsystem.component.ShimmerBox
 import pe.moneyflow.core.designsystem.component.StatTile
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.CategoryPalette
+import pe.moneyflow.core.designsystem.theme.NegativeRed
 import pe.moneyflow.core.designsystem.theme.PositiveGreen
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
@@ -52,6 +58,7 @@ import java.time.LocalDate
 fun DashboardScreen(
     onSeeAllTransactions: () -> Unit,
     onTransactionClick: (String) -> Unit,
+    onOpenUpcoming: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
@@ -60,6 +67,7 @@ fun DashboardScreen(
         state = uiState,
         onSeeAllTransactions = onSeeAllTransactions,
         onTransactionClick = onTransactionClick,
+        onOpenUpcoming = onOpenUpcoming,
         modifier = modifier,
     )
 }
@@ -69,6 +77,7 @@ private fun DashboardContent(
     state: DashboardUiState,
     onSeeAllTransactions: () -> Unit,
     onTransactionClick: (String) -> Unit,
+    onOpenUpcoming: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val data = state.data
@@ -90,6 +99,11 @@ private fun DashboardContent(
         }
 
         item { HeroBalanceCard(data) }
+
+        state.upcomingNudge?.let { nudge ->
+            item { UpcomingNudgeCard(nudge = nudge, currencyCode = data.currencyCode, onClick = onOpenUpcoming) }
+        }
+
         item { StatRow(data) }
 
         if (data.categoryBreakdown.isNotEmpty()) {
@@ -154,16 +168,17 @@ private fun DashboardHeader() {
 
 @Composable
 private fun HeroBalanceCard(data: DashboardData) {
+    val balanceMinor = data.monthIncomeMinor - data.monthSpentMinor
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = "Gastado este mes",
+            text = "Balance del mes",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
         )
         Text(
-            text = Money.format(data.monthSpentMinor, data.currencyCode),
+            text = Money.format(balanceMinor, data.currencyCode),
             style = MaterialTheme.typography.displayMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (balanceMinor < 0) NegativeRed else MaterialTheme.colorScheme.onSurface,
         )
         Spacer(Modifier.height(Spacing.md))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xl)) {
@@ -173,9 +188,64 @@ private fun HeroBalanceCard(data: DashboardData) {
                 valueColor = PositiveGreen,
             )
             HeroStat(
-                label = "Balance",
-                value = Money.format(data.monthIncomeMinor - data.monthSpentMinor, data.currencyCode),
+                label = "Gastado",
+                value = Money.format(data.monthSpentMinor, data.currencyCode),
                 valueColor = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+@Composable
+private fun UpcomingNudgeCard(
+    nudge: UpcomingNudge,
+    currencyCode: String,
+    onClick: () -> Unit,
+) {
+    val hasOverdue = nudge.overdueCount > 0
+    val accent = if (hasOverdue) NegativeRed else MaterialTheme.colorScheme.tertiary
+    val title = when {
+        hasOverdue && nudge.dueSoonCount > 0 ->
+            "${nudge.overdueCount} vencido(s) y ${nudge.dueSoonCount} por vencer"
+        hasOverdue -> "${nudge.overdueCount} pago(s) vencido(s)"
+        else -> "${nudge.dueSoonCount} pago(s) por vencer"
+    }
+
+    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(accent.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (hasOverdue) Icons.Rounded.Warning else Icons.Rounded.CalendarToday,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Column(modifier = Modifier.weight(1f).padding(horizontal = Spacing.md)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Total ${Money.format(nudge.totalAmountMinor, currencyCode)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = "Ver próximos",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -210,7 +280,7 @@ private fun StatRow(data: DashboardData) {
         )
         StatTile(
             label = "Movimientos",
-            value = data.recent.size.toString(),
+            value = data.monthTransactionCount.toString(),
             icon = Icons.Rounded.TrendingUp,
             accent = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.weight(1f),
@@ -233,9 +303,12 @@ private fun CategoryBreakdownCard(data: DashboardData) {
                     ),
                 )
             }
+            val topSpend = data.categoryBreakdown.first()
             DonutChart(
                 slices = slices,
                 diameter = 132.dp,
+                contentDescription = "Gasto por categoría. Mayor: ${topSpend.category.name}, " +
+                    "${(topSpend.fraction * 100).toInt()}%.",
                 centerContent = {
                     Text(
                         text = "${data.categoryBreakdown.size}",

@@ -3,11 +3,11 @@ package pe.moneyflow.app
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.ReceiptLong
-import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -31,6 +33,7 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.serialization.Serializable
 import pe.moneyflow.app.backup.BackupScreen
 import pe.moneyflow.app.security.SecurityScreen
+import pe.moneyflow.app.settings.AppearanceScreen
 import pe.moneyflow.feature.accounts.AccountsRoute
 import pe.moneyflow.feature.accounts.accountsScreen
 import pe.moneyflow.feature.addedit.addEditScreen
@@ -67,6 +70,9 @@ data object BackupRoute
 @Serializable
 data object SecurityRoute
 
+@Serializable
+data object AppearanceRoute
+
 private enum class TopLevelDestination(
     val route: Any,
     val label: String,
@@ -74,7 +80,7 @@ private enum class TopLevelDestination(
 ) {
     DASHBOARD(DashboardRoute, "Inicio", Icons.Rounded.Home),
     TRANSACTIONS(TransactionsRoute, "Movimientos", Icons.Rounded.ReceiptLong),
-    BUDGETS(BudgetsRoute, "Presupuestos", Icons.Rounded.Savings),
+    ANALYTICS(AnalyticsRoute, "Análisis", Icons.Rounded.BarChart),
     UPCOMING(UpcomingRoute, "Próximos", Icons.Rounded.CalendarMonth),
     MORE(MoreRoute, "Más", Icons.Rounded.Menu),
 }
@@ -82,6 +88,7 @@ private enum class TopLevelDestination(
 @Composable
 fun MoneyFlowApp() {
     val navController = rememberNavController()
+    val haptics = LocalHapticFeedback.current
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val isTopLevel = TopLevelDestination.entries.any { currentDestination.isRouteInHierarchy(it.route) }
@@ -104,7 +111,10 @@ fun MoneyFlowApp() {
         },
         floatingActionButton = {
             if (isTopLevel) {
-                FloatingActionButton(onClick = { navController.navigateToAddEdit() }) {
+                FloatingActionButton(onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    navController.navigateToAddEdit()
+                }) {
                     Icon(Icons.Rounded.Add, contentDescription = "Agregar movimiento")
                 }
             }
@@ -118,11 +128,12 @@ fun MoneyFlowApp() {
             dashboardScreen(
                 onSeeAllTransactions = { navController.navigateToTopLevel(TransactionsRoute) },
                 onTransactionClick = { id -> navController.navigateToAddEdit(id) },
+                onOpenUpcoming = { navController.navigateToTopLevel(UpcomingRoute) },
             )
             transactionsScreen(
                 onTransactionClick = { id -> navController.navigateToAddEdit(id) },
             )
-            budgetsScreen()
+            budgetsScreen(onBack = { navController.popBackStack() })
             upcomingScreen(
                 onPaymentClick = { id -> navController.navigateToAddEdit(id) },
             )
@@ -134,8 +145,9 @@ fun MoneyFlowApp() {
                     onOpenCategories = { navController.navigate(CategoriesRoute) },
                     onOpenPaymentMethods = { navController.navigate(PaymentMethodsRoute) },
                     onOpenRecurring = { navController.navigate(RecurringRoute) },
-                    onOpenAnalytics = { navController.navigate(AnalyticsRoute) },
+                    onOpenBudgets = { navController.navigate(BudgetsRoute) },
                     onOpenCurrency = { navController.navigate(CurrencyRoute) },
+                    onOpenAppearance = { navController.navigate(AppearanceRoute) },
                     onOpenBackup = { navController.navigate(BackupRoute) },
                     onOpenSecurity = { navController.navigate(SecurityRoute) },
                 )
@@ -146,8 +158,9 @@ fun MoneyFlowApp() {
             categoriesScreen(onBack = { navController.popBackStack() })
             paymentMethodsScreen(onBack = { navController.popBackStack() })
             recurringScreen(onBack = { navController.popBackStack() })
-            analyticsScreen(onBack = { navController.popBackStack() })
+            analyticsScreen()
             currencyScreen(onBack = { navController.popBackStack() })
+            composable<AppearanceRoute> { AppearanceScreen(onBack = { navController.popBackStack() }) }
             composable<BackupRoute> { BackupScreen(onBack = { navController.popBackStack() }) }
             composable<SecurityRoute> { SecurityScreen(onBack = { navController.popBackStack() }) }
             addEditScreen(onDone = { navController.popBackStack() })

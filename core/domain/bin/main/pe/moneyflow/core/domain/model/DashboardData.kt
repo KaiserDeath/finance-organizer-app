@@ -8,6 +8,8 @@ data class DashboardData(
     val monthSpentMinor: Long,
     val todaySpentMinor: Long,
     val monthIncomeMinor: Long,
+    /** Number of transactions recorded in the current calendar month. */
+    val monthTransactionCount: Int = 0,
     /** Remaining budget for the month, or null when no budget is configured yet. */
     val remainingBudgetMinor: Long?,
     val recent: List<Transaction>,

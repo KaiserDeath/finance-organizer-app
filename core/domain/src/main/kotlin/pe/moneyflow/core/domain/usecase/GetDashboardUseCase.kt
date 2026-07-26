@@ -60,6 +60,7 @@ class GetDashboardUseCase @Inject constructor(
                 monthSpentMinor = monthSpent,
                 todaySpentMinor = todaySpent,
                 monthIncomeMinor = monthIncome,
+                monthTransactionCount = monthTx.size,
                 remainingBudgetMinor = null,
                 recent = allTx.sortedByDescending { it.createdAt }.take(6),
                 categoryBreakdown = breakdown,
