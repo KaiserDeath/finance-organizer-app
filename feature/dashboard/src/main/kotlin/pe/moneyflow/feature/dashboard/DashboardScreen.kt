@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Warning
@@ -49,6 +50,8 @@ import pe.moneyflow.core.designsystem.theme.PositiveGreen
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.DashboardData
+import pe.moneyflow.core.domain.model.Insight
+import pe.moneyflow.core.domain.model.InsightSeverity
 import pe.moneyflow.core.ui.component.CategoryAvatar
 import pe.moneyflow.core.ui.component.TransactionRow
 import pe.moneyflow.core.ui.util.toMonthTitle
@@ -59,6 +62,7 @@ fun DashboardScreen(
     onSeeAllTransactions: () -> Unit,
     onTransactionClick: (String) -> Unit,
     onOpenUpcoming: () -> Unit,
+    onOpenInsights: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
@@ -68,6 +72,7 @@ fun DashboardScreen(
         onSeeAllTransactions = onSeeAllTransactions,
         onTransactionClick = onTransactionClick,
         onOpenUpcoming = onOpenUpcoming,
+        onOpenInsights = onOpenInsights,
         modifier = modifier,
     )
 }
@@ -78,6 +83,7 @@ private fun DashboardContent(
     onSeeAllTransactions: () -> Unit,
     onTransactionClick: (String) -> Unit,
     onOpenUpcoming: () -> Unit,
+    onOpenInsights: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val data = state.data
@@ -105,6 +111,10 @@ private fun DashboardContent(
         }
 
         item { StatRow(data) }
+
+        state.topInsight?.let { insight ->
+            item { InsightCard(insight = insight, onClick = onOpenInsights) }
+        }
 
         if (data.categoryBreakdown.isNotEmpty()) {
             item { CategoryBreakdownCard(data) }
@@ -245,6 +255,54 @@ private fun UpcomingNudgeCard(
             Icon(
                 imageVector = Icons.Rounded.ChevronRight,
                 contentDescription = "Ver próximos",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun InsightCard(insight: Insight, onClick: () -> Unit) {
+    val accent = when (insight.severity) {
+        InsightSeverity.WARNING -> MaterialTheme.colorScheme.tertiary
+        InsightSeverity.POSITIVE -> PositiveGreen
+        InsightSeverity.INFO -> MaterialTheme.colorScheme.primary
+    }
+    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(accent.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Lightbulb,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Column(modifier = Modifier.weight(1f).padding(horizontal = Spacing.md)) {
+                Text(
+                    text = insight.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = insight.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                )
+            }
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = "Ver sugerencias",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

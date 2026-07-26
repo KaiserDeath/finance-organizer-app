@@ -14,16 +14,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -35,11 +43,14 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -67,6 +78,7 @@ fun TransactionsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var showFilters by remember { mutableStateOf(false) }
 
     val onDelete: (Transaction) -> Unit = { tx ->
         viewModel.delete(tx.id)
@@ -101,12 +113,20 @@ fun TransactionsScreen(
                     onTransactionClick = onTransactionClick,
                     onDelete = onDelete,
                     onQueryChange = viewModel::onQueryChange,
-                    onToggleType = viewModel::toggleType,
-                    onToggleCategory = viewModel::toggleCategory,
-                    onClearFilters = viewModel::clearFilters,
+                    onOpenFilters = { showFilters = true },
                 )
             }
         }
+    }
+
+    if (showFilters) {
+        FilterSheet(
+            state = uiState,
+            onToggleType = viewModel::toggleType,
+            onToggleCategory = viewModel::toggleCategory,
+            onClearFilters = viewModel::clearFilters,
+            onDismiss = { showFilters = false },
+        )
     }
 }
 
@@ -116,9 +136,7 @@ private fun TransactionsList(
     onTransactionClick: (String) -> Unit,
     onDelete: (Transaction) -> Unit,
     onQueryChange: (String) -> Unit,
-    onToggleType: (TransactionType) -> Unit,
-    onToggleCategory: (String) -> Unit,
-    onClearFilters: () -> Unit,
+    onOpenFilters: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -133,13 +151,12 @@ private fun TransactionsList(
             )
         }
 
-        item(key = "filters") {
-            FiltersHeader(
-                state = state,
+        item(key = "search") {
+            SearchRow(
+                query = state.filter.query,
+                activeFilterCount = state.filter.types.size + state.filter.categoryIds.size,
                 onQueryChange = onQueryChange,
-                onToggleType = onToggleType,
-                onToggleCategory = onToggleCategory,
-                onClearFilters = onClearFilters,
+                onOpenFilters = onOpenFilters,
             )
         }
 
@@ -177,68 +194,110 @@ private fun TransactionsList(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FiltersHeader(
-    state: TransactionsUiState,
+private fun SearchRow(
+    query: String,
+    activeFilterCount: Int,
     onQueryChange: (String) -> Unit,
-    onToggleType: (TransactionType) -> Unit,
-    onToggleCategory: (String) -> Unit,
-    onClearFilters: () -> Unit,
+    onOpenFilters: () -> Unit,
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         OutlinedTextField(
-            value = state.filter.query,
+            value = query,
             onValueChange = onQueryChange,
             label = { Text("Buscar") },
             singleLine = true,
             leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
             trailingIcon = {
-                if (state.filter.query.isNotEmpty()) {
+                if (query.isNotEmpty()) {
                     IconButton(onClick = { onQueryChange("") }) {
                         Icon(Icons.Rounded.Close, contentDescription = "Limpiar búsqueda")
                     }
                 }
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f),
         )
-
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            val typeLabels = listOf(
-                TransactionType.EXPENSE to "Gastos",
-                TransactionType.INCOME to "Ingresos",
-                TransactionType.TRANSFER to "Transferencias",
-            )
-            typeLabels.forEach { (type, label) ->
-                FilterChip(
-                    selected = type in state.filter.types,
-                    onClick = { onToggleType(type) },
-                    label = { Text(label) },
-                )
+        BadgedBox(
+            badge = { if (activeFilterCount > 0) Badge { Text(activeFilterCount.toString()) } },
+        ) {
+            FilledTonalIconButton(onClick = onOpenFilters) {
+                Icon(Icons.Rounded.Tune, contentDescription = "Filtros")
             }
         }
+    }
+}
 
-        if (state.expenseCategories.isNotEmpty()) {
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterSheet(
+    state: TransactionsUiState,
+    onToggleType: (TransactionType) -> Unit,
+    onToggleCategory: (String) -> Unit,
+    onClearFilters: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Filtros",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (state.isFilterActive) {
+                    TextButton(onClick = onClearFilters) {
+                        Icon(Icons.Rounded.Close, contentDescription = null)
+                        Text("  Limpiar")
+                    }
+                }
+            }
+
+            Text("Tipo", style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                state.expenseCategories.forEach { category ->
+                val typeLabels = listOf(
+                    TransactionType.EXPENSE to "Gastos",
+                    TransactionType.INCOME to "Ingresos",
+                    TransactionType.TRANSFER to "Transferencias",
+                )
+                typeLabels.forEach { (type, label) ->
                     FilterChip(
-                        selected = category.id in state.filter.categoryIds,
-                        onClick = { onToggleCategory(category.id) },
-                        label = { Text(category.name) },
+                        selected = type in state.filter.types,
+                        onClick = { onToggleType(type) },
+                        label = { Text(label) },
                     )
                 }
             }
-        }
 
-        if (state.isFilterActive) {
-            TextButton(onClick = onClearFilters) {
-                Icon(Icons.Rounded.Close, contentDescription = null)
-                Text("  Limpiar filtros")
+            if (state.expenseCategories.isNotEmpty()) {
+                Text("Categoría", style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    state.expenseCategories.forEach { category ->
+                        FilterChip(
+                            selected = category.id in state.filter.categoryIds,
+                            onClick = { onToggleCategory(category.id) },
+                            label = { Text(category.name) },
+                        )
+                    }
+                }
             }
         }
     }

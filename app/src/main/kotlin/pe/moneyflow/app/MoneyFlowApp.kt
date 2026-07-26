@@ -129,6 +129,7 @@ fun MoneyFlowApp() {
                 onSeeAllTransactions = { navController.navigateToTopLevel(TransactionsRoute) },
                 onTransactionClick = { id -> navController.navigateToAddEdit(id) },
                 onOpenUpcoming = { navController.navigateToTopLevel(UpcomingRoute) },
+                onOpenInsights = { navController.navigate(InsightsRoute) },
             )
             transactionsScreen(
                 onTransactionClick = { id -> navController.navigateToAddEdit(id) },
