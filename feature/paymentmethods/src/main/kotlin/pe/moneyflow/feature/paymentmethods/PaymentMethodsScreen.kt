@@ -84,6 +84,7 @@ import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
+import pe.moneyflow.core.ui.preset.FinancePresets
 import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.PaymentMethodType
@@ -195,8 +196,12 @@ fun PaymentMethodsScreen(
             existing = editing,
             accounts = uiState.accounts,
             onDismiss = { showSheet = false },
-            onConfirm = { method ->
-                viewModel.save(method)
+            onConfirm = { method, alsoCreateAccount ->
+                if (editing == null) {
+                    viewModel.saveWithAccount(method, alsoCreateAccount, currencyCode = "PEN")
+                } else {
+                    viewModel.save(method)
+                }
                 showSheet = false
             },
         )
@@ -297,7 +302,7 @@ private fun AddEditPaymentMethodSheet(
     existing: PaymentMethod?,
     accounts: List<Account>,
     onDismiss: () -> Unit,
-    onConfirm: (PaymentMethod) -> Unit,
+    onConfirm: (PaymentMethod, alsoCreateAccount: Boolean) -> Unit,
 ) {
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var type by remember { mutableStateOf(existing?.type ?: PaymentMethodType.CASH) }
@@ -308,6 +313,7 @@ private fun AddEditPaymentMethodSheet(
     var deepLink by remember { mutableStateOf(existing?.deepLinkPackage ?: "") }
     var playStore by remember { mutableStateOf(existing?.playStoreId ?: "") }
     var showAdvanced by remember { mutableStateOf(!existing?.deepLinkPackage.isNullOrBlank()) }
+    var alsoCreateAccount by remember { mutableStateOf(existing == null) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -327,6 +333,32 @@ private fun AddEditPaymentMethodSheet(
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+
+            // Quick presets — only when creating, so editing an existing method stays focused.
+            if (existing == null) {
+                Text("Elige uno o personaliza abajo", style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    FinancePresets.all.forEach { preset ->
+                        FilterChip(
+                            selected = name == preset.name && type == preset.paymentMethodType,
+                            onClick = {
+                                name = preset.name
+                                type = preset.paymentMethodType
+                                colorHex = preset.colorHex
+                                iconKey = preset.iconKey
+                            },
+                            label = { Text(preset.name) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = iconForKey(preset.iconKey),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            },
+                        )
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = name,
@@ -417,6 +449,25 @@ private fun AddEditPaymentMethodSheet(
                 }
             }
 
+            // Link the two: create a matching account unless the user linked to an existing one.
+            if (existing == null && accountId == null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "También crear cuenta",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = "Aparecerá en Cuentas con saldo inicial 0",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = alsoCreateAccount, onCheckedChange = { alsoCreateAccount = it })
+                }
+            }
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -485,6 +536,7 @@ private fun AddEditPaymentMethodSheet(
                             deepLinkPackage = deepLink.trim().ifBlank { null },
                             playStoreId = playStore.trim().ifBlank { null },
                         ),
+                        alsoCreateAccount && accountId == null,
                     )
                 },
                 enabled = name.isNotBlank(),

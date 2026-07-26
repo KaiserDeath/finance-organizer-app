@@ -35,6 +35,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -62,7 +63,9 @@ import pe.moneyflow.core.domain.model.AccountBalance
 import pe.moneyflow.core.domain.model.NetWorth
 import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.AccountType
+import pe.moneyflow.core.model.PaymentMethodType
 import pe.moneyflow.core.ui.component.CategoryAvatar
+import pe.moneyflow.core.ui.preset.FinancePresets
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -143,8 +146,17 @@ fun AccountsScreen(
     if (showAddDialog) {
         AddAccountSheet(
             onDismiss = { showAddDialog = false },
-            onConfirm = { name, type, currency, opening ->
-                viewModel.add(name, type, currency, opening)
+            onConfirm = { form ->
+                viewModel.add(
+                    name = form.name,
+                    type = form.type,
+                    currencyCode = form.currency,
+                    openingBalanceMinor = form.openingMinor,
+                    colorHex = form.colorHex,
+                    iconKey = form.iconKey,
+                    alsoCreatePaymentMethod = form.alsoCreatePaymentMethod,
+                    paymentMethodType = form.paymentMethodType,
+                )
                 showAddDialog = false
             },
         )
@@ -250,16 +262,34 @@ private fun AccountCard(balance: AccountBalance, onArchive: () -> Unit) {
     }
 }
 
+/** Collected result of the new-account sheet. */
+private data class NewAccountForm(
+    val name: String,
+    val type: AccountType,
+    val currency: String,
+    val openingMinor: Long,
+    val colorHex: String?,
+    val iconKey: String?,
+    val alsoCreatePaymentMethod: Boolean,
+    val paymentMethodType: PaymentMethodType?,
+)
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun AddAccountSheet(
     onDismiss: () -> Unit,
-    onConfirm: (name: String, type: AccountType, currency: String, openingMinor: Long) -> Unit,
+    onConfirm: (NewAccountForm) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(AccountType.CASH) }
     var currency by remember { mutableStateOf("PEN") }
     var openingText by remember { mutableStateOf("") }
+    // Set when a preset chip is chosen, so the created account keeps that brand's look and can be
+    // paired with a matching payment method. Cleared when the user picks a type manually.
+    var presetColorHex by remember { mutableStateOf<String?>(null) }
+    var presetIconKey by remember { mutableStateOf<String?>(null) }
+    var presetPmType by remember { mutableStateOf<PaymentMethodType?>(null) }
+    var alsoCreatePaymentMethod by remember { mutableStateOf(true) }
 
     val openingMinor = Money.parseToMinor(openingText) ?: 0L
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -283,6 +313,32 @@ private fun AddAccountSheet(
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+
+            // Quick presets — tap a bank/wallet to fill everything, or type your own below.
+            Text("Elige uno o personaliza abajo", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                FinancePresets.all.forEach { preset ->
+                    FilterChip(
+                        selected = name == preset.name && type == preset.accountType,
+                        onClick = {
+                            name = preset.name
+                            type = preset.accountType
+                            presetColorHex = preset.colorHex
+                            presetIconKey = preset.iconKey
+                            presetPmType = preset.paymentMethodType
+                        },
+                        label = { Text(preset.name) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = iconForKey(preset.iconKey),
+                                contentDescription = null,
+                                modifier = Modifier.height(18.dp),
+                            )
+                        },
+                    )
+                }
+            }
+
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -296,7 +352,13 @@ private fun AddAccountSheet(
                 AccountPresets.ordered.forEach { option ->
                     FilterChip(
                         selected = type == option,
-                        onClick = { type = option },
+                        onClick = {
+                            type = option
+                            // Manual type choice drops the preset's brand look/pairing.
+                            presetColorHex = null
+                            presetIconKey = null
+                            presetPmType = null
+                        },
                         label = { Text(AccountPresets.of(option).label) },
                     )
                 }
@@ -323,8 +385,41 @@ private fun AddAccountSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            // Link the two: also make it selectable as a payment method when logging an expense.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "También crear método de pago",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "Para poder elegirla al registrar un movimiento",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = alsoCreatePaymentMethod,
+                    onCheckedChange = { alsoCreatePaymentMethod = it },
+                )
+            }
+
             Button(
-                onClick = { onConfirm(name, type, currency, openingMinor) },
+                onClick = {
+                    onConfirm(
+                        NewAccountForm(
+                            name = name,
+                            type = type,
+                            currency = currency,
+                            openingMinor = openingMinor,
+                            colorHex = presetColorHex,
+                            iconKey = presetIconKey,
+                            alsoCreatePaymentMethod = alsoCreatePaymentMethod,
+                            paymentMethodType = presetPmType,
+                        ),
+                    )
+                },
                 enabled = name.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text("Crear cuenta") }

@@ -13,8 +13,12 @@ import pe.moneyflow.core.domain.usecase.ArchiveAccountUseCase
 import pe.moneyflow.core.domain.usecase.CreateTransferUseCase
 import pe.moneyflow.core.domain.usecase.GetNetWorthUseCase
 import pe.moneyflow.core.domain.usecase.SaveAccountUseCase
+import pe.moneyflow.core.domain.usecase.SavePaymentMethodUseCase
 import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.AccountType
+import pe.moneyflow.core.model.PaymentMethod
+import pe.moneyflow.core.model.PaymentMethodType
+import pe.moneyflow.core.ui.preset.toPaymentMethodType
 import java.util.UUID
 import javax.inject.Inject
 
@@ -30,6 +34,7 @@ data class AccountsUiState(
 class AccountsViewModel @Inject constructor(
     getNetWorth: GetNetWorthUseCase,
     private val saveAccount: SaveAccountUseCase,
+    private val savePaymentMethod: SavePaymentMethodUseCase,
     private val archiveAccount: ArchiveAccountUseCase,
     private val createTransfer: CreateTransferUseCase,
 ) : ViewModel() {
@@ -47,21 +52,41 @@ class AccountsViewModel @Inject constructor(
         type: AccountType,
         currencyCode: String,
         openingBalanceMinor: Long,
+        colorHex: String? = null,
+        iconKey: String? = null,
+        alsoCreatePaymentMethod: Boolean = false,
+        paymentMethodType: PaymentMethodType? = null,
     ) {
         if (name.isBlank()) return
-        val preset = AccountPresets.of(type)
+        val typePreset = AccountPresets.of(type)
+        val resolvedColor = colorHex ?: typePreset.colorHex
+        val resolvedIcon = iconKey ?: typePreset.iconKey
+        val accountId = UUID.randomUUID().toString()
+        val cleanName = name.trim()
         viewModelScope.launch {
             saveAccount(
                 Account(
-                    id = UUID.randomUUID().toString(),
-                    name = name.trim(),
+                    id = accountId,
+                    name = cleanName,
                     type = type,
                     currencyCode = currencyCode,
                     openingBalanceMinor = openingBalanceMinor,
-                    colorHex = preset.colorHex,
-                    iconKey = preset.iconKey,
+                    colorHex = resolvedColor,
+                    iconKey = resolvedIcon,
                 ),
             )
+            if (alsoCreatePaymentMethod) {
+                savePaymentMethod(
+                    PaymentMethod(
+                        id = UUID.randomUUID().toString(),
+                        name = cleanName,
+                        type = paymentMethodType ?: type.toPaymentMethodType(),
+                        iconKey = resolvedIcon,
+                        colorHex = resolvedColor,
+                        accountId = accountId,
+                    ),
+                )
+            }
         }
     }
 

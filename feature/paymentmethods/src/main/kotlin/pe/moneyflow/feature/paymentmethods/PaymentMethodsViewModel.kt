@@ -11,9 +11,12 @@ import kotlinx.coroutines.launch
 import pe.moneyflow.core.domain.repository.AccountRepository
 import pe.moneyflow.core.domain.usecase.DeletePaymentMethodUseCase
 import pe.moneyflow.core.domain.usecase.ObservePaymentMethodsUseCase
+import pe.moneyflow.core.domain.usecase.SaveAccountUseCase
 import pe.moneyflow.core.domain.usecase.SavePaymentMethodUseCase
 import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.PaymentMethod
+import pe.moneyflow.core.ui.preset.toAccountType
+import java.util.UUID
 import javax.inject.Inject
 
 data class PaymentMethodsUiState(
@@ -27,6 +30,7 @@ class PaymentMethodsViewModel @Inject constructor(
     observePaymentMethods: ObservePaymentMethodsUseCase,
     accountRepository: AccountRepository,
     private val savePaymentMethod: SavePaymentMethodUseCase,
+    private val saveAccount: SaveAccountUseCase,
     private val deletePaymentMethod: DeletePaymentMethodUseCase,
 ) : ViewModel() {
 
@@ -43,6 +47,32 @@ class PaymentMethodsViewModel @Inject constructor(
 
     fun save(method: PaymentMethod) {
         viewModelScope.launch { savePaymentMethod(method) }
+    }
+
+    /**
+     * Save a new method and, when [alsoCreateAccount] is on, create a matching account (same
+     * name/look) and link the method to it — so a "BCP" set up here also shows up under Cuentas.
+     */
+    fun saveWithAccount(method: PaymentMethod, alsoCreateAccount: Boolean, currencyCode: String) {
+        viewModelScope.launch {
+            var linkedAccountId = method.accountId
+            if (alsoCreateAccount) {
+                val accountId = UUID.randomUUID().toString()
+                saveAccount(
+                    Account(
+                        id = accountId,
+                        name = method.name,
+                        type = method.type.toAccountType(),
+                        currencyCode = currencyCode,
+                        openingBalanceMinor = 0,
+                        colorHex = method.colorHex,
+                        iconKey = method.iconKey,
+                    ),
+                )
+                linkedAccountId = accountId
+            }
+            savePaymentMethod(method.copy(accountId = linkedAccountId))
+        }
     }
 
     fun delete(id: String) {
