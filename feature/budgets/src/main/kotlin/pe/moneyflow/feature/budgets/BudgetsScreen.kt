@@ -11,16 +11,21 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -28,13 +33,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,8 +67,10 @@ import pe.moneyflow.core.domain.model.BudgetProgress
 import pe.moneyflow.core.model.BudgetPeriod
 import pe.moneyflow.core.ui.component.CategoryAvatar
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetsScreen(
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: BudgetsViewModel = hiltViewModel(),
 ) {
@@ -72,6 +81,21 @@ fun BudgetsScreen(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            if (onBack != null) {
+                TopAppBar(
+                    title = { Text("Presupuestos") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "Volver",
+                            )
+                        }
+                    },
+                )
+            }
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
                 Icon(Icons.Rounded.Add, contentDescription = "Nuevo presupuesto")
@@ -88,12 +112,14 @@ fun BudgetsScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            item {
-                Text(
-                    text = "Presupuestos",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+            if (onBack == null) {
+                item {
+                    Text(
+                        text = "Presupuestos",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
 
             if (uiState.isEmpty) {
@@ -123,7 +149,7 @@ fun BudgetsScreen(
     }
 
     if (showAddDialog) {
-        AddBudgetDialog(
+        AddBudgetSheet(
             categories = uiState.expenseCategories,
             onDismiss = { showAddDialog = false },
             onConfirm = { name, categoryId, amount, period ->
@@ -244,7 +270,7 @@ private fun BudgetCard(progress: BudgetProgress, onDelete: () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun AddBudgetDialog(
+private fun AddBudgetSheet(
     categories: List<pe.moneyflow.core.model.Category>,
     onDismiss: () -> Unit,
     onConfirm: (name: String, categoryId: String?, amountMinor: Long, period: BudgetPeriod) -> Unit,
@@ -255,70 +281,83 @@ private fun AddBudgetDialog(
     var period by remember { mutableStateOf(BudgetPeriod.MONTHLY) }
 
     val amountMinor = Money.parseToMinor(amountText) ?: 0L
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(name, categoryId, amountMinor, period) },
-                enabled = name.isNotBlank() && amountMinor > 0,
-            ) { Text("Crear") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
-        title = { Text("Nuevo presupuesto") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Nombre") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = amountText,
-                    onValueChange = { amountText = it },
-                    label = { Text("Monto") },
-                    prefix = { Text("S/ ") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Text(
+                text = "Nuevo presupuesto",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nombre") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = amountText,
+                onValueChange = { amountText = it },
+                label = { Text("Monto") },
+                prefix = { Text("S/ ") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-                Text("Periodo", style = MaterialTheme.typography.labelMedium)
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    val periods = listOf(
-                        BudgetPeriod.WEEKLY to "Semanal",
-                        BudgetPeriod.MONTHLY to "Mensual",
-                        BudgetPeriod.YEARLY to "Anual",
-                    )
-                    periods.forEachIndexed { index, (value, label) ->
-                        SegmentedButton(
-                            selected = period == value,
-                            onClick = { period = value },
-                            shape = SegmentedButtonDefaults.itemShape(index, periods.size),
-                        ) { Text(label) }
-                    }
-                }
-
-                Text("Categoría", style = MaterialTheme.typography.labelMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    FilterChip(
-                        selected = categoryId == null,
-                        onClick = { categoryId = null },
-                        label = { Text("General") },
-                    )
-                    categories.forEach { category ->
-                        FilterChip(
-                            selected = categoryId == category.id,
-                            onClick = { categoryId = category.id },
-                            label = { Text(category.name) },
-                        )
-                    }
+            Text("Periodo", style = MaterialTheme.typography.labelLarge)
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                val periods = listOf(
+                    BudgetPeriod.WEEKLY to "Semanal",
+                    BudgetPeriod.MONTHLY to "Mensual",
+                    BudgetPeriod.YEARLY to "Anual",
+                )
+                periods.forEachIndexed { index, (value, label) ->
+                    SegmentedButton(
+                        selected = period == value,
+                        onClick = { period = value },
+                        shape = SegmentedButtonDefaults.itemShape(index, periods.size),
+                    ) { Text(label) }
                 }
             }
-        },
-    )
+
+            Text("Categoría", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                FilterChip(
+                    selected = categoryId == null,
+                    onClick = { categoryId = null },
+                    label = { Text("General") },
+                )
+                categories.forEach { category ->
+                    FilterChip(
+                        selected = categoryId == category.id,
+                        onClick = { categoryId = category.id },
+                        label = { Text(category.name) },
+                    )
+                }
+            }
+
+            Button(
+                onClick = { onConfirm(name, categoryId, amountMinor, period) },
+                enabled = name.isNotBlank() && amountMinor > 0,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) { Text("Crear presupuesto") }
+        }
+    }
 }
 
 private fun periodLabel(period: BudgetPeriod): String = when (period) {

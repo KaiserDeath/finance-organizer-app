@@ -37,6 +37,8 @@ class SavingsViewModel @Inject constructor(
     private val deleteGoal: DeleteSavingsGoalUseCase,
 ) : ViewModel() {
 
+    private var recentlyDeleted: SavingsGoal? = null
+
     val uiState: StateFlow<SavingsUiState> =
         combine(observeGoals(), settingsRepository.preferences) { goals, prefs ->
             SavingsUiState(
@@ -70,6 +72,13 @@ class SavingsViewModel @Inject constructor(
     }
 
     fun delete(id: String) {
+        recentlyDeleted = uiState.value.goals.firstOrNull { it.id == id }
         viewModelScope.launch { deleteGoal(id) }
+    }
+
+    fun undoDelete() {
+        val toRestore = recentlyDeleted ?: return
+        recentlyDeleted = null
+        viewModelScope.launch { saveGoal(toRestore) }
     }
 }

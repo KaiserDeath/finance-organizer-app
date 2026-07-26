@@ -38,6 +38,8 @@ class RecurringViewModel @Inject constructor(
     private val clock: Clock,
 ) : ViewModel() {
 
+    private var recentlyDeleted: RecurringExpense? = null
+
     val uiState: StateFlow<RecurringUiState> =
         combine(observeRecurring(), observeCategories()) { items, categories ->
             RecurringUiState(
@@ -82,7 +84,14 @@ class RecurringViewModel @Inject constructor(
     }
 
     fun delete(id: String) {
+        recentlyDeleted = uiState.value.items.firstOrNull { it.id == id }
         viewModelScope.launch { deleteRecurring(id) }
+    }
+
+    fun undoDelete() {
+        val toRestore = recentlyDeleted ?: return
+        recentlyDeleted = null
+        viewModelScope.launch { saveRecurring(toRestore) }
     }
 
     fun today(): LocalDate = LocalDate.now(clock)

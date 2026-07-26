@@ -29,6 +29,8 @@ class CategoriesViewModel @Inject constructor(
     private val deleteCategory: DeleteCategoryUseCase,
 ) : ViewModel() {
 
+    private var recentlyDeleted: Category? = null
+
     val uiState: StateFlow<CategoriesUiState> = observeCategories()
         .map { categories ->
             CategoriesUiState(
@@ -61,6 +63,13 @@ class CategoriesViewModel @Inject constructor(
     }
 
     fun delete(id: String) {
+        recentlyDeleted = (uiState.value.expense + uiState.value.income).firstOrNull { it.id == id }
         viewModelScope.launch { deleteCategory(id) }
+    }
+
+    fun undoDelete() {
+        val toRestore = recentlyDeleted ?: return
+        recentlyDeleted = null
+        viewModelScope.launch { saveCategory(toRestore) }
     }
 }

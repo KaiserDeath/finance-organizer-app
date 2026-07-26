@@ -1,6 +1,7 @@
 package pe.moneyflow.feature.savings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -8,42 +9,62 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.component.EmptyState
 import pe.moneyflow.core.designsystem.component.MoneyCard
@@ -61,10 +82,25 @@ fun SavingsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
     var contributeGoal by remember { mutableStateOf<SavingsGoal?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    val onDelete: (SavingsGoal) -> Unit = { goal ->
+        viewModel.delete(goal.id)
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = "Meta eliminada",
+                actionLabel = "Deshacer",
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete()
+        }
+    }
 
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Ahorros") },
@@ -111,11 +147,11 @@ fun SavingsScreen(
                     )
                 }
                 items(uiState.goals, key = { it.id }) { goal ->
-                    GoalCard(
+                    SwipeableGoal(
                         goal = goal,
                         currencyCode = uiState.currencyCode,
                         onContribute = { contributeGoal = goal },
-                        onDelete = { viewModel.delete(goal.id) },
+                        onDelete = onDelete,
                     )
                 }
             }
@@ -123,7 +159,7 @@ fun SavingsScreen(
     }
 
     if (showAddDialog) {
-        AddGoalDialog(
+        AddGoalSheet(
             currencyCode = uiState.currencyCode,
             onDismiss = { showAddDialog = false },
             onConfirm = { name, target ->
@@ -170,6 +206,56 @@ private fun OverallCard(savedMinor: Long, targetMinor: Long, currencyCode: Strin
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableGoal(
+    goal: SavingsGoal,
+    currencyCode: String,
+    onContribute: () -> Unit,
+    onDelete: (SavingsGoal) -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onDelete(goal)
+                true
+            } else {
+                false
+            }
+        },
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = { DeleteBackground() },
+    ) {
+        GoalCard(
+            goal = goal,
+            currencyCode = currencyCode,
+            onContribute = onContribute,
+            onDelete = { onDelete(goal) },
+        )
+    }
+}
+
+@Composable
+private fun DeleteBackground() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = Spacing.xl),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Delete,
+            contentDescription = "Eliminar",
+            tint = MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
 @Composable
 private fun GoalCard(
     goal: SavingsGoal,
@@ -177,61 +263,64 @@ private fun GoalCard(
     onContribute: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    MoneyCard(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = goal.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = if (goal.isComplete) {
-                        "¡Meta alcanzada!"
-                    } else {
-                        "Faltan ${Money.format(goal.remainingMinor, currencyCode)}"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (goal.isComplete) PositiveGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+    Surface(color = MaterialTheme.colorScheme.background) {
+        MoneyCard(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = goal.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = if (goal.isComplete) {
+                            "¡Meta alcanzada!"
+                        } else {
+                            "Faltan ${Money.format(goal.remainingMinor, currencyCode)}"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (goal.isComplete) PositiveGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Rounded.DeleteOutline,
+                        contentDescription = "Eliminar",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Rounded.DeleteOutline,
-                    contentDescription = "Eliminar",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
 
-        Spacer(Modifier.height(Spacing.md))
-        LinearProgressIndicator(
-            progress = { goal.fraction },
-            modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)),
-            color = PositiveGreen,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "${Money.format(goal.currentAmountMinor, currencyCode)} de ${Money.format(goal.targetAmountMinor, currencyCode)}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Spacer(Modifier.height(Spacing.md))
+            LinearProgressIndicator(
+                progress = { goal.fraction },
+                modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)),
+                color = PositiveGreen,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
-            AssistChip(
-                onClick = onContribute,
-                label = { Text("Aportar") },
-            )
+            Spacer(Modifier.height(Spacing.sm))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${Money.format(goal.currentAmountMinor, currencyCode)} de ${Money.format(goal.targetAmountMinor, currencyCode)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                AssistChip(
+                    onClick = onContribute,
+                    label = { Text("Aportar") },
+                )
+            }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddGoalDialog(
+private fun AddGoalSheet(
     currencyCode: String,
     onDismiss: () -> Unit,
     onConfirm: (name: String, targetMinor: Long) -> Unit,
@@ -239,38 +328,51 @@ private fun AddGoalDialog(
     var name by remember { mutableStateOf("") }
     var targetText by remember { mutableStateOf("") }
     val targetMinor = Money.parseToMinor(targetText) ?: 0L
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Text(
+                text = "Nueva meta",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nombre") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = targetText,
+                onValueChange = { targetText = it },
+                label = { Text("Monto objetivo") },
+                prefix = { Text("${Money.symbolFor(currencyCode)} ") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Button(
                 onClick = { onConfirm(name, targetMinor) },
                 enabled = name.isNotBlank() && targetMinor > 0,
-            ) { Text("Crear") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
-        title = { Text("Nueva meta") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Nombre") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = targetText,
-                    onValueChange = { targetText = it },
-                    label = { Text("Monto objetivo") },
-                    prefix = { Text("${Money.symbolFor(currencyCode)} ") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        },
-    )
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) { Text("Crear meta") }
+        }
+    }
 }
 
 @Composable

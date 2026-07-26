@@ -5,27 +5,54 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import pe.moneyflow.core.domain.repository.AccountRepository
+import pe.moneyflow.core.domain.usecase.DeletePaymentMethodUseCase
 import pe.moneyflow.core.domain.usecase.ObservePaymentMethodsUseCase
+import pe.moneyflow.core.domain.usecase.SavePaymentMethodUseCase
+import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.PaymentMethod
 import javax.inject.Inject
 
 data class PaymentMethodsUiState(
     val isLoading: Boolean = true,
     val methods: List<PaymentMethod> = emptyList(),
+    val accounts: List<Account> = emptyList(),
 )
 
 @HiltViewModel
 class PaymentMethodsViewModel @Inject constructor(
     observePaymentMethods: ObservePaymentMethodsUseCase,
+    accountRepository: AccountRepository,
+    private val savePaymentMethod: SavePaymentMethodUseCase,
+    private val deletePaymentMethod: DeletePaymentMethodUseCase,
 ) : ViewModel() {
 
-    val uiState: StateFlow<PaymentMethodsUiState> = observePaymentMethods()
-        .map { PaymentMethodsUiState(isLoading = false, methods = it) }
-        .stateIn(
+    private var recentlyDeleted: PaymentMethod? = null
+
+    val uiState: StateFlow<PaymentMethodsUiState> =
+        combine(observePaymentMethods(), accountRepository.observeAll()) { methods, accounts ->
+            PaymentMethodsUiState(isLoading = false, methods = methods, accounts = accounts)
+        }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = PaymentMethodsUiState(),
         )
+
+    fun save(method: PaymentMethod) {
+        viewModelScope.launch { savePaymentMethod(method) }
+    }
+
+    fun delete(id: String) {
+        recentlyDeleted = uiState.value.methods.firstOrNull { it.id == id }
+        viewModelScope.launch { deletePaymentMethod(id) }
+    }
+
+    fun undoDelete() {
+        val method = recentlyDeleted ?: return
+        recentlyDeleted = null
+        viewModelScope.launch { savePaymentMethod(method) }
+    }
 }

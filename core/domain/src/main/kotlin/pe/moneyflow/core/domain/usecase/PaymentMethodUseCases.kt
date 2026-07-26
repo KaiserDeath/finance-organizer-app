@@ -10,3 +10,15 @@ class ObservePaymentMethodsUseCase @Inject constructor(
 ) {
     operator fun invoke(): Flow<List<PaymentMethod>> = repository.observeAll()
 }
+
+class SavePaymentMethodUseCase @Inject constructor(
+    private val repository: PaymentMethodRepository,
+) {
+    suspend operator fun invoke(paymentMethod: PaymentMethod) = repository.upsert(paymentMethod)
+}
+
+class DeletePaymentMethodUseCase @Inject constructor(
+    private val repository: PaymentMethodRepository,
+) {
+    suspend operator fun invoke(id: String) = repository.delete(id)
+}

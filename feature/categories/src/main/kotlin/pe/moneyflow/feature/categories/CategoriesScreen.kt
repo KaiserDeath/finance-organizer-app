@@ -13,41 +13,60 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import pe.moneyflow.core.designsystem.component.SectionHeader
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.Spacing
@@ -75,11 +94,26 @@ fun CategoriesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    val onDelete: (Category) -> Unit = { category ->
+        viewModel.delete(category.id)
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = "Categoría eliminada",
+                actionLabel = "Deshacer",
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete()
+        }
+    }
 
     Scaffold(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Categorías") },
@@ -109,25 +143,66 @@ fun CategoriesScreen(
             if (uiState.expense.isNotEmpty()) {
                 item { SectionHeader(title = "Gastos", modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.sm)) }
                 items(uiState.expense, key = { it.id }) { category ->
-                    CategoryRow(category = category, onDelete = { viewModel.delete(category.id) })
+                    SwipeableCategory(category = category, onDelete = onDelete)
                 }
             }
             if (uiState.income.isNotEmpty()) {
                 item { SectionHeader(title = "Ingresos", modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.sm)) }
                 items(uiState.income, key = { it.id }) { category ->
-                    CategoryRow(category = category, onDelete = { viewModel.delete(category.id) })
+                    SwipeableCategory(category = category, onDelete = onDelete)
                 }
             }
         }
     }
 
     if (showAddDialog) {
-        AddCategoryDialog(
+        AddCategorySheet(
             onDismiss = { showAddDialog = false },
             onConfirm = { name, colorHex, iconKey, type ->
                 viewModel.add(name, colorHex, iconKey, type)
                 showAddDialog = false
             },
+        )
+    }
+}
+
+@Composable
+private fun SwipeableCategory(category: Category, onDelete: (Category) -> Unit) {
+    val haptics = LocalHapticFeedback.current
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onDelete(category)
+                true
+            } else {
+                false
+            }
+        },
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = { DeleteBackground() },
+    ) {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            CategoryRow(category = category, onDelete = { onDelete(category) })
+        }
+    }
+}
+
+@Composable
+private fun DeleteBackground() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = Spacing.xl),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Delete,
+            contentDescription = "Eliminar",
+            tint = MaterialTheme.colorScheme.error,
         )
     }
 }
@@ -160,7 +235,7 @@ private fun CategoryRow(category: Category, onDelete: () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun AddCategoryDialog(
+private fun AddCategorySheet(
     onDismiss: () -> Unit,
     onConfirm: (name: String, colorHex: String, iconKey: String, type: CategoryType) -> Unit,
 ) {
@@ -169,82 +244,96 @@ private fun AddCategoryDialog(
     var colorHex by remember { mutableStateOf(PaletteHex.first()) }
     var iconKey by remember { mutableStateOf(IconChoices.first()) }
 
-    AlertDialog(
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(name, colorHex, iconKey, type) },
-                enabled = name.isNotBlank(),
-            ) { Text("Agregar") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
-        title = { Text("Nueva categoría") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Nombre") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Text(
+                text = "Nueva categoría",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nombre") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    val types = listOf(CategoryType.EXPENSE to "Gasto", CategoryType.INCOME to "Ingreso")
-                    types.forEachIndexed { index, (value, label) ->
-                        SegmentedButton(
-                            selected = type == value,
-                            onClick = { type = value },
-                            shape = SegmentedButtonDefaults.itemShape(index, types.size),
-                        ) { Text(label) }
-                    }
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                val types = listOf(CategoryType.EXPENSE to "Gasto", CategoryType.INCOME to "Ingreso")
+                types.forEachIndexed { index, (value, label) ->
+                    SegmentedButton(
+                        selected = type == value,
+                        onClick = { type = value },
+                        shape = SegmentedButtonDefaults.itemShape(index, types.size),
+                    ) { Text(label) }
                 }
+            }
 
-                Text("Color", style = MaterialTheme.typography.labelMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    PaletteHex.forEach { hex ->
-                        val color = colorFromHex(hex, MaterialTheme.colorScheme.primary)
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .border(
-                                    width = if (colorHex == hex) 3.dp else 0.dp,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    shape = CircleShape,
-                                )
-                                .clickable { colorHex = hex },
+            Text("Color", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                PaletteHex.forEach { hex ->
+                    val color = colorFromHex(hex, MaterialTheme.colorScheme.primary)
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .border(
+                                width = if (colorHex == hex) 3.dp else 0.dp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                shape = CircleShape,
+                            )
+                            .clickable { colorHex = hex },
+                    )
+                }
+            }
+
+            Text("Ícono", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                IconChoices.forEach { key ->
+                    val selected = iconKey == key
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                            .clickable { iconKey = key },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = iconForKey(key),
+                            contentDescription = null,
+                            tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
                         )
                     }
                 }
-
-                Text("Ícono", style = MaterialTheme.typography.labelMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    IconChoices.forEach { key ->
-                        val selected = iconKey == key
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (selected) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceVariant,
-                                )
-                                .clickable { iconKey = key },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = iconForKey(key),
-                                contentDescription = null,
-                                tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
-                }
             }
-        },
-    )
+
+            Button(
+                onClick = { onConfirm(name, colorHex, iconKey, type) },
+                enabled = name.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) { Text("Agregar categoría") }
+        }
+    }
 }

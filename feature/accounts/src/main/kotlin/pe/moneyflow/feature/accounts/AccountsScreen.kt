@@ -10,29 +10,34 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.SwapHoriz
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -136,7 +141,7 @@ fun AccountsScreen(
     }
 
     if (showAddDialog) {
-        AddAccountDialog(
+        AddAccountSheet(
             onDismiss = { showAddDialog = false },
             onConfirm = { name, type, currency, opening ->
                 viewModel.add(name, type, currency, opening)
@@ -146,7 +151,7 @@ fun AccountsScreen(
     }
 
     if (showTransferDialog && uiState.accounts.size >= 2) {
-        TransferDialog(
+        TransferSheet(
             accounts = uiState.accounts,
             onDismiss = { showTransferDialog = false },
             onConfirm = { fromId, toId, amount, currency ->
@@ -245,9 +250,9 @@ private fun AccountCard(balance: AccountBalance, onArchive: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun AddAccountDialog(
+private fun AddAccountSheet(
     onDismiss: () -> Unit,
     onConfirm: (name: String, type: AccountType, currency: String, openingMinor: Long) -> Unit,
 ) {
@@ -257,66 +262,79 @@ private fun AddAccountDialog(
     var openingText by remember { mutableStateOf("") }
 
     val openingMinor = Money.parseToMinor(openingText) ?: 0L
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Text(
+                text = "Nueva cuenta",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nombre") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Text("Tipo", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                AccountPresets.ordered.forEach { option ->
+                    FilterChip(
+                        selected = type == option,
+                        onClick = { type = option },
+                        label = { Text(AccountPresets.of(option).label) },
+                    )
+                }
+            }
+
+            Text("Moneda", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                supportedCurrencies.forEach { code ->
+                    FilterChip(
+                        selected = currency == code,
+                        onClick = { currency = code },
+                        label = { Text(code) },
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = openingText,
+                onValueChange = { openingText = it },
+                label = { Text("Saldo inicial") },
+                prefix = { Text("${Money.symbolFor(currency)} ") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Button(
                 onClick = { onConfirm(name, type, currency, openingMinor) },
                 enabled = name.isNotBlank(),
-            ) { Text("Crear") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
-        title = { Text("Nueva cuenta") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Nombre") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                Text("Tipo", style = MaterialTheme.typography.labelMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    AccountPresets.ordered.forEach { option ->
-                        FilterChip(
-                            selected = type == option,
-                            onClick = { type = option },
-                            label = { Text(AccountPresets.of(option).label) },
-                        )
-                    }
-                }
-
-                Text("Moneda", style = MaterialTheme.typography.labelMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    supportedCurrencies.forEach { code ->
-                        FilterChip(
-                            selected = currency == code,
-                            onClick = { currency = code },
-                            label = { Text(code) },
-                        )
-                    }
-                }
-
-                OutlinedTextField(
-                    value = openingText,
-                    onValueChange = { openingText = it },
-                    label = { Text("Saldo inicial") },
-                    prefix = { Text("${Money.symbolFor(currency)} ") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        },
-    )
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) { Text("Crear cuenta") }
+        }
+    }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun TransferDialog(
+private fun TransferSheet(
     accounts: List<Account>,
     onDismiss: () -> Unit,
     onConfirm: (fromId: String, toId: String, amountMinor: Long, currency: String) -> Unit,
@@ -329,58 +347,72 @@ private fun TransferDialog(
     val currency = fromAccount?.currencyCode ?: "PEN"
     val amountMinor = Money.parseToMinor(amountText) ?: 0L
     val valid = fromId != toId && amountMinor > 0
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Text(
+                text = "Transferir",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+
+            Text("Desde", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                accounts.forEach { account ->
+                    FilterChip(
+                        selected = fromId == account.id,
+                        onClick = {
+                            fromId = account.id
+                            if (toId == account.id) {
+                                toId = accounts.first { it.id != account.id }.id
+                            }
+                        },
+                        label = { Text(account.name) },
+                    )
+                }
+            }
+
+            Text("Hacia", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                accounts.filter { it.id != fromId }.forEach { account ->
+                    FilterChip(
+                        selected = toId == account.id,
+                        onClick = { toId = account.id },
+                        label = { Text(account.name) },
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = amountText,
+                onValueChange = { amountText = it },
+                label = { Text("Monto") },
+                prefix = { Text("${Money.symbolFor(currency)} ") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Button(
                 onClick = { onConfirm(fromId, toId, amountMinor, currency) },
                 enabled = valid,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text("Transferir") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
-        title = { Text("Transferir") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                Text("Desde", style = MaterialTheme.typography.labelMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    accounts.forEach { account ->
-                        FilterChip(
-                            selected = fromId == account.id,
-                            onClick = {
-                                fromId = account.id
-                                if (toId == account.id) {
-                                    toId = accounts.first { it.id != account.id }.id
-                                }
-                            },
-                            label = { Text(account.name) },
-                        )
-                    }
-                }
-
-                Text("Hacia", style = MaterialTheme.typography.labelMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    accounts.filter { it.id != fromId }.forEach { account ->
-                        FilterChip(
-                            selected = toId == account.id,
-                            onClick = { toId = account.id },
-                            label = { Text(account.name) },
-                        )
-                    }
-                }
-
-                OutlinedTextField(
-                    value = amountText,
-                    onValueChange = { amountText = it },
-                    label = { Text("Monto") },
-                    prefix = { Text("${Money.symbolFor(currency)} ") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        },
-    )
+        }
+    }
 }
 
 private fun accountTypeLabel(type: AccountType): String = AccountPresets.of(type).label
