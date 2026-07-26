@@ -11,3 +11,6 @@ build/
 .cxx
 local.properties
 *.hprof
+
+# Eclipse/IDE compiled output
+bin/
