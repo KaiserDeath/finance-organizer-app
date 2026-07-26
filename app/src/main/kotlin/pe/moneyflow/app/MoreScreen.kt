@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.CurrencyExchange
 import androidx.compose.material.icons.rounded.EventRepeat
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Palette
@@ -64,6 +65,7 @@ fun MoreScreen(
     onOpenAppearance: () -> Unit,
     onOpenBackup: () -> Unit,
     onOpenSecurity: () -> Unit,
+    onOpenLegal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val sections = listOf(
@@ -145,6 +147,12 @@ fun MoreScreen(
                     "Copia de seguridad",
                     "Exporta o restaura tus datos",
                     onOpenBackup,
+                ),
+                MoreItem(
+                    Icons.Rounded.Info,
+                    "Acerca de y legal",
+                    "Privacidad, datos y marcas",
+                    onOpenLegal,
                 ),
             ),
         ),

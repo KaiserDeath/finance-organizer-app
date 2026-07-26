@@ -22,19 +22,28 @@ data class FinancePreset(
      * bank apps rather than shipping its own). Verified against Google Play, July 2026.
      */
     val deepLinkPackage: String? = null,
+    /**
+     * Official mobile web-banking URL, opened in an external browser as a fallback when the app is
+     * not installed. Banks only; wallets (Yape/Plin) and cash have none. Verified July 2026.
+     */
+    val webUrl: String? = null,
 )
 
 object FinancePresets {
     val all: List<FinancePreset> = listOf(
         FinancePreset("Efectivo", AccountType.CASH, PaymentMethodType.CASH, "cash", "#66BB6A"),
-        FinancePreset("BCP", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#EA6A1E", "com.bcp.bank.bcp"),
-        FinancePreset("BBVA", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#1464A5", "com.bbva.nxt_peru"),
-        FinancePreset("Interbank", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#00A94F", "pe.com.interbank.mobilebanking"),
-        FinancePreset("Scotiabank", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#D5122B", "pe.com.scotiabank.blpm.android.client"),
+        FinancePreset("BCP", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#EA6A1E", "com.bcp.bank.bcp", "https://bcpzonasegura.viabcp.com/"),
+        FinancePreset("BBVA", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#1464A5", "com.bbva.nxt_peru", "https://www.bbva.pe/personas/acceso-banca-por-internet.html"),
+        FinancePreset("Interbank", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#00A94F", "pe.com.interbank.mobilebanking", "https://bancaporinternet.interbank.pe/"),
+        FinancePreset("Scotiabank", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#D5122B", "pe.com.scotiabank.blpm.android.client", "https://www.scotiabank.com.pe/Personas/Canales-digitales/canales/banca-por-internet"),
         FinancePreset("Yape", AccountType.EWALLET, PaymentMethodType.EWALLET, "wallet", "#742284", "com.bcp.innovacxion.yapeapp"),
         FinancePreset("Plin", AccountType.EWALLET, PaymentMethodType.EWALLET, "wallet", "#00B7C4"),
         FinancePreset("Tarjeta de crédito", AccountType.CREDIT_CARD, PaymentMethodType.CARD, "card", "#EF5350"),
     )
+
+    /** Official web-banking URL for a stored [packageName], so it need not be persisted per method. */
+    fun webUrlFor(packageName: String?): String? =
+        packageName?.let { pkg -> all.firstOrNull { it.deepLinkPackage == pkg }?.webUrl }
 }
 
 /** Sensible default payment-method type for an account type, used when auto-creating the pair. */

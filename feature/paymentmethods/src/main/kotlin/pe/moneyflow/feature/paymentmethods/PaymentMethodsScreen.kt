@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -75,6 +76,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -84,6 +86,7 @@ import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
+import pe.moneyflow.core.ui.legal.LegalText
 import pe.moneyflow.core.ui.preset.FinancePresets
 import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.PaymentMethod
@@ -164,7 +167,8 @@ fun PaymentMethodsScreen(
         ) {
             item {
                 Text(
-                    text = "Toca un método para editarlo, o el ícono ↗ para abrir su app.",
+                    text = "Toca un método para editarlo, o \"Abrir\" para ir a su app oficial " +
+                        "(saldrás de MoneyFlow).",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -183,9 +187,19 @@ fun PaymentMethodsScreen(
                             packageName = method.deepLinkPackage,
                             appName = method.name,
                             playStoreId = method.playStoreId,
+                            webBankingUrl = FinancePresets.webUrlFor(method.deepLinkPackage),
                         )
                     },
                     onDelete = onDelete,
+                )
+            }
+
+            item {
+                Text(
+                    text = LegalText.NON_AFFILIATION_SHORT,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = Spacing.md),
                 )
             }
         }
@@ -285,13 +299,18 @@ private fun PaymentMethodRow(method: PaymentMethod, onClick: () -> Unit, onLaunc
             )
         }
         if (!method.deepLinkPackage.isNullOrBlank()) {
-            IconButton(onClick = onLaunch) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
-                    contentDescription = "Abrir app",
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
+            // Transparent redirection: name the destination so the user knows they're leaving.
+            AssistChip(
+                onClick = onLaunch,
+                label = { Text("Abrir ${method.name}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+            )
         }
     }
 }
@@ -387,51 +406,6 @@ private fun AddEditPaymentMethodSheet(
                 }
             }
 
-            Text("Color", style = MaterialTheme.typography.labelLarge)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                PaletteHex.forEach { hex ->
-                    val color = colorFromHex(hex, MaterialTheme.colorScheme.primary)
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .clip(CircleShape)
-                            .background(color)
-                            .border(
-                                width = if (colorHex == hex) 3.dp else 0.dp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                shape = CircleShape,
-                            )
-                            .clickable { colorHex = hex },
-                    )
-                }
-            }
-
-            Text("Ícono", style = MaterialTheme.typography.labelLarge)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                IconChoices.forEach { key ->
-                    val selected = iconKey == key
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (selected) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                            )
-                            .clickable { iconKey = key },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = iconForKey(key),
-                            contentDescription = null,
-                            tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-            }
-
             if (accounts.isNotEmpty()) {
                 Text("Cuenta (opcional)", style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -485,18 +459,64 @@ private fun AddEditPaymentMethodSheet(
                 Switch(checked = isDefault, onCheckedChange = { isDefault = it })
             }
 
-            // Advanced: the app link (technical, hidden by default).
+            // Advanced: personalization + app link, hidden by default so the common path is just
+            // name + type (or a preset).
             val chevron by animateFloatAsState(if (showAdvanced) 180f else 0f, label = "adv-chevron")
             TextButton(
                 onClick = { showAdvanced = !showAdvanced },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Opciones avanzadas (enlace a la app)")
+                Text("Personalizar (color, ícono, enlace a la app)")
                 Spacer(Modifier.width(Spacing.xs))
                 Icon(Icons.Rounded.ExpandMore, contentDescription = null, modifier = Modifier.rotate(chevron))
             }
             AnimatedVisibility(visible = showAdvanced) {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                    Text("Color", style = MaterialTheme.typography.labelLarge)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        PaletteHex.forEach { hex ->
+                            val color = colorFromHex(hex, MaterialTheme.colorScheme.primary)
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .border(
+                                        width = if (colorHex == hex) 3.dp else 0.dp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        shape = CircleShape,
+                                    )
+                                    .clickable { colorHex = hex },
+                            )
+                        }
+                    }
+
+                    Text("Ícono", style = MaterialTheme.typography.labelLarge)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        IconChoices.forEach { key ->
+                            val selected = iconKey == key
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.primaryContainer
+                                        else MaterialTheme.colorScheme.surfaceVariant,
+                                    )
+                                    .clickable { iconKey = key },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = iconForKey(key),
+                                    contentDescription = null,
+                                    tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = deepLink,
                         onValueChange = { deepLink = it },

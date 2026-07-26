@@ -34,6 +34,7 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.serialization.Serializable
 import pe.moneyflow.app.backup.BackupScreen
 import pe.moneyflow.app.security.SecurityScreen
+import pe.moneyflow.app.legal.LegalScreen
 import pe.moneyflow.app.settings.AppearanceScreen
 import pe.moneyflow.feature.accounts.AccountsRoute
 import pe.moneyflow.feature.accounts.accountsScreen
@@ -73,6 +74,9 @@ data object SecurityRoute
 
 @Serializable
 data object AppearanceRoute
+
+@Serializable
+data object LegalRoute
 
 private enum class TopLevelDestination(
     val route: Any,
@@ -157,6 +161,7 @@ fun MoneyFlowApp(startInAddTransaction: Boolean = false) {
                     onOpenAppearance = { navController.navigate(AppearanceRoute) },
                     onOpenBackup = { navController.navigate(BackupRoute) },
                     onOpenSecurity = { navController.navigate(SecurityRoute) },
+                    onOpenLegal = { navController.navigate(LegalRoute) },
                 )
             }
             insightsScreen(onBack = { navController.popBackStack() })
@@ -170,6 +175,7 @@ fun MoneyFlowApp(startInAddTransaction: Boolean = false) {
             composable<AppearanceRoute> { AppearanceScreen(onBack = { navController.popBackStack() }) }
             composable<BackupRoute> { BackupScreen(onBack = { navController.popBackStack() }) }
             composable<SecurityRoute> { SecurityScreen(onBack = { navController.popBackStack() }) }
+            composable<LegalRoute> { LegalScreen(onBack = { navController.popBackStack() }) }
             addEditScreen(onDone = { navController.popBackStack() })
         }
     }
