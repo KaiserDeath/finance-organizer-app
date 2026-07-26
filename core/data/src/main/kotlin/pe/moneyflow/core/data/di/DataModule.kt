@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import pe.moneyflow.core.common.DefaultDispatcher
 import pe.moneyflow.core.common.IoDispatcher
+import pe.moneyflow.core.data.backup.BackupRepositoryImpl
 import pe.moneyflow.core.data.repository.AccountRepositoryImpl
 import pe.moneyflow.core.data.repository.BudgetRepositoryImpl
 import pe.moneyflow.core.data.repository.CategoryRepositoryImpl
@@ -18,6 +19,7 @@ import pe.moneyflow.core.data.repository.RecurringExpenseRepositoryImpl
 import pe.moneyflow.core.data.repository.SavingsGoalRepositoryImpl
 import pe.moneyflow.core.data.repository.TransactionRepositoryImpl
 import pe.moneyflow.core.domain.repository.AccountRepository
+import pe.moneyflow.core.domain.repository.BackupRepository
 import pe.moneyflow.core.domain.repository.BudgetRepository
 import pe.moneyflow.core.domain.repository.CategoryRepository
 import pe.moneyflow.core.domain.repository.ExchangeRateRepository
@@ -65,6 +67,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindExchangeRateRepository(impl: ExchangeRateRepositoryImpl): ExchangeRateRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindBackupRepository(impl: BackupRepositoryImpl): BackupRepository
 }
 
 @Module

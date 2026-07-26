@@ -29,6 +29,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlinx.serialization.Serializable
+import pe.moneyflow.app.backup.BackupScreen
+import pe.moneyflow.app.security.SecurityScreen
 import pe.moneyflow.feature.accounts.AccountsRoute
 import pe.moneyflow.feature.accounts.accountsScreen
 import pe.moneyflow.feature.addedit.addEditScreen
@@ -56,6 +58,12 @@ import pe.moneyflow.feature.upcoming.upcomingScreen
 
 @Serializable
 data object MoreRoute
+
+@Serializable
+data object BackupRoute
+
+@Serializable
+data object SecurityRoute
 
 private enum class TopLevelDestination(
     val route: Any,
@@ -125,6 +133,8 @@ fun MoneyFlowApp() {
                     onOpenRecurring = { navController.navigate(RecurringRoute) },
                     onOpenAnalytics = { navController.navigate(AnalyticsRoute) },
                     onOpenCurrency = { navController.navigate(CurrencyRoute) },
+                    onOpenBackup = { navController.navigate(BackupRoute) },
+                    onOpenSecurity = { navController.navigate(SecurityRoute) },
                 )
             }
             accountsScreen(onBack = { navController.popBackStack() })
@@ -134,6 +144,8 @@ fun MoneyFlowApp() {
             recurringScreen(onBack = { navController.popBackStack() })
             analyticsScreen(onBack = { navController.popBackStack() })
             currencyScreen(onBack = { navController.popBackStack() })
+            composable<BackupRoute> { BackupScreen(onBack = { navController.popBackStack() }) }
+            composable<SecurityRoute> { SecurityScreen(onBack = { navController.popBackStack() }) }
             addEditScreen(onDone = { navController.popBackStack() })
         }
     }

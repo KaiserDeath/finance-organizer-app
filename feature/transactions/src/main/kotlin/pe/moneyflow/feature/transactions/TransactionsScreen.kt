@@ -2,6 +2,9 @@ package pe.moneyflow.feature.transactions
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -12,11 +15,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -26,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,7 +51,9 @@ import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.component.EmptyState
 import pe.moneyflow.core.designsystem.component.ShimmerBox
 import pe.moneyflow.core.designsystem.theme.Spacing
+import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.Transaction
+import pe.moneyflow.core.model.TransactionType
 import pe.moneyflow.core.ui.component.TransactionRow
 
 @Composable
@@ -76,7 +87,7 @@ fun TransactionsScreen(
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             when {
                 uiState.isLoading -> LoadingList()
-                uiState.isEmpty -> EmptyState(
+                uiState.isEmpty && !uiState.isFilterActive -> EmptyState(
                     icon = Icons.Rounded.ReceiptLong,
                     title = "Sin movimientos",
                     subtitle = "Registra un gasto con el botón + para verlo aquí.",
@@ -87,6 +98,10 @@ fun TransactionsScreen(
                     state = uiState,
                     onTransactionClick = onTransactionClick,
                     onDelete = onDelete,
+                    onQueryChange = viewModel::onQueryChange,
+                    onToggleType = viewModel::toggleType,
+                    onToggleCategory = viewModel::toggleCategory,
+                    onClearFilters = viewModel::clearFilters,
                 )
             }
         }
@@ -98,6 +113,10 @@ private fun TransactionsList(
     state: TransactionsUiState,
     onTransactionClick: (String) -> Unit,
     onDelete: (Transaction) -> Unit,
+    onQueryChange: (String) -> Unit,
+    onToggleType: (TransactionType) -> Unit,
+    onToggleCategory: (String) -> Unit,
+    onClearFilters: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -110,6 +129,27 @@ private fun TransactionsList(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
             )
+        }
+
+        item(key = "filters") {
+            FiltersHeader(
+                state = state,
+                onQueryChange = onQueryChange,
+                onToggleType = onToggleType,
+                onToggleCategory = onToggleCategory,
+                onClearFilters = onClearFilters,
+            )
+        }
+
+        if (state.sections.isEmpty()) {
+            item(key = "no-matches") {
+                EmptyState(
+                    icon = Icons.Rounded.Search,
+                    title = "Sin resultados",
+                    subtitle = "Ningún movimiento coincide con tu búsqueda o filtros.",
+                    modifier = Modifier.fillMaxWidth().padding(Spacing.xl),
+                )
+            }
         }
 
         state.sections.forEach { section ->
@@ -130,6 +170,73 @@ private fun TransactionsList(
                     color = MaterialTheme.colorScheme.outlineVariant,
                     modifier = Modifier.padding(start = 72.dp),
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FiltersHeader(
+    state: TransactionsUiState,
+    onQueryChange: (String) -> Unit,
+    onToggleType: (TransactionType) -> Unit,
+    onToggleCategory: (String) -> Unit,
+    onClearFilters: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        OutlinedTextField(
+            value = state.filter.query,
+            onValueChange = onQueryChange,
+            label = { Text("Buscar") },
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+            trailingIcon = {
+                if (state.filter.query.isNotEmpty()) {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Limpiar búsqueda")
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            val typeLabels = listOf(
+                TransactionType.EXPENSE to "Gastos",
+                TransactionType.INCOME to "Ingresos",
+                TransactionType.TRANSFER to "Transferencias",
+            )
+            typeLabels.forEach { (type, label) ->
+                FilterChip(
+                    selected = type in state.filter.types,
+                    onClick = { onToggleType(type) },
+                    label = { Text(label) },
+                )
+            }
+        }
+
+        if (state.expenseCategories.isNotEmpty()) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                state.expenseCategories.forEach { category ->
+                    FilterChip(
+                        selected = category.id in state.filter.categoryIds,
+                        onClick = { onToggleCategory(category.id) },
+                        label = { Text(category.name) },
+                    )
+                }
+            }
+        }
+
+        if (state.isFilterActive) {
+            TextButton(onClick = onClearFilters) {
+                Icon(Icons.Rounded.Close, contentDescription = null)
+                Text("  Limpiar filtros")
             }
         }
     }

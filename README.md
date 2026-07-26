@@ -87,7 +87,8 @@ search. "Plin" has no standalone app (it lives inside partner bank apps), so it 
 - **Phase 2** — Budgets, upcoming payments, recurring templates (WorkManager), reminders/notifications.
 - **Phase 3** — Analytics & monthly reports (Vico charts, CSV/PDF export).
 - **Phase 4** — Accounts, income, transfers, savings goals, net worth, multi-currency.
-- **Phase 5** — Biometric/PIN lock, backup/restore, home-screen widgets (Glance), onboarding, full search/filters.
+- **Phase 5** — Biometric/PIN lock, backup/restore (JSON), onboarding, full search/filters ✅.
+  Home-screen widgets (Glance) remain (Phase 5b).
 - **Phase 6** — Smart/AI insights behind the `SmartInsights` interface (rule-based first, LLM later).
 
 ## Testing

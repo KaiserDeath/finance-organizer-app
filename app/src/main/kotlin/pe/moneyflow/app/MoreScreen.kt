@@ -17,9 +17,11 @@ import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.CurrencyExchange
 import androidx.compose.material.icons.rounded.EventRepeat
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,6 +45,8 @@ fun MoreScreen(
     onOpenRecurring: () -> Unit,
     onOpenAnalytics: () -> Unit,
     onOpenCurrency: () -> Unit,
+    onOpenBackup: () -> Unit,
+    onOpenSecurity: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -132,6 +136,26 @@ fun MoreScreen(
                     title = "Monedas",
                     subtitle = "Moneda base y tipos de cambio",
                     onClick = onOpenCurrency,
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(start = 68.dp),
+                )
+                MoreRow(
+                    icon = Icons.Rounded.Lock,
+                    title = "Seguridad",
+                    subtitle = "Bloqueo con PIN y biometría",
+                    onClick = onOpenSecurity,
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(start = 68.dp),
+                )
+                MoreRow(
+                    icon = Icons.Rounded.Backup,
+                    title = "Copia de seguridad",
+                    subtitle = "Exporta o restaura tus datos",
+                    onClick = onOpenBackup,
                 )
             }
         }

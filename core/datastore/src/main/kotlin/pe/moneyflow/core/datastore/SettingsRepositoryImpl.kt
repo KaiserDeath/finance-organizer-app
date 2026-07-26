@@ -24,6 +24,8 @@ class SettingsRepositoryImpl @Inject constructor(
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val CURRENCY = stringPreferencesKey("currency_code")
         val ONBOARDING = booleanPreferencesKey("onboarding_complete")
+        val PIN_HASH = stringPreferencesKey("pin_hash")
+        val BIOMETRIC = booleanPreferencesKey("biometric_enabled")
     }
 
     override val preferences: Flow<UserPreferences> = dataStore.data
@@ -39,6 +41,8 @@ class SettingsRepositoryImpl @Inject constructor(
                 useDynamicColor = prefs[Keys.DYNAMIC_COLOR] ?: true,
                 currencyCode = prefs[Keys.CURRENCY] ?: "PEN",
                 onboardingComplete = prefs[Keys.ONBOARDING] ?: false,
+                pinHash = prefs[Keys.PIN_HASH],
+                biometricEnabled = prefs[Keys.BIOMETRIC] ?: false,
             )
         }
 
@@ -56,5 +60,15 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setOnboardingComplete(complete: Boolean) {
         dataStore.edit { it[Keys.ONBOARDING] = complete }
+    }
+
+    override suspend fun setPinHash(hash: String?) {
+        dataStore.edit { prefs ->
+            if (hash == null) prefs.remove(Keys.PIN_HASH) else prefs[Keys.PIN_HASH] = hash
+        }
+    }
+
+    override suspend fun setBiometricEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.BIOMETRIC] = enabled }
     }
 }

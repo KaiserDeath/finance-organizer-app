@@ -3,12 +3,16 @@ package pe.moneyflow.feature.transactions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import pe.moneyflow.core.domain.model.TransactionFilter
 import pe.moneyflow.core.domain.usecase.DeleteTransactionUseCase
+import pe.moneyflow.core.domain.usecase.FilterTransactionsUseCase
 import pe.moneyflow.core.domain.usecase.GetTransactionUseCase
 import pe.moneyflow.core.domain.usecase.ObserveCategoriesUseCase
 import pe.moneyflow.core.domain.usecase.ObserveTransactionsUseCase
@@ -31,14 +35,18 @@ data class TransactionsUiState(
     val sections: List<TransactionSection> = emptyList(),
     val categoriesById: Map<String, Category> = emptyMap(),
     val currencyCode: String = "PEN",
+    val filter: TransactionFilter = TransactionFilter(),
+    val expenseCategories: List<Category> = emptyList(),
 ) {
     val isEmpty: Boolean get() = !isLoading && sections.isEmpty()
+    val isFilterActive: Boolean get() = filter.isActive
 }
 
 @HiltViewModel
 class TransactionsViewModel @Inject constructor(
     observeTransactions: ObserveTransactionsUseCase,
     observeCategories: ObserveCategoriesUseCase,
+    private val filterTransactions: FilterTransactionsUseCase,
     private val getTransaction: GetTransactionUseCase,
     private val deleteTransaction: DeleteTransactionUseCase,
     private val saveTransaction: SaveTransactionUseCase,
@@ -46,19 +54,48 @@ class TransactionsViewModel @Inject constructor(
 
     private var recentlyDeleted: Transaction? = null
 
+    private val filterState = MutableStateFlow(TransactionFilter())
+
     val uiState: StateFlow<TransactionsUiState> =
-        combine(observeTransactions(), observeCategories()) { transactions, categories ->
+        combine(
+            observeTransactions(),
+            observeCategories(),
+            filterState,
+        ) { transactions, categories, filter ->
+            val filtered = filterTransactions(transactions, filter)
             TransactionsUiState(
                 isLoading = false,
-                sections = buildSections(transactions),
+                sections = buildSections(filtered),
                 categoriesById = categories.associateBy { it.id },
                 currencyCode = transactions.firstOrNull()?.currencyCode ?: "PEN",
+                filter = filter,
+                expenseCategories = categories,
             )
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = TransactionsUiState(),
         )
+
+    fun onQueryChange(query: String) = filterState.update { it.copy(query = query) }
+
+    fun toggleType(type: TransactionType) = filterState.update { current ->
+        current.copy(
+            types = if (type in current.types) current.types - type else current.types + type,
+        )
+    }
+
+    fun toggleCategory(categoryId: String) = filterState.update { current ->
+        current.copy(
+            categoryIds = if (categoryId in current.categoryIds) {
+                current.categoryIds - categoryId
+            } else {
+                current.categoryIds + categoryId
+            },
+        )
+    }
+
+    fun clearFilters() = filterState.update { TransactionFilter() }
 
     fun delete(id: String) {
         viewModelScope.launch {

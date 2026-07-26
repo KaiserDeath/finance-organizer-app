@@ -76,4 +76,6 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setDynamicColor(enabled: Boolean) = Unit
     override suspend fun setCurrency(code: String) = Unit
     override suspend fun setOnboardingComplete(complete: Boolean) = Unit
+    override suspend fun setPinHash(hash: String?) = Unit
+    override suspend fun setBiometricEnabled(enabled: Boolean) = Unit
 }

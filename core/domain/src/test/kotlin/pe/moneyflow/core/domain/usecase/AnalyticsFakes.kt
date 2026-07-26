@@ -38,10 +38,16 @@ internal class FakePmRepo(private val items: List<PaymentMethod>) : PaymentMetho
     override suspend fun delete(id: String) = Unit
 }
 
-internal class FakeSettings(private val currency: String = "PEN") : SettingsRepository {
-    override val preferences: Flow<UserPreferences> = flowOf(UserPreferences(currencyCode = currency))
+internal class FakeSettings(
+    private val currency: String = "PEN",
+    private val pinHash: String? = null,
+) : SettingsRepository {
+    override val preferences: Flow<UserPreferences> =
+        flowOf(UserPreferences(currencyCode = currency, pinHash = pinHash))
     override suspend fun setThemeMode(mode: ThemeMode) = Unit
     override suspend fun setDynamicColor(enabled: Boolean) = Unit
     override suspend fun setCurrency(code: String) = Unit
     override suspend fun setOnboardingComplete(complete: Boolean) = Unit
+    override suspend fun setPinHash(hash: String?) = Unit
+    override suspend fun setBiometricEnabled(enabled: Boolean) = Unit
 }
