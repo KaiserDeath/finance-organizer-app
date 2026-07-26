@@ -149,7 +149,10 @@ fun AddEditScreen(
                 types.forEachIndexed { index, (type, label) ->
                     SegmentedButton(
                         selected = uiState.type == type,
-                        onClick = { viewModel.onTypeChange(type) },
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            viewModel.onTypeChange(type)
+                        },
                         shape = SegmentedButtonDefaults.itemShape(index, types.size),
                     ) { Text(label) }
                 }
@@ -185,7 +188,10 @@ fun AddEditScreen(
                 uiState.categories.forEach { category ->
                     FilterChip(
                         selected = uiState.categoryId == category.id,
-                        onClick = { viewModel.onCategorySelect(category.id) },
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            viewModel.onCategorySelect(category.id)
+                        },
                         label = { Text(category.name) },
                         leadingIcon = {
                             Icon(
@@ -204,7 +210,10 @@ fun AddEditScreen(
                 uiState.paymentMethods.forEach { method ->
                     FilterChip(
                         selected = uiState.paymentMethodId == method.id,
-                        onClick = { viewModel.onPaymentMethodSelect(method.id) },
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            viewModel.onPaymentMethodSelect(method.id)
+                        },
                         label = { Text(method.name) },
                     )
                 }
@@ -241,7 +250,10 @@ fun AddEditScreen(
                         statuses.forEachIndexed { index, (value, label) ->
                             SegmentedButton(
                                 selected = uiState.status == value,
-                                onClick = { viewModel.onStatusChange(value) },
+                                onClick = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    viewModel.onStatusChange(value)
+                                },
                                 shape = SegmentedButtonDefaults.itemShape(index, statuses.size),
                             ) { Text(label) }
                         }
@@ -254,7 +266,10 @@ fun AddEditScreen(
                             uiState.accounts.forEach { account ->
                                 FilterChip(
                                     selected = uiState.accountId == account.id,
-                                    onClick = { viewModel.onAccountSelect(account.id) },
+                                    onClick = {
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        viewModel.onAccountSelect(account.id)
+                                    },
                                     label = { Text(account.name) },
                                 )
                             }
