@@ -66,5 +66,17 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+
+        <!-- Home-screen widget: current-month balance/spend/income (Phase 5b, Glance). -->
+        <receiver
+            android:name=".widget.MonthSummaryWidgetReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/month_summary_widget_info" />
+        </receiver>
     </application>
 </manifest>

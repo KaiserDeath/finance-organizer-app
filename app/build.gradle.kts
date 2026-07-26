@@ -71,6 +71,10 @@ dependencies {
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.fragment.ktx)
 
+    // Home-screen widget (Phase 5b) — Glance
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
