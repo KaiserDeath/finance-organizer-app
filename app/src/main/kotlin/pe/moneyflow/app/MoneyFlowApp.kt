@@ -16,6 +16,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -86,10 +87,15 @@ private enum class TopLevelDestination(
 }
 
 @Composable
-fun MoneyFlowApp() {
+fun MoneyFlowApp(startInAddTransaction: Boolean = false) {
     val navController = rememberNavController()
     val haptics = LocalHapticFeedback.current
     val backStackEntry by navController.currentBackStackEntryAsState()
+
+    // Right after onboarding, drop the user straight into logging their first movement.
+    LaunchedEffect(Unit) {
+        if (startInAddTransaction) navController.navigateToAddEdit()
+    }
     val currentDestination = backStackEntry?.destination
     val isTopLevel = TopLevelDestination.entries.any { currentDestination.isRouteInHierarchy(it.route) }
 

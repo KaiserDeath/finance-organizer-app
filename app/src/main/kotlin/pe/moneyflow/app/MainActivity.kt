@@ -12,6 +12,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,6 +39,9 @@ class MainActivity : FragmentActivity() {
         val activity = this
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
+            // Remembers that the user finished onboarding this launch, so the app can open the
+            // first-transaction form once the graph is shown.
+            var justOnboarded by rememberSaveable { mutableStateOf(false) }
             val darkTheme = when (state.preferences.themeMode) {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
@@ -49,7 +55,10 @@ class MainActivity : FragmentActivity() {
                     when {
                         state.isLoading -> Unit
                         state.showOnboarding -> OnboardingScreen(
-                            onFinish = viewModel::completeOnboarding,
+                            onFinish = {
+                                justOnboarded = true
+                                viewModel.completeOnboarding()
+                            },
                         )
 
                         state.showLock -> LockScreen(
@@ -59,7 +68,7 @@ class MainActivity : FragmentActivity() {
                             },
                         )
 
-                        else -> MoneyFlowApp()
+                        else -> MoneyFlowApp(startInAddTransaction = justOnboarded)
                     }
                 }
             }
