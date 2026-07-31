@@ -8,6 +8,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -62,8 +63,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -82,6 +82,7 @@ import pe.moneyflow.core.model.TransactionType
 import pe.moneyflow.core.ui.component.PaymentDisplayStatus
 import pe.moneyflow.core.ui.component.PaymentStatusPill
 import pe.moneyflow.core.ui.component.paymentDisplayStatus
+import pe.moneyflow.core.ui.component.AmountKeypad
 import pe.moneyflow.core.ui.paymentmethod.PaymentMethodSelector
 import pe.moneyflow.core.ui.paymentmethod.toCardKind
 import pe.moneyflow.core.ui.paymentmethod.toNature
@@ -122,13 +123,11 @@ fun AddEditScreen(
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
-    val amountFocus = remember { FocusRequester() }
 
-    // Auto-focus the amount field on a fresh entry so logging starts on the numeric keypad.
+    // The keypad is open from the start on a new entry: the amount is the first thing to fill,
+    // and its own keypad beats waiting for the IME to animate in over the form.
     val isEditing by rememberUpdatedState(uiState.isEditing)
-    LaunchedEffect(Unit) {
-        if (!isEditing) runCatching { amountFocus.requestFocus() }
-    }
+    var showKeypad by remember { mutableStateOf(!isEditing) }
 
     // When editing something that used the advanced fields, reveal them so nothing is hidden.
     LaunchedEffect(uiState.isEditing, uiState.status, uiState.notes, uiState.date) {
@@ -185,19 +184,20 @@ fun AddEditScreen(
                 }
             }
 
-            // Amount — the first thing to fill, so it holds focus on open.
-            OutlinedTextField(
-                value = uiState.amountText,
-                onValueChange = viewModel::onAmountChange,
-                label = { Text("Monto") },
-                prefix = { Text("${Money.symbolFor(uiState.currencyCode)} ") },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(amountFocus),
+            // Amount — a display, not an IME field: the in-app keypad below drives it.
+            AmountDisplay(
+                amountText = uiState.amountText,
+                currencyCode = uiState.currencyCode,
+                onClick = { showKeypad = true },
+                modifier = Modifier.fillMaxWidth(),
             )
+            if (showKeypad) {
+                AmountKeypad(
+                    value = uiState.amountText,
+                    onValueChange = viewModel::onAmountChange,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             // Title
             OutlinedTextField(
@@ -206,7 +206,10 @@ fun AddEditScreen(
                 label = { Text("Descripción") },
                 placeholder = { Text("Ej. Almuerzo, Uber, Netflix") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Typing a description hands the screen back to the IME.
+                    .onFocusChanged { if (it.isFocused) showKeypad = false },
             )
 
             // Category
@@ -415,6 +418,34 @@ fun AddEditScreen(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+}
+
+/** The amount as a large read-only figure; tapping it brings the keypad back. */
+@Composable
+private fun AmountDisplay(
+    amountText: String,
+    currencyCode: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val hasValue = amountText.isNotEmpty()
+    Column(modifier = modifier.clickable(onClick = onClick)) {
+        Text(
+            text = "Monto",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = "${Money.symbolFor(currencyCode)} ${if (hasValue) amountText else "0"}",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = if (hasValue) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
     }
 }
 

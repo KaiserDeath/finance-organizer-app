@@ -96,14 +96,28 @@ class AddEditViewModel @Inject constructor(
     // Preserve the original creation timestamp when editing.
     private var createdAt: Instant = Instant.now()
 
+    /** Once the user picks a category by hand, description typing stops overriding it. */
+    private var categoryManuallyChosen = false
+
     init {
         viewModelScope.launch {
             val categories = categoryRepository.observeAll().first()
+            val prefs = settingsRepository.preferences.first()
+            // Only the methods the user declared having reach the selector — no chips that render
+            // but can't be selected. (Archived ones are already excluded at the DAO.)
             val methods = paymentMethodRepository.observeAll().first()
+                .let { all ->
+                    prefs.activeMethodIds
+                        ?.let { active -> all.filter { it.id in active } }
+                        ?.takeIf { it.isNotEmpty() }
+                        ?: all
+                }
             val accounts = accountRepository.observeAll().first()
-            val currency = settingsRepository.preferences.first().currencyCode
+            val currency = prefs.currencyCode
             _uiState.update { current ->
-                val methodId = current.paymentMethodId
+                // If the default no longer exists or fell outside the user's selection, fall back
+                // to the first valid method — never null, never an orphan id.
+                val methodId = current.paymentMethodId?.takeIf { id -> methods.any { it.id == id } }
                     ?: methods.firstOrNull { it.isDefault }?.id
                     ?: methods.firstOrNull()?.id
                 // The account follows the chosen method's linked account, so the two stay coherent.
@@ -150,18 +164,33 @@ class AddEditViewModel @Inject constructor(
         }
     }
 
-    fun onTitleChange(value: String) = _uiState.update { it.copy(title = value) }
+    fun onTitleChange(value: String) = _uiState.update { state ->
+        val updated = state.copy(title = value)
+        // "almuerzo" already implies Comida; suggest it, but never over a manual choice or
+        // while editing an existing movement.
+        if (categoryManuallyChosen || state.isEditing || updated.type != TransactionType.EXPENSE) {
+            updated
+        } else {
+            val suggestion = CategorySuggester.suggest(value, updated.allCategories)
+            updated.copy(categoryId = suggestion?.id ?: updated.categoryId)
+        }
+    }
 
     fun onAmountChange(value: String) = _uiState.update { it.copy(amountText = value) }
 
     fun onTypeChange(type: TransactionType) = _uiState.update { state ->
+        // Switching type discards the previous category choice, so suggestions apply again.
+        categoryManuallyChosen = false
         val newState = state.copy(type = type)
         // Reset the category if it no longer matches the new type.
         val stillValid = newState.categories.any { it.id == newState.categoryId }
         newState.copy(categoryId = if (stillValid) newState.categoryId else newState.categories.firstOrNull()?.id)
     }
 
-    fun onCategorySelect(id: String) = _uiState.update { it.copy(categoryId = id) }
+    fun onCategorySelect(id: String) {
+        categoryManuallyChosen = true
+        _uiState.update { it.copy(categoryId = id) }
+    }
 
     fun onPaymentMethodSelect(id: String?, cardKind: CardKind?) = _uiState.update { state ->
         // Pull the transaction onto the method's linked account so the pair can't drift; a method
