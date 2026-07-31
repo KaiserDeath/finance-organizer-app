@@ -7,30 +7,47 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.component.MoneyProgressBar
 import pe.moneyflow.core.designsystem.component.SectionHeader
+import pe.moneyflow.core.designsystem.component.pressScale
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Motion
@@ -38,6 +55,8 @@ import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.BudgetProgress
+import pe.moneyflow.core.domain.model.StreakDay
+import pe.moneyflow.core.model.QuickShortcut
 import pe.moneyflow.core.ui.component.CategoryAvatar
 import pe.moneyflow.core.ui.util.toMonthTitle
 import java.time.YearMonth
@@ -165,5 +184,96 @@ private fun BudgetMiniRow(progress: BudgetProgress) {
         }
         Spacer(Modifier.height(Spacing.sm))
         MoneyProgressBar(fraction = progress.fraction, color = barColor, height = 6.dp)
+    }
+}
+
+/**
+ * "De un toque": the row that takes logging a habitual expense from five taps to one.
+ *
+ * Each chip carries its description and its usual amount, so the tap is a decision the user
+ * already made — nothing to confirm. The save is automatic, so it always offers deshacer, and it
+ * gets the FAB's haptic to feel like the same class of action.
+ */
+@Composable
+fun ShortcutsRow(
+    shortcuts: List<QuickShortcut>,
+    currencyCode: String,
+    onShortcut: (QuickShortcut) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = LocalHapticFeedback.current
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(
+            text = "De un toque",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = Spacing.xs),
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            items(items = shortcuts, key = { it.label + it.amountMinor }) { shortcut ->
+                val interaction = remember { MutableInteractionSource() }
+                AssistChip(
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onShortcut(shortcut)
+                    },
+                    interactionSource = interaction,
+                    label = {
+                        Text("${shortcut.label} · ${Money.format(shortcut.amountMinor, currencyCode)}")
+                    },
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .pressScale(interaction),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Seven dots, one per day, against that day's variable allowance.
+ *
+ * The only non-actionable element left on the dashboard, kept on purpose: it doesn't inform a
+ * decision, it sustains the habit of logging. If sessions show it reads as decoration, it goes.
+ */
+@Composable
+fun StreakRow(days: List<StreakDay>, modifier: Modifier = Modifier) {
+    val loggedCount = days.count { it.logged }
+    val outline = MaterialTheme.colorScheme.outlineVariant
+    val within = MaterialTheme.colorScheme.primary
+    val over = MaterialTheme.colorScheme.tertiary
+
+    MoneyCard(modifier = modifier, shadowElevation = 0.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics {
+                    contentDescription = "Racha: $loggedCount de ${days.size} días registrados"
+                },
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Racha",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                days.forEach { day ->
+                    val color = when {
+                        !day.logged -> Color.Transparent
+                        day.withinAllowance == false -> over
+                        else -> within
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .border(1.dp, if (day.logged) color else outline, CircleShape),
+                    )
+                }
+            }
+        }
     }
 }

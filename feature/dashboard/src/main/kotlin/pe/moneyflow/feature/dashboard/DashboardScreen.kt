@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,66 +18,84 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
-import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import pe.moneyflow.core.common.Money
-import pe.moneyflow.core.designsystem.component.DonutChart
-import pe.moneyflow.core.designsystem.component.DonutSlice
 import pe.moneyflow.core.designsystem.component.EmptyState
-import pe.moneyflow.core.designsystem.component.GlassCard
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.component.SectionHeader
 import pe.moneyflow.core.designsystem.component.ShimmerBox
 import pe.moneyflow.core.designsystem.component.StatTile
-import pe.moneyflow.core.designsystem.icon.iconForKey
-import pe.moneyflow.core.designsystem.theme.CategoryPalette
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.theme.moneyColors
-import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.DashboardData
-import pe.moneyflow.core.ui.component.AnimatedAmount
-import pe.moneyflow.core.ui.component.CategoryAvatar
-import pe.moneyflow.core.ui.component.InsightCard
+import pe.moneyflow.core.model.QuickShortcut
 import pe.moneyflow.core.ui.component.TransactionRow
-import pe.moneyflow.core.ui.util.toMonthTitle
-import java.time.LocalDate
 
 @Composable
 fun DashboardScreen(
     onSeeAllTransactions: () -> Unit,
     onTransactionClick: (String) -> Unit,
     onOpenUpcoming: () -> Unit,
-    onOpenInsights: () -> Unit,
     onOpenBudgets: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    DashboardContent(
-        state = uiState,
-        onSeeAllTransactions = onSeeAllTransactions,
-        onTransactionClick = onTransactionClick,
-        onOpenUpcoming = onOpenUpcoming,
-        onOpenInsights = onOpenInsights,
-        onOpenBudgets = onOpenBudgets,
-        onPreviousMonth = viewModel::showPreviousMonth,
-        onNextMonth = viewModel::showNextMonth,
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    // A one-tap save is automatic enough to demand a way back: 4 s of deshacer.
+    val onShortcut: (QuickShortcut) -> Unit = { shortcut ->
+        viewModel.logShortcut(shortcut, uiState.data.currencyCode)
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = "${shortcut.label} guardado",
+                actionLabel = "Deshacer",
+                duration = SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed) viewModel.undoShortcut()
+        }
+    }
+
+    Scaffold(
         modifier = modifier,
-    )
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { innerPadding ->
+        DashboardContent(
+            state = uiState,
+            onSeeAllTransactions = onSeeAllTransactions,
+            onTransactionClick = onTransactionClick,
+            onOpenUpcoming = onOpenUpcoming,
+            onOpenBudgets = onOpenBudgets,
+            onPreviousMonth = viewModel::showPreviousMonth,
+            onNextMonth = viewModel::showNextMonth,
+            onShortcut = onShortcut,
+            modifier = Modifier.padding(innerPadding),
+        )
+    }
 }
 
 @Composable
@@ -86,10 +104,10 @@ private fun DashboardContent(
     onSeeAllTransactions: () -> Unit,
     onTransactionClick: (String) -> Unit,
     onOpenUpcoming: () -> Unit,
-    onOpenInsights: () -> Unit,
     onOpenBudgets: () -> Unit,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
+    onShortcut: (QuickShortcut) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val data = state.data
@@ -129,6 +147,23 @@ private fun DashboardContent(
             )
         }
 
+        // Card order is deliberate: shortcuts (act), payments nudge (act), budgets at risk
+        // (decide), then today's numbers. Everything merely informative moved to Análisis.
+        if (state.shortcuts.isNotEmpty()) {
+            item {
+                ShortcutsRow(
+                    shortcuts = state.shortcuts,
+                    currencyCode = data.currencyCode,
+                    onShortcut = onShortcut,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        if (state.streak.isNotEmpty()) {
+            item { StreakRow(days = state.streak, modifier = Modifier.fillMaxWidth()) }
+        }
+
         state.upcomingNudge?.let { nudge ->
             item { UpcomingNudgeCard(nudge = nudge, currencyCode = data.currencyCode, onClick = onOpenUpcoming) }
         }
@@ -146,21 +181,6 @@ private fun DashboardContent(
         }
 
         item { StatRow(data) }
-
-        state.topInsight?.let { insight ->
-            item {
-                InsightCard(
-                    insight = insight,
-                    onClick = onOpenInsights,
-                    maxMessageLines = 2,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-
-        if (data.categoryBreakdown.isNotEmpty()) {
-            item { CategoryBreakdownCard(data) }
-        }
 
         item {
             SectionHeader(
@@ -271,112 +291,15 @@ private fun StatRow(data: DashboardData) {
             modifier = Modifier.weight(1f),
             shadowElevation = 0.dp,
         )
+        // Replaced the "Movimientos" count (a number that enables no decision) with what the
+        // month still owes — in amber, and deliberately outside the spent total.
         StatTile(
-            label = "Movimientos",
-            value = data.monthTransactionCount.toString(),
-            icon = Icons.AutoMirrored.Rounded.TrendingUp,
-            accent = MaterialTheme.colorScheme.secondary,
+            label = "Por pagar",
+            value = Money.format(data.monthPendingMinor, data.currencyCode),
+            icon = Icons.Rounded.Schedule,
+            accent = MaterialTheme.colorScheme.tertiary,
             modifier = Modifier.weight(1f),
             shadowElevation = 0.dp,
-        )
-    }
-}
-
-@Composable
-private fun CategoryBreakdownCard(data: DashboardData) {
-    MoneyCard(modifier = Modifier.fillMaxWidth(), shadowElevation = 0.dp) {
-        SectionHeader(title = "Por categoría", modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(Spacing.lg))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            val slices = data.categoryBreakdown.mapIndexed { index, spend ->
-                DonutSlice(
-                    fraction = spend.fraction,
-                    color = colorFromHex(
-                        spend.category.colorHex,
-                        CategoryPalette[index % CategoryPalette.size],
-                    ),
-                )
-            }
-            val topSpend = data.categoryBreakdown.first()
-            // Summed from the slices rather than taken from monthSpentMinor, so the center total is
-            // always consistent with the ring actually drawn.
-            val breakdownTotalMinor = data.categoryBreakdown.sumOf { it.amountMinor }
-            DonutChart(
-                slices = slices,
-                diameter = 132.dp,
-                contentDescription = "Gasto por categoría, total " +
-                    "${Money.format(breakdownTotalMinor, data.currencyCode)}. " +
-                    "Mayor: ${topSpend.category.name}, ${(topSpend.fraction * 100).toInt()}%.",
-                centerContent = {
-                    // The center is the most privileged spot in the chart, so it carries the total
-                    // spend. It previously showed the *count* of categories, which is close to the
-                    // least useful fact available here.
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = Money.format(breakdownTotalMinor, data.currencyCode),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Center,
-                        )
-                        Text(
-                            text = if (data.categoryBreakdown.size == 1) "1 categoría"
-                            else "${data.categoryBreakdown.size} categorías",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                },
-            )
-            Spacer(Modifier.size(Spacing.xl))
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                data.categoryBreakdown.take(4).forEachIndexed { index, spend ->
-                    CategoryLegendRow(
-                        name = spend.category.name,
-                        amount = Money.format(spend.amountMinor, data.currencyCode),
-                        percent = spend.fraction,
-                        color = colorFromHex(
-                            spend.category.colorHex,
-                            CategoryPalette[index % CategoryPalette.size],
-                        ),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CategoryLegendRow(name: String, amount: String, percent: Float, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(color),
-        )
-        Spacer(Modifier.size(Spacing.sm))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-            )
-        }
-        Text(
-            text = "${(percent * 100).toInt()}%",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.size(Spacing.sm))
-        Text(
-            text = amount,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }

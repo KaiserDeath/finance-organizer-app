@@ -11,20 +11,34 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import pe.moneyflow.core.domain.model.BudgetProgress
 import pe.moneyflow.core.domain.model.DashboardData
 import pe.moneyflow.core.domain.model.Insight
 import pe.moneyflow.core.domain.model.InsightKind
 import pe.moneyflow.core.domain.model.InsightSeverity
 import pe.moneyflow.core.domain.model.SpendingPace
+import pe.moneyflow.core.domain.model.StreakDay
+import pe.moneyflow.core.domain.model.UpcomingPayment
+import pe.moneyflow.core.domain.model.streakOf
+import pe.moneyflow.core.domain.repository.SettingsRepository
+import pe.moneyflow.core.domain.usecase.DeleteTransactionUseCase
 import pe.moneyflow.core.domain.usecase.GetBudgetsProgressUseCase
 import pe.moneyflow.core.domain.usecase.GetDashboardUseCase
+import pe.moneyflow.core.domain.usecase.GetFrequentShortcutsUseCase
 import pe.moneyflow.core.domain.usecase.GetInsightsUseCase
 import pe.moneyflow.core.domain.usecase.GetUpcomingPaymentsUseCase
+import pe.moneyflow.core.domain.usecase.ObserveTransactionsUseCase
+import pe.moneyflow.core.domain.usecase.SaveTransactionUseCase
 import pe.moneyflow.core.model.BudgetPeriod
+import pe.moneyflow.core.model.QuickShortcut
+import pe.moneyflow.core.model.Transaction
+import pe.moneyflow.core.model.TransactionStatus
+import pe.moneyflow.core.model.TransactionType
 import java.time.Clock
 import java.time.LocalDate
 import java.time.YearMonth
+import java.util.UUID
 import javax.inject.Inject
 
 /** A dashboard prompt about payments that need attention, or null when nothing is due. */
@@ -51,6 +65,10 @@ data class DashboardUiState(
     val pace: SpendingPace? = null,
     /** Top budgets by how close they are to their limit — the ones worth surfacing first. */
     val topBudgets: List<BudgetProgress> = emptyList(),
+    /** One-tap presets for the "De un toque" row; empty hides the row. */
+    val shortcuts: List<QuickShortcut> = emptyList(),
+    /** Last seven days against the variable daily allowance; empty on past months. */
+    val streak: List<StreakDay> = emptyList(),
 ) {
     val isCurrentMonth: Boolean get() = data.month == YearMonth.now()
 
@@ -68,10 +86,18 @@ class DashboardViewModel @Inject constructor(
     getUpcoming: GetUpcomingPaymentsUseCase,
     getInsights: GetInsightsUseCase,
     getBudgetsProgress: GetBudgetsProgressUseCase,
+    getFrequentShortcuts: GetFrequentShortcutsUseCase,
+    observeTransactions: ObserveTransactionsUseCase,
+    settingsRepository: SettingsRepository,
+    private val saveTransaction: SaveTransactionUseCase,
+    private val deleteTransaction: DeleteTransactionUseCase,
     private val clock: Clock,
 ) : ViewModel() {
 
     private val selectedMonth = MutableStateFlow(YearMonth.now(clock))
+
+    /** The last shortcut-logged movement, so its snackbar's deshacer can remove it. */
+    private var lastShortcutId: String? = null
 
     fun showPreviousMonth() = selectedMonth.update { it.minusMonths(1) }
 
@@ -85,11 +111,15 @@ class DashboardViewModel @Inject constructor(
     val uiState: StateFlow<DashboardUiState> = selectedMonth
         .flatMapLatest { month ->
             combine(
-                getDashboard(month),
-                getUpcoming(),
-                getInsights(),
-                getBudgetsProgress(),
-            ) { data, upcoming, insights, budgets ->
+                combine(getDashboard(month), getUpcoming(), getInsights(), getBudgetsProgress()) {
+                        data, upcoming, insights, budgets ->
+                    CoreInputs(data, upcoming, insights, budgets)
+                },
+                settingsRepository.preferences,
+                observeTransactions(),
+                getFrequentShortcuts(),
+            ) { core, prefs, transactions, inferredShortcuts ->
+                val (data, upcoming, insights, budgets) = core
                 val today = LocalDate.now(clock)
                 val isCurrentMonth = YearMonth.from(today) == month
 
@@ -124,6 +154,12 @@ class DashboardViewModel @Inject constructor(
                     .minByOrNull { severityRank[it.severity] ?: 3 }
 
                 val monthlyBudgets = budgets.filter { it.budget.period == BudgetPeriod.MONTHLY }
+                // Real budget entities win; the onboarding target is the fallback denominator so
+                // skipping budget setup degrades the hero instead of blanking it.
+                val monthBudgetMinor = monthlyBudgets
+                    .sumOf { it.budget.amountMinor }
+                    .takeIf { monthlyBudgets.isNotEmpty() }
+                    ?: prefs.monthlyBudgetMinor
                 val pace = if (isCurrentMonth) {
                     SpendingPace.of(
                         month = month,
@@ -131,9 +167,7 @@ class DashboardViewModel @Inject constructor(
                         spentMinor = data.monthSpentMinor,
                         // Only overall/monthly limits form a month denominator. Summing weekly and
                         // annual budgets into one figure would produce a number that means nothing.
-                        monthBudgetMinor = monthlyBudgets
-                            .sumOf { it.budget.amountMinor }
-                            .takeIf { monthlyBudgets.isNotEmpty() },
+                        monthBudgetMinor = monthBudgetMinor,
                         // What's still owed before month end: pending rows plus projected recurring
                         // occurrences. Already-paid charges are in monthSpentMinor, not here.
                         committedRemainingMinor = upcoming
@@ -160,6 +194,17 @@ class DashboardViewModel @Inject constructor(
                     } else {
                         emptyList()
                     },
+                    // Onboarding's picks win; with none, the 30-day frequency heuristic fills in.
+                    shortcuts = if (isCurrentMonth) {
+                        prefs.shortcuts.ifEmpty { inferredShortcuts }
+                    } else {
+                        emptyList()
+                    },
+                    streak = if (isCurrentMonth) {
+                        streakOf(transactions, monthBudgetMinor, today)
+                    } else {
+                        emptyList()
+                    },
                 )
             }
         }
@@ -168,4 +213,39 @@ class DashboardViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = DashboardUiState(isLoading = true),
         )
+
+    /** Saves the shortcut as a paid movement of today, in one tap. Undone by [undoShortcut]. */
+    fun logShortcut(shortcut: QuickShortcut, currencyCode: String) {
+        val id = UUID.randomUUID().toString()
+        lastShortcutId = id
+        viewModelScope.launch {
+            saveTransaction(
+                Transaction(
+                    id = id,
+                    title = shortcut.label,
+                    amountMinor = shortcut.amountMinor,
+                    currencyCode = currencyCode,
+                    categoryId = shortcut.categoryId,
+                    paymentMethodId = shortcut.paymentMethodId,
+                    type = TransactionType.EXPENSE,
+                    status = TransactionStatus.PAID,
+                    actualDate = LocalDate.now(clock),
+                ),
+            )
+        }
+    }
+
+    fun undoShortcut() {
+        val id = lastShortcutId ?: return
+        lastShortcutId = null
+        viewModelScope.launch { deleteTransaction(id) }
+    }
 }
+
+/** Bundles the first four sources so the outer combine stays within the typed overloads. */
+private data class CoreInputs(
+    val data: DashboardData,
+    val upcoming: List<UpcomingPayment>,
+    val insights: List<Insight>,
+    val budgets: List<BudgetProgress>,
+)

@@ -104,4 +104,7 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setOnboardingComplete(complete: Boolean) = Unit
     override suspend fun setPinHash(hash: String?) = Unit
     override suspend fun setBiometricEnabled(enabled: Boolean) = Unit
+    override suspend fun setMonthlyBudget(minor: Long?) = Unit
+    override suspend fun setActiveMethodIds(ids: Set<String>?) = Unit
+    override suspend fun setShortcuts(shortcuts: List<pe.moneyflow.core.model.QuickShortcut>) = Unit
 }

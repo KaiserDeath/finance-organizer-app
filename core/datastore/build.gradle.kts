@@ -1,6 +1,7 @@
 plugins {
     id("moneyflow.android.library")
     id("moneyflow.android.hilt")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -12,4 +13,5 @@ dependencies {
     implementation(project(":core:model"))
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
 }

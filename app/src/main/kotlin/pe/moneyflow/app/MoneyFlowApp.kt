@@ -294,8 +294,6 @@ fun MoneyFlowApp(
                 onSeeAllTransactions = { navController.navigateToTopLevel(TransactionsRoute()) },
                 onTransactionClick = { id -> navController.navigateToMovementDetail(id) },
                 onOpenUpcoming = { navController.navigate(UpcomingRoute) },
-                // Sugerencias now live inside Análisis (the insights destination was retired).
-                onOpenInsights = { navController.navigateToTopLevel(AnalyticsRoute) },
                 // Plain navigate(): budgets is a stacked destination now, so it gets a back arrow.
                 onOpenBudgets = { navController.navigate(BudgetsRoute()) },
             )
