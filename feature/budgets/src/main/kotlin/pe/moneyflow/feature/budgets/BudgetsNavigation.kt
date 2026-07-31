@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object BudgetsRoute
 
-fun NavGraphBuilder.budgetsScreen(onBack: (() -> Unit)? = null) {
+fun NavGraphBuilder.budgetsScreen(onBack: () -> Unit) {
     composable<BudgetsRoute> {
         BudgetsScreen(onBack = onBack)
     }

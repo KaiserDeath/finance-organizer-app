@@ -5,12 +5,10 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BarChart
-import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -54,9 +52,11 @@ import pe.moneyflow.core.designsystem.component.pressScale
 import pe.moneyflow.core.ui.util.toMonthTitle
 import java.time.LocalDate
 import pe.moneyflow.app.backup.BackupScreen
+import pe.moneyflow.app.money.MoneyScreen
 import pe.moneyflow.app.security.SecurityScreen
 import pe.moneyflow.app.legal.LegalScreen
 import pe.moneyflow.app.settings.AppearanceScreen
+import pe.moneyflow.app.settings.SettingsScreen
 import pe.moneyflow.feature.accounts.AccountsRoute
 import pe.moneyflow.feature.accounts.accountsScreen
 import pe.moneyflow.feature.addedit.addEditScreen
@@ -87,7 +87,10 @@ import pe.moneyflow.feature.upcoming.UpcomingRoute
 import pe.moneyflow.feature.upcoming.upcomingScreen
 
 @Serializable
-data object MoreRoute
+data object MoneyRoute
+
+@Serializable
+data object SettingsRoute
 
 @Serializable
 data object BackupRoute
@@ -115,18 +118,11 @@ internal enum class TopLevelDestination(
         Icons.AutoMirrored.Rounded.ReceiptLong,
         "Movimientos",
     ),
-    // Budgets holds a bottom-nav slot; Próximos does not.
-    //
-    // "Am I within budget?" is the primary question in an expense app and used to cost three taps
-    // (Más → Presupuestos), while a whole slot went to Próximos. Upcoming payments are still one tap
-    // away — the dashboard nudge card links straight to them, and unlike budgets that card *already*
-    // surfaced the information, so demoting the tab costs nothing. The overdue badge moves to the
-    // dashboard nudge accordingly.
-    //
-    // This is the one user-visible IA change in the redesign, and it is a single enum entry to revert.
-    BUDGETS(BudgetsRoute, "Presupuestos", Icons.Rounded.Savings, "Presupuestos"),
     ANALYTICS(AnalyticsRoute, "Análisis", Icons.Rounded.BarChart, "Análisis y reportes"),
-    MORE(MoreRoute, "Más", Icons.Rounded.Menu, "Más"),
+    // Budgets left the bar: its headline number now shows on the "Tu dinero" row without entering,
+    // which was the argument that promoted it in the first place — and four tabs keep the bar
+    // legible on 5-inch screens. It stacks under Tu dinero (and under Inicio's "Ver todo") instead.
+    MONEY(MoneyRoute, "Tu dinero", Icons.Rounded.AccountBalanceWallet, "Tu dinero"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -301,7 +297,8 @@ fun MoneyFlowApp(
                 onTransactionClick = { id -> navController.navigateToMovementDetail(id) },
                 onOpenUpcoming = { navController.navigate(UpcomingRoute) },
                 onOpenInsights = { navController.navigate(InsightsRoute) },
-                onOpenBudgets = { navController.navigateToTopLevel(BudgetsRoute) },
+                // Plain navigate(): budgets is a stacked destination now, so it gets a back arrow.
+                onOpenBudgets = { navController.navigate(BudgetsRoute) },
             )
             transactionsScreen(
                 onTransactionClick = { id -> navController.navigateToMovementDetail(id) },
@@ -311,17 +308,23 @@ fun MoneyFlowApp(
                 onPaymentClick = { id -> navController.navigateToMovementDetail(id) },
                 onOpenRecurring = { navController.navigate(RecurringRoute) },
             )
-            composable<MoreRoute> {
-                MoreScreen(
-                    onOpenInsights = { navController.navigate(InsightsRoute) },
+            composable<MoneyRoute> {
+                MoneyScreen(
+                    onOpenBudgets = { navController.navigate(BudgetsRoute) },
+                    onOpenUpcoming = { navController.navigate(UpcomingRoute) },
                     onOpenAccounts = { navController.navigate(AccountsRoute) },
                     onOpenSavings = { navController.navigate(SavingsRoute) },
-                    onOpenCategories = { navController.navigate(CategoriesRoute) },
                     onOpenPaymentMethods = { navController.navigate(PaymentMethodsRoute) },
-                    onOpenRecurring = { navController.navigate(RecurringRoute) },
-                    onOpenUpcoming = { navController.navigate(UpcomingRoute) },
+                    onOpenSettings = { navController.navigate(SettingsRoute) },
+                )
+            }
+            composable<SettingsRoute> {
+                SettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenCategories = { navController.navigate(CategoriesRoute) },
                     onOpenCurrency = { navController.navigate(CurrencyRoute) },
                     onOpenAppearance = { navController.navigate(AppearanceRoute) },
+                    onOpenRecurring = { navController.navigate(RecurringRoute) },
                     onOpenBackup = { navController.navigate(BackupRoute) },
                     onOpenSecurity = { navController.navigate(SecurityRoute) },
                     onOpenLegal = { navController.navigate(LegalRoute) },

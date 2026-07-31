@@ -75,7 +75,7 @@ import pe.moneyflow.core.ui.component.CategoryAvatar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetsScreen(
-    onBack: (() -> Unit)? = null,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: BudgetsViewModel = hiltViewModel(),
 ) {
@@ -87,19 +87,17 @@ fun BudgetsScreen(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            if (onBack != null) {
-                TopAppBar(
-                    title = { Text("Presupuestos") },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "Volver",
-                            )
-                        }
-                    },
-                )
-            }
+            TopAppBar(
+                title = { Text("Presupuestos") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Volver",
+                        )
+                    }
+                },
+            )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
@@ -117,16 +115,6 @@ fun BudgetsScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            if (onBack == null) {
-                item {
-                    Text(
-                        text = "Presupuestos",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-
             if (uiState.isLoading) {
                 item { SkeletonBlocks(heroHeight = 116.dp, count = 3, blockHeight = 148.dp) }
             } else if (uiState.isEmpty) {
