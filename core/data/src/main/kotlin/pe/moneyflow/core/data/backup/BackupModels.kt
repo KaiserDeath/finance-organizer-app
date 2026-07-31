@@ -98,6 +98,8 @@ internal data class CategoryDto(
     val isDefault: Boolean = false,
     val sortOrder: Int = 0,
     val archived: Boolean = false,
+    // Default keeps backups from before the fixed-expense flag restorable.
+    val isFixed: Boolean = false,
 )
 
 @Serializable
@@ -204,6 +206,7 @@ internal fun Transaction.toDto() = TransactionDto(
 internal fun Category.toDto() = CategoryDto(
     id = id, name = name, iconKey = iconKey, colorHex = colorHex, parentId = parentId,
     type = type.name, isDefault = isDefault, sortOrder = sortOrder, archived = archived,
+    isFixed = isFixed,
 )
 
 internal fun PaymentMethod.toDto() = PaymentMethodDto(
@@ -258,7 +261,7 @@ internal fun TransactionDto.toDomain() = Transaction(
 internal fun CategoryDto.toDomain() = Category(
     id = id, name = name, iconKey = iconKey, colorHex = colorHex, parentId = parentId,
     type = enumOr(type, CategoryType.EXPENSE), isDefault = isDefault, sortOrder = sortOrder,
-    archived = archived,
+    archived = archived, isFixed = isFixed,
 )
 
 internal fun PaymentMethodDto.toDomain() = PaymentMethod(

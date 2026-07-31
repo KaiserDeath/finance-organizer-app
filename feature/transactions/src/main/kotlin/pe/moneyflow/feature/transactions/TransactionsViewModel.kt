@@ -1,7 +1,9 @@
 package pe.moneyflow.feature.transactions
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,6 +46,7 @@ data class TransactionsUiState(
 
 @HiltViewModel
 class TransactionsViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     observeTransactions: ObserveTransactionsUseCase,
     observeCategories: ObserveCategoriesUseCase,
     private val filterTransactions: FilterTransactionsUseCase,
@@ -54,7 +57,11 @@ class TransactionsViewModel @Inject constructor(
 
     private var recentlyDeleted: Transaction? = null
 
-    private val filterState = MutableStateFlow(TransactionFilter())
+    private val filterState = MutableStateFlow(
+        TransactionFilter(
+            categoryIds = setOfNotNull(savedStateHandle.toRoute<TransactionsRoute>().categoryId),
+        ),
+    )
 
     val uiState: StateFlow<TransactionsUiState> =
         combine(

@@ -1,7 +1,9 @@
 package pe.moneyflow.feature.budgets
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,11 +35,19 @@ data class BudgetsUiState(
 
 @HiltViewModel
 class BudgetsViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     getBudgetsProgress: GetBudgetsProgressUseCase,
     observeCategories: ObserveCategoriesUseCase,
     private val saveBudget: SaveBudgetUseCase,
     private val deleteBudget: DeleteBudgetUseCase,
 ) : ViewModel() {
+
+    /** Budget to open in the editor on arrival ("Ajustar el límite" from Análisis). */
+    val initialEditBudgetId: String? =
+        savedStateHandle.toRoute<BudgetsRoute>().editBudgetId
+
+    /** The budget as it was before the last edit, for the snackbar's deshacer. */
+    private var editedPrevious: Budget? = null
 
     val uiState: StateFlow<BudgetsUiState> =
         combine(getBudgetsProgress(), observeCategories()) { progress, categories ->
@@ -53,12 +63,20 @@ class BudgetsViewModel @Inject constructor(
             initialValue = BudgetsUiState(),
         )
 
-    fun add(name: String, categoryId: String?, amountMinor: Long, period: BudgetPeriod) {
+    /** Creates when [existing] is null, updates otherwise (stashing the previous for [undoEdit]). */
+    fun save(
+        existing: Budget?,
+        name: String,
+        categoryId: String?,
+        amountMinor: Long,
+        period: BudgetPeriod,
+    ) {
         if (name.isBlank() || amountMinor <= 0) return
+        editedPrevious = existing
         viewModelScope.launch {
             saveBudget(
                 Budget(
-                    id = UUID.randomUUID().toString(),
+                    id = existing?.id ?: UUID.randomUUID().toString(),
                     name = name.trim(),
                     categoryId = categoryId,
                     amountMinor = amountMinor,
@@ -66,6 +84,12 @@ class BudgetsViewModel @Inject constructor(
                 ),
             )
         }
+    }
+
+    fun undoEdit() {
+        val previous = editedPrevious ?: return
+        editedPrevious = null
+        viewModelScope.launch { saveBudget(previous) }
     }
 
     fun delete(id: String) {

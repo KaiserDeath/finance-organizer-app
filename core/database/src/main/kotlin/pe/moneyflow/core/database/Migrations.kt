@@ -31,5 +31,16 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+/** v7 → v8: fixed-expense flag on categories, backfilled for the seeded fixed-cost defaults. */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE categories ADD COLUMN isFixed INTEGER NOT NULL DEFAULT 0")
+        db.execSQL(
+            "UPDATE categories SET isFixed = 1 WHERE isDefault = 1 AND name IN " +
+                "('Alquiler','Hipoteca','Servicios','Internet','Teléfono','Suscripciones','Seguros')",
+        )
+    }
+}
+
 /** Every migration, in order, for the Room builder. */
-val ALL_MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+val ALL_MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)

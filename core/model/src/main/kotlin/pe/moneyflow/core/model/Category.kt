@@ -14,4 +14,6 @@ data class Category(
     val isDefault: Boolean = false,
     val sortOrder: Int = 0,
     val archived: Boolean = false,
+    /** A fixed expense (rent, utilities): when it overruns, the limit is what gets corrected. */
+    val isFixed: Boolean = false,
 )

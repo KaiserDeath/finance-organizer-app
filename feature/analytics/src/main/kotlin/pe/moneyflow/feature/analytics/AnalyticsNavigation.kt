@@ -7,8 +7,16 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object AnalyticsRoute
 
-fun NavGraphBuilder.analyticsScreen(onBack: (() -> Unit)? = null) {
+fun NavGraphBuilder.analyticsScreen(
+    onAdjustBudget: (String) -> Unit,
+    onSeeExpenses: (String) -> Unit,
+    onBack: (() -> Unit)? = null,
+) {
     composable<AnalyticsRoute> {
-        AnalyticsScreen(onBack = onBack)
+        AnalyticsScreen(
+            onAdjustBudget = onAdjustBudget,
+            onSeeExpenses = onSeeExpenses,
+            onBack = onBack,
+        )
     }
 }

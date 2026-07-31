@@ -18,6 +18,8 @@ internal object SeedData {
         val icon: String,
         val color: String,
         val type: String = "EXPENSE",
+        /** Fixed costs (rent, utilities…) whose overrun means the limit is short, not the spend. */
+        val fixed: Boolean = false,
     )
 
     private data class SeedPayment(
@@ -35,18 +37,18 @@ internal object SeedData {
         SeedCategory("Restaurantes", "restaurant", "#FF8A65"),
         SeedCategory("Transporte", "transport", "#42A5F5"),
         SeedCategory("Combustible", "fuel", "#26A69A"),
-        SeedCategory("Alquiler", "home", "#7E57C2"),
-        SeedCategory("Hipoteca", "account_balance", "#5C6BC0"),
-        SeedCategory("Servicios", "bolt", "#FFA726"),
-        SeedCategory("Internet", "wifi", "#29B6F6"),
-        SeedCategory("Teléfono", "phone", "#66BB6A"),
+        SeedCategory("Alquiler", "home", "#7E57C2", fixed = true),
+        SeedCategory("Hipoteca", "account_balance", "#5C6BC0", fixed = true),
+        SeedCategory("Servicios", "bolt", "#FFA726", fixed = true),
+        SeedCategory("Internet", "wifi", "#29B6F6", fixed = true),
+        SeedCategory("Teléfono", "phone", "#66BB6A", fixed = true),
         SeedCategory("Entretenimiento", "movie", "#EC407A"),
         SeedCategory("Gaming", "sports_esports", "#AB47BC"),
         SeedCategory("Compras", "shopping", "#EF5350"),
         SeedCategory("Salud", "health", "#26C6DA"),
         SeedCategory("Educación", "school", "#8D6E63"),
-        SeedCategory("Suscripciones", "subscriptions", "#5C6BC0"),
-        SeedCategory("Seguros", "shield", "#78909C"),
+        SeedCategory("Suscripciones", "subscriptions", "#5C6BC0", fixed = true),
+        SeedCategory("Seguros", "shield", "#78909C", fixed = true),
         SeedCategory("Viajes", "flight", "#FFCA28"),
         SeedCategory("Mascotas", "pets", "#A1887F"),
         SeedCategory("Impuestos", "receipt", "#90A4AE"),
@@ -107,9 +109,17 @@ internal object SeedData {
         categories.forEachIndexed { index, c ->
             db.execSQL(
                 "INSERT INTO categories " +
-                    "(id, name, iconKey, colorHex, parentId, type, isDefault, sortOrder, archived) " +
-                    "VALUES (?, ?, ?, ?, NULL, ?, 1, ?, 0)",
-                arrayOf(UUID.randomUUID().toString(), c.name, c.icon, c.color, c.type, index),
+                    "(id, name, iconKey, colorHex, parentId, type, isDefault, sortOrder, archived, isFixed) " +
+                    "VALUES (?, ?, ?, ?, NULL, ?, 1, ?, 0, ?)",
+                arrayOf(
+                    UUID.randomUUID().toString(),
+                    c.name,
+                    c.icon,
+                    c.color,
+                    c.type,
+                    index,
+                    if (c.fixed) 1 else 0,
+                ),
             )
         }
 

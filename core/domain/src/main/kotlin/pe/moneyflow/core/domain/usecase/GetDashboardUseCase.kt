@@ -7,6 +7,7 @@ import pe.moneyflow.core.domain.model.DashboardData
 import pe.moneyflow.core.domain.repository.CategoryRepository
 import pe.moneyflow.core.domain.repository.SettingsRepository
 import pe.moneyflow.core.domain.repository.TransactionRepository
+import pe.moneyflow.core.model.TransactionStatus
 import pe.moneyflow.core.model.TransactionType
 import java.time.Clock
 import java.time.LocalDate
@@ -41,7 +42,12 @@ class GetDashboardUseCase @Inject constructor(
             settingsRepository.preferences,
         ) { monthTx, previousTx, allTx, categories, prefs ->
             val today = LocalDate.now(clock)
-            val expenses = monthTx.filter { it.type == TransactionType.EXPENSE }
+            // One definition of "total del mes": what was actually spent, pending excluded.
+            // Pending rows already surface separately (committed/nudge); counting them here both
+            // inflated the hero and double-counted them against committedRemaining.
+            val expenses = monthTx.filter {
+                it.type == TransactionType.EXPENSE && it.status == TransactionStatus.PAID
+            }
             val monthSpent = expenses.sumOf { it.amountMinor }
             val monthIncome = monthTx
                 .filter { it.type == TransactionType.INCOME }
@@ -74,7 +80,7 @@ class GetDashboardUseCase @Inject constructor(
                 monthIncomeMinor = monthIncome,
                 monthTransactionCount = monthTx.size,
                 previousMonthSpentMinor = previousTx
-                    .filter { it.type == TransactionType.EXPENSE }
+                    .filter { it.type == TransactionType.EXPENSE && it.status == TransactionStatus.PAID }
                     .sumOf { it.amountMinor },
                 largestExpense = expenses.maxByOrNull { it.amountMinor },
                 recent = allTx.sortedByDescending { it.createdAt }.take(6),

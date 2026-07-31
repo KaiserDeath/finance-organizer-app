@@ -94,6 +94,7 @@ fun CategoryEntity.toDomain(): Category = Category(
     isDefault = isDefault,
     sortOrder = sortOrder,
     archived = archived,
+    isFixed = isFixed,
 )
 
 fun Category.toEntity(): CategoryEntity = CategoryEntity(
@@ -106,6 +107,7 @@ fun Category.toEntity(): CategoryEntity = CategoryEntity(
     isDefault = isDefault,
     sortOrder = sortOrder,
     archived = archived,
+    isFixed = isFixed,
 )
 
 // --- PaymentMethod ---

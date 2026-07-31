@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.TrendingUp
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -75,13 +77,19 @@ import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.AnalyticsData
+import pe.moneyflow.core.domain.model.BudgetProgress
 import pe.moneyflow.core.domain.model.CumulativeSpend
 import pe.moneyflow.core.domain.model.CategoryDelta
+import pe.moneyflow.core.domain.model.Insight
 import pe.moneyflow.core.domain.model.MonthlyReport
+import pe.moneyflow.core.ui.component.InsightCard
+import java.time.LocalDate
 import kotlin.math.abs
 
 @Composable
 fun AnalyticsScreen(
+    onAdjustBudget: (String) -> Unit,
+    onSeeExpenses: (String) -> Unit,
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: AnalyticsViewModel = hiltViewModel(),
@@ -119,6 +127,8 @@ fun AnalyticsScreen(
     AnalyticsContent(
         state = uiState,
         onBack = onBack,
+        onAdjustBudget = onAdjustBudget,
+        onSeeExpenses = onSeeExpenses,
         snackbarHostState = snackbarHostState,
         onExportCsv = {
             lastExport = viewModel::exportCurrentMonth
@@ -163,6 +173,8 @@ private suspend fun SnackbarHostState.showRetryable(message: String, onRetry: ((
 private fun AnalyticsContent(
     state: AnalyticsUiState,
     onBack: (() -> Unit)?,
+    onAdjustBudget: (String) -> Unit,
+    onSeeExpenses: (String) -> Unit,
     snackbarHostState: SnackbarHostState,
     onExportCsv: () -> Unit,
     onExportPdf: () -> Unit,
@@ -200,6 +212,19 @@ private fun AnalyticsContent(
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
+        // The screen opens with where you overspent and what to do about it, not with a chart:
+        // a number that doesn't lead anywhere is noise formatted as data.
+        val worst = state.worstOverrun
+        if (!state.isLoading && worst != null) {
+            item(key = "worst-overrun") {
+                WorstOverrunCard(
+                    progress = worst,
+                    onAdjustBudget = { onAdjustBudget(worst.budget.id) },
+                    onSeeExpenses = worst.budget.categoryId?.let { id -> { onSeeExpenses(id) } },
+                )
+            }
+        }
+
         item {
             // PrimaryTabRow supersedes TabRow in M3: it carries the current full-width indicator
             // treatment and animates between tabs, which plain TabRow no longer does.
@@ -223,7 +248,7 @@ private fun AnalyticsContent(
         }
 
         if (selectedTab == 0) {
-            trendsTab(state.analytics, state.cumulative)
+            trendsTab(state.analytics, state.cumulative, state.insights)
         } else {
             reportTab(
                 report = state.report,
@@ -236,6 +261,67 @@ private fun AnalyticsContent(
     }
 }
 
+/**
+ * The worst overrun with its two exits: fix the limit, or look at the spending.
+ *
+ * The fixed-expense variant keeps a neutral tone and drops the days-left pressure — rent that
+ * blew its budget doesn't get cut, so the honest message is "your limit is short", and the only
+ * useful action is correcting it.
+ */
+@Composable
+private fun WorstOverrunCard(
+    progress: BudgetProgress,
+    onAdjustBudget: () -> Unit,
+    onSeeExpenses: (() -> Unit)?,
+) {
+    val isFixed = progress.isFixedExpense
+    val overMinor = progress.spentMinor - progress.budget.amountMinor
+    val accent = if (isFixed) MaterialTheme.colorScheme.primary else MaterialTheme.moneyColors.negative
+
+    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = progress.category?.name ?: progress.budget.name,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            text = if (isFixed) {
+                "Tu límite está corto por ${Money.format(overMinor, progress.currencyCode)}"
+            } else {
+                "Te pasaste por ${Money.format(overMinor, progress.currencyCode)}"
+            },
+            style = MaterialTheme.typography.titleLarge,
+            color = accent,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            text = if (isFixed) {
+                "Es un gasto fijo: no se recorta, se corrige el límite."
+            } else {
+                val daysLeft = LocalDate.now().let { it.lengthOfMonth() - it.dayOfMonth }
+                "Quedan $daysLeft día(s) de este mes."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.lg))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Button(
+                onClick = onAdjustBudget,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+            ) { Text("Ajustar el límite") }
+            if (onSeeExpenses != null) {
+                OutlinedButton(
+                    onClick = onSeeExpenses,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) { Text("Ver esos gastos") }
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Trends tab
 // ---------------------------------------------------------------------------------------------
@@ -243,6 +329,7 @@ private fun AnalyticsContent(
 private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(
     data: AnalyticsData,
     cumulative: CumulativeSpend,
+    insights: List<Insight>,
 ) {
     val hasData = data.totalExpenseMinor > 0 || data.totalIncomeMinor > 0
     if (!hasData) {
@@ -270,6 +357,18 @@ private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(
         item { CategoryBreakdownCard(data) }
     }
     item { WeekdayCard(data) }
+    // Sugerencias landed here from the old Más drawer: an insight is a number with an action
+    // behind it, which is this screen's whole premise.
+    if (insights.isNotEmpty()) {
+        item(key = "insights-header") {
+            SectionHeader(title = "Sugerencias", modifier = Modifier.fillMaxWidth())
+        }
+        insights.forEach { insight ->
+            item(key = "insight-${insight.id}") {
+                InsightCard(insight = insight, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
 }
 
 @Composable

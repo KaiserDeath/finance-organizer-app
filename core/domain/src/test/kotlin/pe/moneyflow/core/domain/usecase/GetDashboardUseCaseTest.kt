@@ -12,6 +12,7 @@ import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.CategoryType
 import pe.moneyflow.core.model.ThemeMode
 import pe.moneyflow.core.model.Transaction
+import pe.moneyflow.core.model.TransactionStatus
 import pe.moneyflow.core.model.TransactionType
 import pe.moneyflow.core.model.UserPreferences
 import org.junit.Test
@@ -51,6 +52,31 @@ class GetDashboardUseCaseTest {
         assertEquals(300000L, data.monthIncomeMinor)
         assertEquals(1, data.categoryBreakdown.size)
         assertEquals(1500L, data.categoryBreakdown.first().amountMinor)
+    }
+
+    @Test
+    fun `pending expenses stay out of the month total`() = runTest {
+        val withPending = transactions + Transaction(
+            id = "4",
+            title = "Netflix",
+            amountMinor = 4490,
+            categoryId = "c1",
+            type = TransactionType.EXPENSE,
+            status = TransactionStatus.PENDING,
+            estimatedDate = today.plusDays(3),
+        )
+        val useCase = GetDashboardUseCase(
+            transactionRepository = FakeTransactionRepository(withPending),
+            categoryRepository = FakeCategoryRepository(categories),
+            settingsRepository = FakeSettingsRepository(),
+            clock = clock,
+        )
+
+        val data = useCase().first()
+
+        // "Total del mes" is what was spent; the pending bill surfaces as committed, not here.
+        assertEquals(1500L, data.monthSpentMinor)
+        assertEquals(1500L, data.categoryBreakdown.sumOf { it.amountMinor })
     }
 }
 

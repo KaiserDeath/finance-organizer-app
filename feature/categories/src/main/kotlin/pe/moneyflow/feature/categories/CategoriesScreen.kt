@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +47,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -164,6 +166,7 @@ fun CategoriesScreen(
                         SwipeableCategory(
                             category = category,
                             onDelete = onDelete,
+                            onToggleFixed = { viewModel.setFixed(category.id, it) },
                             modifier = animatedItem(),
                         )
                     }
@@ -174,6 +177,7 @@ fun CategoriesScreen(
                         SwipeableCategory(
                             category = category,
                             onDelete = onDelete,
+                            onToggleFixed = null,
                             modifier = animatedItem(),
                         )
                     }
@@ -185,8 +189,8 @@ fun CategoriesScreen(
     if (showAddDialog) {
         AddCategorySheet(
             onDismiss = { showAddDialog = false },
-            onConfirm = { name, colorHex, iconKey, type ->
-                viewModel.add(name, colorHex, iconKey, type)
+            onConfirm = { name, colorHex, iconKey, type, isFixed ->
+                viewModel.add(name, colorHex, iconKey, type, isFixed)
                 showAddDialog = false
             },
         )
@@ -197,6 +201,7 @@ fun CategoriesScreen(
 private fun SwipeableCategory(
     category: Category,
     onDelete: (Category) -> Unit,
+    onToggleFixed: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -218,7 +223,11 @@ private fun SwipeableCategory(
         backgroundContent = { DeleteBackground() },
     ) {
         Surface(color = MaterialTheme.colorScheme.surface) {
-            CategoryRow(category = category, onDelete = { onDelete(category) })
+            CategoryRow(
+                category = category,
+                onDelete = { onDelete(category) },
+                onToggleFixed = onToggleFixed,
+            )
         }
     }
 }
@@ -240,7 +249,11 @@ private fun DeleteBackground() {
 }
 
 @Composable
-private fun CategoryRow(category: Category, onDelete: () -> Unit) {
+private fun CategoryRow(
+    category: Category,
+    onDelete: () -> Unit,
+    onToggleFixed: ((Boolean) -> Unit)?,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
@@ -255,6 +268,13 @@ private fun CategoryRow(category: Category, onDelete: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f).padding(horizontal = Spacing.md),
         )
+        if (onToggleFixed != null) {
+            FilterChip(
+                selected = category.isFixed,
+                onClick = { onToggleFixed(!category.isFixed) },
+                label = { Text("Fijo") },
+            )
+        }
         IconButton(onClick = onDelete) {
             Icon(
                 Icons.Rounded.DeleteOutline,
@@ -269,12 +289,13 @@ private fun CategoryRow(category: Category, onDelete: () -> Unit) {
 @Composable
 private fun AddCategorySheet(
     onDismiss: () -> Unit,
-    onConfirm: (name: String, colorHex: String, iconKey: String, type: CategoryType) -> Unit,
+    onConfirm: (name: String, colorHex: String, iconKey: String, type: CategoryType, isFixed: Boolean) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(CategoryType.EXPENSE) }
     var colorHex by remember { mutableStateOf(SwatchPalette.first()) }
     var iconKey by remember { mutableStateOf(IconChoices.first()) }
+    var isFixed by remember { mutableStateOf(false) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -316,6 +337,27 @@ private fun AddCategorySheet(
                 }
             }
 
+            if (type == CategoryType.EXPENSE) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Gasto fijo",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = "Alquiler, servicios… si se pasa del límite, se corrige el límite.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = isFixed, onCheckedChange = { isFixed = it })
+                }
+            }
+
             Text("Color", style = MaterialTheme.typography.labelLarge)
             ColorSwatchPicker(selectedHex = colorHex, onSelect = { colorHex = it })
 
@@ -327,7 +369,9 @@ private fun AddCategorySheet(
             )
 
             Button(
-                onClick = { onConfirm(name, colorHex, iconKey, type) },
+                onClick = {
+                    onConfirm(name, colorHex, iconKey, type, isFixed && type == CategoryType.EXPENSE)
+                },
                 enabled = name.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text("Agregar categoría") }

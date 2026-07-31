@@ -9,6 +9,7 @@ import pe.moneyflow.core.domain.model.WeekdaySpend
 import pe.moneyflow.core.domain.repository.CategoryRepository
 import pe.moneyflow.core.domain.repository.SettingsRepository
 import pe.moneyflow.core.domain.repository.TransactionRepository
+import pe.moneyflow.core.model.TransactionStatus
 import pe.moneyflow.core.model.TransactionType
 import java.time.Clock
 import java.time.DayOfWeek
@@ -39,7 +40,11 @@ class GetAnalyticsUseCase @Inject constructor(
             categoryRepository.observeAll(),
             settingsRepository.preferences,
         ) { transactions, categories, prefs ->
-            val expenses = transactions.filter { it.type == TransactionType.EXPENSE }
+            // PAID only, matching the dashboard: the "total del mes" is what was spent, and the
+            // donut here must agree with the hero there. Pending money is shown as committed.
+            val expenses = transactions.filter {
+                it.type == TransactionType.EXPENSE && it.status == TransactionStatus.PAID
+            }
             val incomes = transactions.filter { it.type == TransactionType.INCOME }
 
             val expenseByMonth = expenses.groupBy { YearMonth.from(it.effectiveDate) }

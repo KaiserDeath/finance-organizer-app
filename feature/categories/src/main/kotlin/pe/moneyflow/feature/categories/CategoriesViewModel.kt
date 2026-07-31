@@ -48,7 +48,7 @@ class CategoriesViewModel @Inject constructor(
             initialValue = CategoriesUiState(),
         )
 
-    fun add(name: String, colorHex: String, iconKey: String, type: CategoryType) {
+    fun add(name: String, colorHex: String, iconKey: String, type: CategoryType, isFixed: Boolean = false) {
         if (name.isBlank()) return
         viewModelScope.launch {
             saveCategory(
@@ -60,9 +60,16 @@ class CategoriesViewModel @Inject constructor(
                     type = type,
                     isDefault = false,
                     sortOrder = 999,
+                    isFixed = isFixed,
                 ),
             )
         }
+    }
+
+    /** Marks/unmarks a category as fixed expense (rent-like: an overrun means the limit is short). */
+    fun setFixed(id: String, fixed: Boolean) {
+        val category = uiState.value.expense.firstOrNull { it.id == id } ?: return
+        viewModelScope.launch { saveCategory(category.copy(isFixed = fixed)) }
     }
 
     fun delete(id: String) {

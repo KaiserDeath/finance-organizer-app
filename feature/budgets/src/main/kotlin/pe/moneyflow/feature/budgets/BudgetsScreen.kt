@@ -1,5 +1,6 @@
 package pe.moneyflow.feature.budgets
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -40,12 +41,18 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +63,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.component.animatedItem
 import pe.moneyflow.core.designsystem.component.EmptyState
@@ -80,12 +88,29 @@ fun BudgetsScreen(
     viewModel: BudgetsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showAddDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    // null = closed; Editing(null) = creating; Editing(progress) = editing that budget.
+    var editorTarget by remember { mutableStateOf<EditorTarget?>(null) }
+    var consumedInitialEdit by remember { mutableStateOf(false) }
+
+    // "Ajustar el límite" arrives with the budget id in the route: open its editor as soon as
+    // the list has loaded, exactly once.
+    LaunchedEffect(uiState.items, consumedInitialEdit) {
+        if (consumedInitialEdit) return@LaunchedEffect
+        val wanted = viewModel.initialEditBudgetId ?: return@LaunchedEffect
+        val match = uiState.items.firstOrNull { it.budget.id == wanted }
+        if (match != null) {
+            editorTarget = EditorTarget(match)
+            consumedInitialEdit = true
+        }
+    }
 
     Scaffold(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Presupuestos") },
@@ -100,7 +125,7 @@ fun BudgetsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+            FloatingActionButton(onClick = { editorTarget = EditorTarget(null) }) {
                 Icon(Icons.Rounded.Add, contentDescription = "Nuevo presupuesto")
             }
         },
@@ -139,6 +164,7 @@ fun BudgetsScreen(
                 items(uiState.items, key = { it.budget.id }) { progress ->
                     BudgetCard(
                         progress = progress,
+                        onClick = { editorTarget = EditorTarget(progress) },
                         onDelete = { viewModel.delete(progress.budget.id) },
                         modifier = animatedItem(),
                     )
@@ -147,18 +173,33 @@ fun BudgetsScreen(
         }
     }
 
-    if (showAddDialog) {
-        AddBudgetSheet(
+    editorTarget?.let { target ->
+        BudgetEditorSheet(
+            existing = target.progress,
             categories = uiState.expenseCategories,
             currencyCode = uiState.currencyCode,
-            onDismiss = { showAddDialog = false },
+            onDismiss = { editorTarget = null },
             onConfirm = { name, categoryId, amount, period ->
-                viewModel.add(name, categoryId, amount, period)
-                showAddDialog = false
+                val previous = target.progress?.budget
+                viewModel.save(previous, name, categoryId, amount, period)
+                editorTarget = null
+                if (previous != null) {
+                    scope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Límite actualizado",
+                            actionLabel = "Deshacer",
+                            duration = SnackbarDuration.Long,
+                        )
+                        if (result == SnackbarResult.ActionPerformed) viewModel.undoEdit()
+                    }
+                }
             },
         )
     }
 }
+
+/** Wrapper so "open the create sheet" (null progress) is distinguishable from "closed". */
+private data class EditorTarget(val progress: BudgetProgress?)
 
 @Composable
 private fun OverallCard(spentMinor: Long, limitMinor: Long, currencyCode: String) {
@@ -182,6 +223,7 @@ private fun OverallCard(spentMinor: Long, limitMinor: Long, currencyCode: String
 @Composable
 private fun BudgetCard(
     progress: BudgetProgress,
+    onClick: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -192,7 +234,12 @@ private fun BudgetCard(
     }
     val accent = colorFromHex(progress.category?.colorHex, MaterialTheme.colorScheme.primary)
 
-    MoneyCard(modifier = modifier.fillMaxWidth()) {
+    MoneyCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.large)
+            .clickable(onClick = onClick),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CategoryAvatar(
                 icon = iconForKey(progress.category?.iconKey ?: "savings"),
@@ -264,16 +311,20 @@ private fun BudgetCard(
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun AddBudgetSheet(
+private fun BudgetEditorSheet(
+    existing: BudgetProgress?,
     categories: List<pe.moneyflow.core.model.Category>,
     onDismiss: () -> Unit,
     currencyCode: String,
     onConfirm: (name: String, categoryId: String?, amountMinor: Long, period: BudgetPeriod) -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
-    var amountText by remember { mutableStateOf("") }
-    var categoryId by remember { mutableStateOf<String?>(null) }
-    var period by remember { mutableStateOf(BudgetPeriod.MONTHLY) }
+    val isEditing = existing != null
+    var name by remember { mutableStateOf(existing?.budget?.name ?: "") }
+    var amountText by remember {
+        mutableStateOf(existing?.budget?.amountMinor?.let(Money::formatPlain) ?: "")
+    }
+    var categoryId by remember { mutableStateOf(existing?.budget?.categoryId) }
+    var period by remember { mutableStateOf(existing?.budget?.period ?: BudgetPeriod.MONTHLY) }
 
     val amountMinor = Money.parseToMinor(amountText) ?: 0L
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -293,7 +344,7 @@ private fun AddBudgetSheet(
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             Text(
-                text = "Nuevo presupuesto",
+                text = if (isEditing) "Editar presupuesto" else "Nuevo presupuesto",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -350,7 +401,7 @@ private fun AddBudgetSheet(
                 onClick = { onConfirm(name, categoryId, amountMinor, period) },
                 enabled = name.isNotBlank() && amountMinor > 0,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) { Text("Crear presupuesto") }
+            ) { Text(if (isEditing) "Guardar cambios" else "Crear presupuesto") }
         }
     }
 }

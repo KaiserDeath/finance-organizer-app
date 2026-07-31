@@ -73,8 +73,6 @@ import pe.moneyflow.feature.categories.CategoriesRoute
 import pe.moneyflow.feature.categories.categoriesScreen
 import pe.moneyflow.feature.dashboard.DashboardRoute
 import pe.moneyflow.feature.dashboard.dashboardScreen
-import pe.moneyflow.feature.insights.InsightsRoute
-import pe.moneyflow.feature.insights.insightsScreen
 import pe.moneyflow.feature.paymentmethods.PaymentMethodsRoute
 import pe.moneyflow.feature.paymentmethods.paymentMethodsScreen
 import pe.moneyflow.feature.recurring.RecurringRoute
@@ -113,7 +111,7 @@ internal enum class TopLevelDestination(
 ) {
     DASHBOARD(DashboardRoute, "Inicio", Icons.Rounded.Home, "Inicio"),
     TRANSACTIONS(
-        TransactionsRoute,
+        TransactionsRoute(),
         "Movimientos",
         Icons.AutoMirrored.Rounded.ReceiptLong,
         "Movimientos",
@@ -293,12 +291,13 @@ fun MoneyFlowApp(
             },
         ) {
             dashboardScreen(
-                onSeeAllTransactions = { navController.navigateToTopLevel(TransactionsRoute) },
+                onSeeAllTransactions = { navController.navigateToTopLevel(TransactionsRoute()) },
                 onTransactionClick = { id -> navController.navigateToMovementDetail(id) },
                 onOpenUpcoming = { navController.navigate(UpcomingRoute) },
-                onOpenInsights = { navController.navigate(InsightsRoute) },
+                // Sugerencias now live inside Análisis (the insights destination was retired).
+                onOpenInsights = { navController.navigateToTopLevel(AnalyticsRoute) },
                 // Plain navigate(): budgets is a stacked destination now, so it gets a back arrow.
-                onOpenBudgets = { navController.navigate(BudgetsRoute) },
+                onOpenBudgets = { navController.navigate(BudgetsRoute()) },
             )
             transactionsScreen(
                 onTransactionClick = { id -> navController.navigateToMovementDetail(id) },
@@ -310,7 +309,7 @@ fun MoneyFlowApp(
             )
             composable<MoneyRoute> {
                 MoneyScreen(
-                    onOpenBudgets = { navController.navigate(BudgetsRoute) },
+                    onOpenBudgets = { navController.navigate(BudgetsRoute()) },
                     onOpenUpcoming = { navController.navigate(UpcomingRoute) },
                     onOpenAccounts = { navController.navigate(AccountsRoute) },
                     onOpenSavings = { navController.navigate(SavingsRoute) },
@@ -330,7 +329,6 @@ fun MoneyFlowApp(
                     onOpenLegal = { navController.navigate(LegalRoute) },
                 )
             }
-            insightsScreen(onBack = { navController.popBackStack() })
             accountsScreen(onBack = { navController.popBackStack() })
             savingsScreen(onBack = { navController.popBackStack() })
             categoriesScreen(onBack = { navController.popBackStack() })
@@ -339,7 +337,10 @@ fun MoneyFlowApp(
                 onBack = { navController.popBackStack() },
                 onOpenTransaction = { id -> navController.navigateToMovementDetail(id) },
             )
-            analyticsScreen()
+            analyticsScreen(
+                onAdjustBudget = { id -> navController.navigate(BudgetsRoute(editBudgetId = id)) },
+                onSeeExpenses = { id -> navController.navigate(TransactionsRoute(categoryId = id)) },
+            )
             currencyScreen(onBack = { navController.popBackStack() })
             composable<AppearanceRoute> { AppearanceScreen(onBack = { navController.popBackStack() }) }
             composable<BackupRoute> { BackupScreen(onBack = { navController.popBackStack() }) }

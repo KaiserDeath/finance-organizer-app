@@ -12,11 +12,15 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import pe.moneyflow.core.domain.model.AnalyticsData
+import pe.moneyflow.core.domain.model.BudgetProgress
 import pe.moneyflow.core.domain.model.CumulativeSpend
+import pe.moneyflow.core.domain.model.Insight
 import pe.moneyflow.core.domain.model.MonthlyReport
 import pe.moneyflow.core.domain.usecase.ExportTransactionsCsvUseCase
 import pe.moneyflow.core.domain.usecase.GetAnalyticsUseCase
+import pe.moneyflow.core.domain.usecase.GetBudgetsProgressUseCase
 import pe.moneyflow.core.domain.usecase.GetCumulativeSpendUseCase
+import pe.moneyflow.core.domain.usecase.GetInsightsUseCase
 import pe.moneyflow.core.domain.usecase.GetMonthlyReportUseCase
 import java.time.YearMonth
 import javax.inject.Inject
@@ -27,6 +31,9 @@ data class AnalyticsUiState(
     val report: MonthlyReport = MonthlyReport.empty(YearMonth.now()),
     /** Day-by-day running totals for the cash-flow curve, this month against last. */
     val cumulative: CumulativeSpend = CumulativeSpend.empty(YearMonth.now()),
+    /** The budget the user overran the most — what the screen opens with, when there is one. */
+    val worstOverrun: BudgetProgress? = null,
+    val insights: List<Insight> = emptyList(),
     val isExporting: Boolean = false,
 )
 
@@ -44,6 +51,8 @@ class AnalyticsViewModel @Inject constructor(
     getAnalytics: GetAnalyticsUseCase,
     getMonthlyReport: GetMonthlyReportUseCase,
     getCumulativeSpend: GetCumulativeSpendUseCase,
+    getBudgetsProgress: GetBudgetsProgressUseCase,
+    getInsights: GetInsightsUseCase,
     private val exportCsv: ExportTransactionsCsvUseCase,
 ) : ViewModel() {
 
@@ -52,17 +61,25 @@ class AnalyticsViewModel @Inject constructor(
     private val events = Channel<AnalyticsEvent>(Channel.BUFFERED)
     val eventFlow: Flow<AnalyticsEvent> = events.receiveAsFlow()
 
+    // Analytics absorbed Sugerencias: an insight is a number with an action behind it, which is
+    // exactly what this screen is for — two separate places to look was one too many.
     val uiState: StateFlow<AnalyticsUiState> = combine(
-        getAnalytics(),
-        getMonthlyReport(),
-        getCumulativeSpend(),
+        combine(getAnalytics(), getMonthlyReport(), getCumulativeSpend()) { a, r, c ->
+            Triple(a, r, c)
+        },
+        getBudgetsProgress(),
+        getInsights(),
         exporting,
-    ) { analytics, report, cumulative, isExporting ->
+    ) { (analytics, report, cumulative), budgets, insights, isExporting ->
         AnalyticsUiState(
             isLoading = false,
             analytics = analytics,
             report = report,
             cumulative = cumulative,
+            worstOverrun = budgets
+                .filter { it.isOverBudget }
+                .maxByOrNull { it.spentMinor - it.budget.amountMinor },
+            insights = insights,
             isExporting = isExporting,
         )
     }.stateIn(
