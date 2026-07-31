@@ -77,7 +77,7 @@ fun HeroBalanceCard(
                 "Gastado este mes"
             },
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         // The headline. Counts to its value so logging an expense visibly moves it.
@@ -95,7 +95,7 @@ fun HeroBalanceCard(
             Text(
                 text = "de ${Money.format(budgetMinor, data.currencyCode)} presupuestado",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(Spacing.md))
             HeroProgressBar(pace = pace, currencyCode = data.currencyCode)
@@ -152,7 +152,7 @@ private fun HeroProgressBar(pace: SpendingPace, currencyCode: String) {
         pace.isProjectedOverBudget -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.primary
     }
-    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
 
     Column {
         HeroBar(
@@ -160,7 +160,7 @@ private fun HeroProgressBar(pace: SpendingPace, currencyCode: String) {
             expectedFraction = expectedFraction,
             barColor = barColor,
             trackColor = trackColor,
-            markerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+            markerColor = MaterialTheme.colorScheme.outline,
         )
         Spacer(Modifier.height(Spacing.sm))
         Row(
@@ -181,7 +181,7 @@ private fun HeroProgressBar(pace: SpendingPace, currencyCode: String) {
                         "Excedido por ${Money.format(abs(remaining), currencyCode)}"
                     },
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -198,7 +198,7 @@ private fun HeroStat(
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         content()
     }
@@ -213,7 +213,7 @@ private fun MonthDeltaLabel(data: DashboardData) {
             text = "Sin datos",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         return
     }
@@ -258,7 +258,7 @@ private fun HeroPaceRow(pace: SpendingPace, currencyCode: String) {
     val allowance = pace.remainingDailyAllowanceMinor
     val projectionColor = when {
         pace.isOverBudget || pace.isProjectedOverBudget -> MaterialTheme.moneyColors.negative
-        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+        else -> MaterialTheme.colorScheme.onSurface
     }
     Column {
         Text(
@@ -272,7 +272,7 @@ private fun HeroPaceRow(pace: SpendingPace, currencyCode: String) {
                 text = "Puedes gastar ${Money.format(allowance, currencyCode)} por día " +
                     "(${pace.daysRemaining} ${if (pace.daysRemaining == 1) "día" else "días"} restantes)",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (pace.committedRemainingMinor > 0) {
@@ -280,7 +280,7 @@ private fun HeroPaceRow(pace: SpendingPace, currencyCode: String) {
                 text = "Ya comprometido: " +
                     Money.format(pace.committedRemainingMinor, currencyCode),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

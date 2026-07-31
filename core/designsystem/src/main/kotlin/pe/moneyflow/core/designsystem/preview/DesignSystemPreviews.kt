@@ -231,7 +231,7 @@ private fun CardsPreview() {
                 Text(
                     "Gastado este mes",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text("S/ 1,240.50", style = MaterialTheme.typography.displayMedium)
             }
