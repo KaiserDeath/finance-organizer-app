@@ -40,6 +40,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import pe.moneyflow.core.designsystem.component.animatedItem
 import pe.moneyflow.core.designsystem.component.EmptyState
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.theme.Spacing
@@ -131,7 +132,11 @@ fun CurrencyScreen(
                 }
             } else {
                 items(uiState.rates, key = { it.id }) { rate ->
-                    RateCard(rate = rate, onDelete = { viewModel.delete(rate.id) })
+                    RateCard(
+                        rate = rate,
+                        onDelete = { viewModel.delete(rate.id) },
+                        modifier = animatedItem(),
+                    )
                 }
             }
         }
@@ -149,8 +154,12 @@ fun CurrencyScreen(
 }
 
 @Composable
-private fun RateCard(rate: ExchangeRate, onDelete: () -> Unit) {
-    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+private fun RateCard(
+    rate: ExchangeRate,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    MoneyCard(modifier = modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(

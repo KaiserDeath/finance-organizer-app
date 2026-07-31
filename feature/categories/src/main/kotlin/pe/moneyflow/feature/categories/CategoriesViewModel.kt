@@ -20,7 +20,10 @@ data class CategoriesUiState(
     val isLoading: Boolean = true,
     val expense: List<Category> = emptyList(),
     val income: List<Category> = emptyList(),
-)
+) {
+    /** Both lists genuinely empty, as opposed to not having loaded yet. */
+    val isEmpty: Boolean get() = !isLoading && expense.isEmpty() && income.isEmpty()
+}
 
 @HiltViewModel
 class CategoriesViewModel @Inject constructor(

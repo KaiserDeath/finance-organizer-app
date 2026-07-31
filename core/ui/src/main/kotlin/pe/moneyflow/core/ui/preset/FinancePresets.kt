@@ -1,6 +1,7 @@
 package pe.moneyflow.core.ui.preset
 
 import pe.moneyflow.core.model.AccountType
+import pe.moneyflow.core.model.CardKind
 import pe.moneyflow.core.model.PaymentMethodType
 
 /**
@@ -27,6 +28,8 @@ data class FinancePreset(
      * not installed. Banks only; wallets (Yape/Plin) and cash have none. Verified July 2026.
      */
     val webUrl: String? = null,
+    /** Debit/credit nature for card presets; null for cash, wallets and banks. */
+    val cardKind: CardKind? = null,
 )
 
 object FinancePresets {
@@ -38,7 +41,9 @@ object FinancePresets {
         FinancePreset("Scotiabank", AccountType.BANK, PaymentMethodType.BANK, "account_balance", "#D5122B", "pe.com.scotiabank.blpm.android.client", "https://www.scotiabank.com.pe/Personas/Canales-digitales/canales/banca-por-internet"),
         FinancePreset("Yape", AccountType.EWALLET, PaymentMethodType.EWALLET, "wallet", "#742284", "com.bcp.innovacxion.yapeapp"),
         FinancePreset("Plin", AccountType.EWALLET, PaymentMethodType.EWALLET, "wallet", "#00B7C4"),
-        FinancePreset("Tarjeta de crédito", AccountType.CREDIT_CARD, PaymentMethodType.CARD, "card", "#EF5350"),
+        FinancePreset("Tunki", AccountType.EWALLET, PaymentMethodType.EWALLET, "wallet", "#00C2A8"),
+        FinancePreset("Tarjeta de débito", AccountType.BANK, PaymentMethodType.CARD, "card", "#42A5F5", cardKind = CardKind.DEBIT),
+        FinancePreset("Tarjeta de crédito", AccountType.CREDIT_CARD, PaymentMethodType.CARD, "card", "#EF5350", cardKind = CardKind.CREDIT),
     )
 
     /** Official web-banking URL for a stored [packageName], so it need not be persisted per method. */
@@ -61,4 +66,15 @@ fun PaymentMethodType.toAccountType(): AccountType = when (this) {
     PaymentMethodType.CARD -> AccountType.CREDIT_CARD
     PaymentMethodType.EWALLET -> AccountType.EWALLET
     PaymentMethodType.BANK -> AccountType.BANK
+}
+
+/**
+ * Account type for a payment method, honoring the card's [cardKind] so a **debit** card links to a
+ * Bank (checking) account and a **credit** card to a Credit-card account. Falls back to
+ * [toAccountType] for non-cards.
+ */
+fun accountTypeFor(type: PaymentMethodType, cardKind: CardKind?): AccountType = when (cardKind) {
+    CardKind.DEBIT -> AccountType.BANK
+    CardKind.CREDIT -> AccountType.CREDIT_CARD
+    null -> type.toAccountType()
 }

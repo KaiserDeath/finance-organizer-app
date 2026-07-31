@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.AssistChip
@@ -82,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import pe.moneyflow.core.designsystem.component.animatedItem
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.Spacing
@@ -89,16 +91,20 @@ import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.ui.legal.LegalText
 import pe.moneyflow.core.ui.preset.FinancePresets
 import pe.moneyflow.core.model.Account
+import pe.moneyflow.core.model.CardKind
 import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.PaymentMethodType
+import pe.moneyflow.core.designsystem.component.EmptyState
+import pe.moneyflow.core.designsystem.component.SkeletonRows
 import pe.moneyflow.core.ui.component.CategoryAvatar
+import pe.moneyflow.core.ui.component.ColorSwatchPicker
+import pe.moneyflow.core.ui.component.IconChoicePicker
+import pe.moneyflow.core.ui.component.SwatchPalette
+import pe.moneyflow.core.ui.paymentmethod.PaymentNature
+import pe.moneyflow.core.ui.paymentmethod.paymentNatureOf
 import pe.moneyflow.core.ui.util.launchPaymentApp
 import java.util.UUID
 
-private val PaletteHex = listOf(
-    "#4F46E5", "#0EA5A5", "#F59E0B", "#EC4899", "#8B5CF6", "#10B981",
-    "#EF4444", "#3B82F6", "#F97316", "#14B8A6", "#A855F7", "#84CC16",
-)
 private val IconChoices = listOf(
     "payments", "card", "wallet", "account_balance", "attach_money", "savings", "phone", "category",
 )
@@ -174,24 +180,40 @@ fun PaymentMethodsScreen(
                 )
             }
 
-            items(items = uiState.methods, key = { it.id }) { method ->
-                SwipeablePaymentMethod(
-                    method = method,
-                    onClick = {
-                        editing = method
-                        showSheet = true
-                    },
-                    onLaunch = {
-                        launchPaymentApp(
-                            context = context,
-                            packageName = method.deepLinkPackage,
-                            appName = method.name,
-                            playStoreId = method.playStoreId,
-                            webBankingUrl = FinancePresets.webUrlFor(method.deepLinkPackage),
+            if (uiState.isLoading) {
+                item { SkeletonRows(count = 6) }
+            } else if (uiState.isEmpty) {
+                item {
+                    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+                        EmptyState(
+                            icon = Icons.Rounded.CreditCard,
+                            title = "Sin métodos de pago",
+                            subtitle = "Agrega tu efectivo, tarjetas o billeteras para saber con qué pagas cada gasto.",
+                            modifier = Modifier.fillMaxWidth(),
                         )
-                    },
-                    onDelete = onDelete,
-                )
+                    }
+                }
+            } else {
+                items(items = uiState.methods, key = { it.id }) { method ->
+                    SwipeablePaymentMethod(
+                        method = method,
+                        onClick = {
+                            editing = method
+                            showSheet = true
+                        },
+                        onLaunch = {
+                            launchPaymentApp(
+                                context = context,
+                                packageName = method.deepLinkPackage,
+                                appName = method.name,
+                                playStoreId = method.playStoreId,
+                                webBankingUrl = FinancePresets.webUrlFor(method.deepLinkPackage),
+                            )
+                        },
+                        onDelete = onDelete,
+                        modifier = animatedItem(),
+                    )
+                }
             }
 
             item {
@@ -212,7 +234,11 @@ fun PaymentMethodsScreen(
             onDismiss = { showSheet = false },
             onConfirm = { method, alsoCreateAccount ->
                 if (editing == null) {
-                    viewModel.saveWithAccount(method, alsoCreateAccount, currencyCode = "PEN")
+                    viewModel.saveWithAccount(
+                        method,
+                        alsoCreateAccount,
+                        currencyCode = uiState.currencyCode,
+                    )
                 } else {
                     viewModel.save(method)
                 }
@@ -228,6 +254,7 @@ private fun SwipeablePaymentMethod(
     onClick: () -> Unit,
     onLaunch: () -> Unit,
     onDelete: (PaymentMethod) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
     val dismissState = rememberSwipeToDismissBoxState(
@@ -242,6 +269,7 @@ private fun SwipeablePaymentMethod(
         },
     )
     SwipeToDismissBox(
+        modifier = modifier,
         state = dismissState,
         enableDismissFromStartToEnd = false,
         backgroundContent = { DeleteBackground() },
@@ -293,7 +321,7 @@ private fun PaymentMethodRow(method: PaymentMethod, onClick: () -> Unit, onLaunc
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                text = method.type.label() + if (method.isDefault) " · Predeterminado" else "",
+                text = method.natureLabel() + if (method.isDefault) " · Predeterminado" else "",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -325,7 +353,8 @@ private fun AddEditPaymentMethodSheet(
 ) {
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var type by remember { mutableStateOf(existing?.type ?: PaymentMethodType.CASH) }
-    var colorHex by remember { mutableStateOf(existing?.colorHex ?: PaletteHex.first()) }
+    var cardKind by remember { mutableStateOf(existing?.cardKind) }
+    var colorHex by remember { mutableStateOf(existing?.colorHex ?: SwatchPalette.first()) }
     var iconKey by remember { mutableStateOf(existing?.iconKey ?: IconChoices.first()) }
     var accountId by remember { mutableStateOf(existing?.accountId) }
     var isDefault by remember { mutableStateOf(existing?.isDefault ?: false) }
@@ -359,10 +388,13 @@ private fun AddEditPaymentMethodSheet(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     FinancePresets.all.forEach { preset ->
                         FilterChip(
-                            selected = name == preset.name && type == preset.paymentMethodType,
+                            selected = name == preset.name &&
+                                type == preset.paymentMethodType &&
+                                cardKind == preset.cardKind,
                             onClick = {
                                 name = preset.name
                                 type = preset.paymentMethodType
+                                cardKind = preset.cardKind
                                 colorHex = preset.colorHex
                                 iconKey = preset.iconKey
                                 deepLink = preset.deepLinkPackage ?: ""
@@ -389,20 +421,40 @@ private fun AddEditPaymentMethodSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Text("Tipo", style = MaterialTheme.typography.labelLarge)
+            // Money nature — the primary choice. Débito/Crédito mark it a card (and drive which
+            // account it links to); Efectivo covers cash and wallets, keeping the preset's own
+            // underlying type (Yape→billetera, BCP→banco) for account mapping and deep-links.
+            Text("Tipo de dinero", style = MaterialTheme.typography.labelLarge)
+            val currentNature = paymentNatureOf(type, cardKind)
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                val types = listOf(
-                    PaymentMethodType.CASH to "Efectivo",
-                    PaymentMethodType.CARD to "Tarjeta",
-                    PaymentMethodType.EWALLET to "Billetera",
-                    PaymentMethodType.BANK to "Banco",
-                )
-                types.forEachIndexed { index, (value, label) ->
+                PaymentNature.entries.forEachIndexed { index, value ->
                     SegmentedButton(
-                        selected = type == value,
-                        onClick = { type = value },
-                        shape = SegmentedButtonDefaults.itemShape(index, types.size),
-                    ) { Text(label) }
+                        selected = currentNature == value,
+                        onClick = {
+                            when (value) {
+                                PaymentNature.EFECTIVO -> {
+                                    cardKind = null
+                                    // A card or bank becomes plain cash; a wallet keeps its type.
+                                    if (type == PaymentMethodType.CARD || type == PaymentMethodType.BANK) {
+                                        type = PaymentMethodType.CASH
+                                    }
+                                }
+                                PaymentNature.DEBITO ->
+                                    // A bank stays a bank (also débito); anything else is a debit card.
+                                    if (type == PaymentMethodType.BANK) {
+                                        cardKind = null
+                                    } else {
+                                        type = PaymentMethodType.CARD
+                                        cardKind = CardKind.DEBIT
+                                    }
+                                PaymentNature.CREDITO -> {
+                                    type = PaymentMethodType.CARD
+                                    cardKind = CardKind.CREDIT
+                                }
+                            }
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index, PaymentNature.entries.size),
+                    ) { Text(value.label) }
                 }
             }
 
@@ -473,49 +525,14 @@ private fun AddEditPaymentMethodSheet(
             AnimatedVisibility(visible = showAdvanced) {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                     Text("Color", style = MaterialTheme.typography.labelLarge)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        PaletteHex.forEach { hex ->
-                            val color = colorFromHex(hex, MaterialTheme.colorScheme.primary)
-                            Box(
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(color)
-                                    .border(
-                                        width = if (colorHex == hex) 3.dp else 0.dp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        shape = CircleShape,
-                                    )
-                                    .clickable { colorHex = hex },
-                            )
-                        }
-                    }
+                    ColorSwatchPicker(selectedHex = colorHex, onSelect = { colorHex = it })
 
                     Text("Ícono", style = MaterialTheme.typography.labelLarge)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        IconChoices.forEach { key ->
-                            val selected = iconKey == key
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (selected) MaterialTheme.colorScheme.primaryContainer
-                                        else MaterialTheme.colorScheme.surfaceVariant,
-                                    )
-                                    .clickable { iconKey = key },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = iconForKey(key),
-                                    contentDescription = null,
-                                    tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        }
-                    }
+                    IconChoicePicker(
+                        choices = IconChoices,
+                        selectedKey = iconKey,
+                        onSelect = { iconKey = it },
+                    )
 
                     OutlinedTextField(
                         value = deepLink,
@@ -550,6 +567,7 @@ private fun AddEditPaymentMethodSheet(
                         base.copy(
                             name = name.trim(),
                             type = type,
+                            cardKind = if (type == PaymentMethodType.CARD) cardKind else null,
                             iconKey = iconKey,
                             colorHex = colorHex,
                             accountId = accountId,
@@ -572,4 +590,11 @@ private fun PaymentMethodType.label(): String = when (this) {
     PaymentMethodType.CARD -> "Tarjeta"
     PaymentMethodType.EWALLET -> "Billetera digital"
     PaymentMethodType.BANK -> "Banco"
+}
+
+/** Debit/credit for cards, otherwise the plain type label — so the row shows the money's nature. */
+private fun PaymentMethod.natureLabel(): String = when (cardKind) {
+    CardKind.DEBIT -> "Tarjeta de débito"
+    CardKind.CREDIT -> "Tarjeta de crédito"
+    null -> type.label()
 }

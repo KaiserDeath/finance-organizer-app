@@ -32,7 +32,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -66,9 +65,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pe.moneyflow.core.common.Money
+import pe.moneyflow.core.designsystem.component.animatedItem
 import pe.moneyflow.core.designsystem.component.EmptyState
+import pe.moneyflow.core.designsystem.illustration.Illustration
 import pe.moneyflow.core.designsystem.component.MoneyCard
-import pe.moneyflow.core.designsystem.theme.PositiveGreen
+import pe.moneyflow.core.designsystem.component.MoneyProgressBar
+import pe.moneyflow.core.designsystem.component.SkeletonBlocks
+import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.model.SavingsGoal
 
@@ -127,11 +130,13 @@ fun SavingsScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            if (uiState.isEmpty) {
+            if (uiState.isLoading) {
+                item { SkeletonBlocks(heroHeight = 116.dp, count = 3, blockHeight = 132.dp) }
+            } else if (uiState.isEmpty) {
                 item {
                     MoneyCard(modifier = Modifier.fillMaxWidth()) {
                         EmptyState(
-                            icon = Icons.Rounded.Savings,
+                            illustration = Illustration.NoSavings,
                             title = "Sin metas de ahorro",
                             subtitle = "Crea una meta (fondo de emergencia, un viaje…) y registra tus aportes.",
                             modifier = Modifier.fillMaxWidth(),
@@ -152,6 +157,7 @@ fun SavingsScreen(
                         currencyCode = uiState.currencyCode,
                         onContribute = { contributeGoal = goal },
                         onDelete = onDelete,
+                        modifier = animatedItem(),
                     )
                 }
             }
@@ -197,12 +203,7 @@ private fun OverallCard(savedMinor: Long, targetMinor: Long, currencyCode: Strin
             color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(Modifier.height(Spacing.md))
-        LinearProgressIndicator(
-            progress = { fraction },
-            modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)),
-            color = PositiveGreen,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-        )
+        MoneyProgressBar(fraction = fraction, color = MaterialTheme.moneyColors.positive)
     }
 }
 
@@ -213,6 +214,7 @@ private fun SwipeableGoal(
     currencyCode: String,
     onContribute: () -> Unit,
     onDelete: (SavingsGoal) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
     val dismissState = rememberSwipeToDismissBoxState(
@@ -227,6 +229,7 @@ private fun SwipeableGoal(
         },
     )
     SwipeToDismissBox(
+        modifier = modifier,
         state = dismissState,
         enableDismissFromStartToEnd = false,
         backgroundContent = { DeleteBackground() },
@@ -279,7 +282,7 @@ private fun GoalCard(
                             "Faltan ${Money.format(goal.remainingMinor, currencyCode)}"
                         },
                         style = MaterialTheme.typography.labelMedium,
-                        color = if (goal.isComplete) PositiveGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (goal.isComplete) MaterialTheme.moneyColors.positive else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 IconButton(onClick = onDelete) {
@@ -292,12 +295,7 @@ private fun GoalCard(
             }
 
             Spacer(Modifier.height(Spacing.md))
-            LinearProgressIndicator(
-                progress = { goal.fraction },
-                modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)),
-                color = PositiveGreen,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            )
+            MoneyProgressBar(fraction = goal.fraction, color = MaterialTheme.moneyColors.positive)
             Spacer(Modifier.height(Spacing.sm))
             Row(
                 modifier = Modifier.fillMaxWidth(),

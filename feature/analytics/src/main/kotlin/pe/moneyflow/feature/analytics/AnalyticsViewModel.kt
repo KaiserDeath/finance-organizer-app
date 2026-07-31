@@ -12,9 +12,11 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import pe.moneyflow.core.domain.model.AnalyticsData
+import pe.moneyflow.core.domain.model.CumulativeSpend
 import pe.moneyflow.core.domain.model.MonthlyReport
 import pe.moneyflow.core.domain.usecase.ExportTransactionsCsvUseCase
 import pe.moneyflow.core.domain.usecase.GetAnalyticsUseCase
+import pe.moneyflow.core.domain.usecase.GetCumulativeSpendUseCase
 import pe.moneyflow.core.domain.usecase.GetMonthlyReportUseCase
 import java.time.YearMonth
 import javax.inject.Inject
@@ -23,6 +25,8 @@ data class AnalyticsUiState(
     val isLoading: Boolean = true,
     val analytics: AnalyticsData = AnalyticsData.Empty,
     val report: MonthlyReport = MonthlyReport.empty(YearMonth.now()),
+    /** Day-by-day running totals for the cash-flow curve, this month against last. */
+    val cumulative: CumulativeSpend = CumulativeSpend.empty(YearMonth.now()),
     val isExporting: Boolean = false,
 )
 
@@ -39,6 +43,7 @@ sealed interface AnalyticsEvent {
 class AnalyticsViewModel @Inject constructor(
     getAnalytics: GetAnalyticsUseCase,
     getMonthlyReport: GetMonthlyReportUseCase,
+    getCumulativeSpend: GetCumulativeSpendUseCase,
     private val exportCsv: ExportTransactionsCsvUseCase,
 ) : ViewModel() {
 
@@ -50,12 +55,14 @@ class AnalyticsViewModel @Inject constructor(
     val uiState: StateFlow<AnalyticsUiState> = combine(
         getAnalytics(),
         getMonthlyReport(),
+        getCumulativeSpend(),
         exporting,
-    ) { analytics, report, isExporting ->
+    ) { analytics, report, cumulative, isExporting ->
         AnalyticsUiState(
             isLoading = false,
             analytics = analytics,
             report = report,
+            cumulative = cumulative,
             isExporting = isExporting,
         )
     }.stateIn(

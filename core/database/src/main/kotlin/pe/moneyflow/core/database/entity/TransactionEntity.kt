@@ -54,6 +54,7 @@ data class TransactionEntity(
     val currencyCode: String,
     val categoryId: String?,
     val paymentMethodId: String?,
+    val cardKind: String?,
     val accountId: String?,
     val transferAccountId: String?,
     val type: String,

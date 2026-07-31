@@ -4,10 +4,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import pe.moneyflow.core.domain.repository.CategoryRepository
 import pe.moneyflow.core.domain.repository.PaymentMethodRepository
+import pe.moneyflow.core.domain.repository.RecurringExpenseRepository
 import pe.moneyflow.core.domain.repository.SettingsRepository
 import pe.moneyflow.core.domain.repository.TransactionRepository
 import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.PaymentMethod
+import pe.moneyflow.core.model.RecurringExpense
 import pe.moneyflow.core.model.ThemeMode
 import pe.moneyflow.core.model.Transaction
 import pe.moneyflow.core.model.UserPreferences
@@ -28,6 +30,15 @@ internal class FakeCatRepo(private val items: List<Category>) : CategoryReposito
     override fun observeAll(): Flow<List<Category>> = flowOf(items)
     override suspend fun getById(id: String): Category? = items.firstOrNull { it.id == id }
     override suspend fun upsert(category: Category) = Unit
+    override suspend fun delete(id: String) = Unit
+}
+
+internal class FakeRecurringRepo(private val items: List<RecurringExpense>) : RecurringExpenseRepository {
+    override fun observeAll(): Flow<List<RecurringExpense>> = flowOf(items)
+    override suspend fun getDue(date: LocalDate): List<RecurringExpense> =
+        items.filter { it.autoCreate && !it.nextRunDate.isAfter(date) }
+    override suspend fun getById(id: String): RecurringExpense? = items.firstOrNull { it.id == id }
+    override suspend fun upsert(recurring: RecurringExpense) = Unit
     override suspend fun delete(id: String) = Unit
 }
 

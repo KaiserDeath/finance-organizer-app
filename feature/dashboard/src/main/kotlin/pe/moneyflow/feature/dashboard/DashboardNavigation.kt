@@ -12,6 +12,7 @@ fun NavGraphBuilder.dashboardScreen(
     onTransactionClick: (String) -> Unit,
     onOpenUpcoming: () -> Unit,
     onOpenInsights: () -> Unit,
+    onOpenBudgets: () -> Unit,
 ) {
     composable<DashboardRoute> {
         DashboardScreen(
@@ -19,6 +20,7 @@ fun NavGraphBuilder.dashboardScreen(
             onTransactionClick = onTransactionClick,
             onOpenUpcoming = onOpenUpcoming,
             onOpenInsights = onOpenInsights,
+            onOpenBudgets = onOpenBudgets,
         )
     }
 }

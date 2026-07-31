@@ -31,15 +31,20 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -49,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,16 +65,17 @@ import pe.moneyflow.core.designsystem.component.BarChartEntry
 import pe.moneyflow.core.designsystem.component.DonutChart
 import pe.moneyflow.core.designsystem.component.DonutSlice
 import pe.moneyflow.core.designsystem.component.EmptyState
+import pe.moneyflow.core.designsystem.illustration.Illustration
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.component.SectionHeader
 import pe.moneyflow.core.designsystem.component.ShimmerBox
 import pe.moneyflow.core.designsystem.component.StatTile
 import pe.moneyflow.core.designsystem.theme.CategoryPalette
-import pe.moneyflow.core.designsystem.theme.NegativeRed
-import pe.moneyflow.core.designsystem.theme.PositiveGreen
+import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.AnalyticsData
+import pe.moneyflow.core.domain.model.CumulativeSpend
 import pe.moneyflow.core.domain.model.CategoryDelta
 import pe.moneyflow.core.domain.model.MonthlyReport
 import kotlin.math.abs
@@ -81,20 +88,30 @@ fun AnalyticsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Remembering which export the user asked for is what lets a failure offer a real "Reintentar"
+    // instead of just reporting itself. Errors used to surface as a Toast, which is both a legacy
+    // look and a dead end — there was nothing to act on.
+    var lastExport by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     LaunchedEffect(viewModel) {
         viewModel.eventFlow.collectLatest { event ->
             when (event) {
-                is AnalyticsEvent.ShareCsv -> runShare(context) { CsvExporter.share(context, event.csv, event.fileName) }
-                is AnalyticsEvent.SharePdf -> runShare(context) { PdfReportExporter.share(context, event.report, event.fileName) }
+                is AnalyticsEvent.ShareCsv -> runShare(snackbarHostState, lastExport) {
+                    CsvExporter.share(context, event.csv, event.fileName)
+                }
+
+                is AnalyticsEvent.SharePdf -> runShare(snackbarHostState, lastExport) {
+                    PdfReportExporter.share(context, event.report, event.fileName)
+                }
+
                 is AnalyticsEvent.ExportFailed ->
-                    android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_LONG).show()
+                    snackbarHostState.showRetryable(event.message, lastExport)
+
+                // Retrying an empty month would fail identically, so this one is informational only.
                 AnalyticsEvent.NothingToExport ->
-                    android.widget.Toast.makeText(
-                        context,
-                        "No hay movimientos para exportar este mes",
-                        android.widget.Toast.LENGTH_SHORT,
-                    ).show()
+                    snackbarHostState.showSnackbar("No hay movimientos para exportar este mes")
             }
         }
     }
@@ -102,23 +119,43 @@ fun AnalyticsScreen(
     AnalyticsContent(
         state = uiState,
         onBack = onBack,
-        onExportCsv = viewModel::exportCurrentMonth,
-        onExportPdf = viewModel::exportPdfReport,
+        snackbarHostState = snackbarHostState,
+        onExportCsv = {
+            lastExport = viewModel::exportCurrentMonth
+            viewModel.exportCurrentMonth()
+        },
+        onExportPdf = {
+            lastExport = viewModel::exportPdfReport
+            viewModel.exportPdfReport()
+        },
         modifier = modifier,
     )
 }
 
-/** Runs a share action, surfacing any file/intent failure as a toast instead of crashing. */
-private inline fun runShare(context: android.content.Context, block: () -> Unit) {
+/** Runs a share action, surfacing any file/intent failure inline instead of crashing. */
+private suspend inline fun runShare(
+    snackbarHostState: SnackbarHostState,
+    noinline onRetry: (() -> Unit)?,
+    block: () -> Unit,
+) {
     try {
         block()
     } catch (e: Exception) {
-        android.widget.Toast.makeText(
-            context,
-            e.message ?: "No se pudo compartir el archivo",
-            android.widget.Toast.LENGTH_LONG,
-        ).show()
+        snackbarHostState.showRetryable(
+            message = e.message ?: "No se pudo compartir el archivo",
+            onRetry = onRetry,
+        )
     }
+}
+
+/** Shows [message], offering a retry action when there is something meaningful to retry. */
+private suspend fun SnackbarHostState.showRetryable(message: String, onRetry: (() -> Unit)?) {
+    val result = showSnackbar(
+        message = message,
+        actionLabel = if (onRetry != null) "Reintentar" else null,
+        duration = SnackbarDuration.Long,
+    )
+    if (result == SnackbarResult.ActionPerformed) onRetry?.invoke()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -126,6 +163,7 @@ private inline fun runShare(context: android.content.Context, block: () -> Unit)
 private fun AnalyticsContent(
     state: AnalyticsUiState,
     onBack: (() -> Unit)?,
+    snackbarHostState: SnackbarHostState,
     onExportCsv: () -> Unit,
     onExportPdf: () -> Unit,
     modifier: Modifier = Modifier,
@@ -136,17 +174,20 @@ private fun AnalyticsContent(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        // No topBar: as a bottom-nav destination the shell supplies the collapsing app bar. A back
+        // arrow only makes sense if this screen is ever pushed, which the graph doesn't currently do.
         topBar = {
-            TopAppBar(
-                title = { Text("Análisis y reportes") },
-                navigationIcon = {
-                    if (onBack != null) {
+            if (onBack != null) {
+                TopAppBar(
+                    title = { Text("Análisis y reportes") },
+                    navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
                         }
-                    }
-                },
-            )
+                    },
+                )
+            }
         },
     ) { innerPadding ->
     LazyColumn(
@@ -160,7 +201,9 @@ private fun AnalyticsContent(
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         item {
-            TabRow(selectedTabIndex = selectedTab, containerColor = Color.Transparent) {
+            // PrimaryTabRow supersedes TabRow in M3: it carries the current full-width indicator
+            // treatment and animates between tabs, which plain TabRow no longer does.
+            PrimaryTabRow(selectedTabIndex = selectedTab, containerColor = Color.Transparent) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
@@ -180,7 +223,7 @@ private fun AnalyticsContent(
         }
 
         if (selectedTab == 0) {
-            trendsTab(state.analytics)
+            trendsTab(state.analytics, state.cumulative)
         } else {
             reportTab(
                 report = state.report,
@@ -197,13 +240,16 @@ private fun AnalyticsContent(
 // Trends tab
 // ---------------------------------------------------------------------------------------------
 
-private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(data: AnalyticsData) {
+private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(
+    data: AnalyticsData,
+    cumulative: CumulativeSpend,
+) {
     val hasData = data.totalExpenseMinor > 0 || data.totalIncomeMinor > 0
     if (!hasData) {
         item {
             MoneyCard(modifier = Modifier.fillMaxWidth()) {
                 EmptyState(
-                    icon = Icons.Rounded.Insights,
+                    illustration = Illustration.NoBreakdown,
                     title = "Aún no hay datos",
                     subtitle = "Registra gastos para ver tus tendencias de los últimos meses.",
                     modifier = Modifier.fillMaxWidth(),
@@ -214,6 +260,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(data: Analy
     }
 
     item { SummaryStatRow(data) }
+    // Leads the tab: direction of travel is the most actionable thing here, and it's the only chart
+    // that answers "am I ahead of last month right now?" while the month can still be changed.
+    if (cumulative.hasData) {
+        item { CashFlowCard(cumulative = cumulative, modifier = Modifier.fillMaxWidth()) }
+    }
     item { MonthlyTrendCard(data) }
     if (data.categoryBreakdown.isNotEmpty()) {
         item { CategoryBreakdownCard(data) }
@@ -255,6 +306,8 @@ private fun MonthlyTrendCard(data: AnalyticsData) {
                     highlighted = point.month == lastMonth,
                 )
             },
+            contentDescription = "Gasto por mes.",
+            valueLabel = { Money.format(it.value, data.currencyCode) },
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -275,15 +328,38 @@ private fun CategoryBreakdownCard(data: AnalyticsData) {
                     ),
                 )
             }
+            val breakdownTotalMinor = data.categoryBreakdown.sumOf { it.amountMinor }
+            val topSpend = data.categoryBreakdown.firstOrNull()
             DonutChart(
                 slices = slices,
                 diameter = 132.dp,
+                contentDescription = buildString {
+                    append("Gasto por categoría, total ")
+                    append(Money.format(breakdownTotalMinor, data.currencyCode))
+                    append(".")
+                    if (topSpend != null) {
+                        append(" Mayor: ${topSpend.category.name}, ")
+                        append("${(topSpend.fraction * 100).toInt()}%.")
+                    }
+                },
                 centerContent = {
-                    Text(
-                        text = "${data.categoryBreakdown.size}",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                    // Total spend, matching the dashboard — the count of categories is not the fact
+                    // worth the most privileged position in the chart.
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = Money.format(breakdownTotalMinor, data.currencyCode),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                        )
+                        Text(
+                            text = if (data.categoryBreakdown.size == 1) "1 categoría"
+                            else "${data.categoryBreakdown.size} categorías",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 },
             )
             Spacer(Modifier.size(Spacing.xl))
@@ -350,6 +426,8 @@ private fun WeekdayCard(data: AnalyticsData) {
                     value = day.amountMinor,
                 )
             },
+            contentDescription = "Gasto por día de la semana.",
+            valueLabel = { Money.format(it.value, data.currencyCode) },
             barColor = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.fillMaxWidth(),
             barHeight = 110.dp,
@@ -435,12 +513,13 @@ private fun MonthComparisonCard(report: MonthlyReport) {
             MiniStat(
                 label = "Ingresos",
                 value = Money.format(report.currentIncomeMinor, report.currencyCode),
-                valueColor = PositiveGreen,
+                valueColor = MaterialTheme.moneyColors.positive,
             )
             MiniStat(
                 label = "Balance",
                 value = Money.format(report.balanceMinor, report.currencyCode),
-                valueColor = if (report.balanceMinor >= 0) PositiveGreen else NegativeRed,
+                valueColor = if (report.balanceMinor >= 0) MaterialTheme.moneyColors.positive
+                else MaterialTheme.moneyColors.negative,
             )
             MiniStat(
                 label = "Movimientos",
@@ -485,7 +564,7 @@ private fun DeltaChip(
     }
     val up = deltaMinor > 0
     val isBad = if (invertColor) up else !up
-    val color = if (isBad) NegativeRed else PositiveGreen
+    val color = if (isBad) MaterialTheme.moneyColors.negative else MaterialTheme.moneyColors.positive
     val percentText = fraction?.let { " (${(abs(it) * 100).toInt()}%)" }.orEmpty()
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
@@ -535,7 +614,8 @@ private fun CategoryDeltaRow(delta: CategoryDelta, currencyCode: String) {
                 Text(
                     text = (if (d > 0) "+" else "-") + Money.format(abs(d), currencyCode),
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (d > 0) NegativeRed else PositiveGreen,
+                    color = if (d > 0) MaterialTheme.moneyColors.negative
+                    else MaterialTheme.moneyColors.positive,
                 )
             }
         }

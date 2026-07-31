@@ -14,7 +14,10 @@ import javax.inject.Inject
 data class InsightsUiState(
     val isLoading: Boolean = true,
     val insights: List<Insight> = emptyList(),
-)
+) {
+    /** Genuinely nothing to suggest, as opposed to not having loaded yet. */
+    val isEmpty: Boolean get() = !isLoading && insights.isEmpty()
+}
 
 @HiltViewModel
 class InsightsViewModel @Inject constructor(

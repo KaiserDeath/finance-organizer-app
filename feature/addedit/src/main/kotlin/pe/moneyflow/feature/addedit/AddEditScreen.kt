@@ -1,16 +1,25 @@
 package pe.moneyflow.feature.addedit
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -21,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,8 +44,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -49,6 +59,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
@@ -58,14 +69,24 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.icon.iconForKey
+import pe.moneyflow.core.designsystem.component.pressScale
+import pe.moneyflow.core.designsystem.theme.IconSize
+import pe.moneyflow.core.designsystem.theme.Motion
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.model.TransactionStatus
 import pe.moneyflow.core.model.TransactionType
+import pe.moneyflow.core.ui.component.PaymentDisplayStatus
+import pe.moneyflow.core.ui.component.PaymentStatusPill
+import pe.moneyflow.core.ui.component.paymentDisplayStatus
+import pe.moneyflow.core.ui.paymentmethod.PaymentMethodSelector
+import pe.moneyflow.core.ui.paymentmethod.toCardKind
+import pe.moneyflow.core.ui.paymentmethod.toNature
+import pe.moneyflow.core.ui.recurrence.RecurrenceEditor
+import pe.moneyflow.core.ui.util.toDueRelativeLabel
 import pe.moneyflow.core.ui.util.toFullLabel
 import java.time.Instant
 import java.time.LocalDate
@@ -80,14 +101,21 @@ fun AddEditScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val haptics = LocalHapticFeedback.current
-    val snackbarHostState = remember { SnackbarHostState() }
 
-    // On save: a tactile confirmation + a brief "guardado" cue, then return.
+    // On save: the button itself confirms, then we leave.
+    //
+    // This used to fire a snackbar and then `delay(500)` before navigating — two problems. The dwell
+    // was an arbitrary sleep unrelated to anything on screen, and the snackbar was shown on a screen
+    // that was about to be destroyed, so the confirmation the user was meant to read left with it.
+    //
+    // Now the save button morphs to a "Guardado" state and we await *that animation* before calling
+    // [onDone]. The dwell is the animation's own duration, so the timing is a consequence of the
+    // motion rather than a magic number, and the confirmation is visible where the user just tapped.
+    val confirmation = remember { Animatable(0f) }
     LaunchedEffect(uiState.saved) {
         if (uiState.saved) {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            launch { snackbarHostState.showSnackbar("Movimiento guardado") }
-            delay(500)
+            confirmation.animateTo(1f, animationSpec = Motion.spatialSlow())
             onDone()
         }
     }
@@ -115,7 +143,6 @@ fun AddEditScreen(
 
     Scaffold(
         modifier = modifier,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(if (uiState.isEditing) "Editar movimiento" else "Nuevo movimiento") },
@@ -163,7 +190,7 @@ fun AddEditScreen(
                 value = uiState.amountText,
                 onValueChange = viewModel::onAmountChange,
                 label = { Text("Monto") },
-                prefix = { Text("S/ ") },
+                prefix = { Text("${Money.symbolFor(uiState.currencyCode)} ") },
                 singleLine = true,
                 textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -197,24 +224,47 @@ fun AddEditScreen(
                             Icon(
                                 imageVector = iconForKey(category.iconKey),
                                 contentDescription = null,
-                                modifier = Modifier.height(18.dp),
+                                modifier = Modifier.size(IconSize.chip),
                             )
                         },
                     )
                 }
             }
 
-            // Payment method
+            // Payment method — pick Efectivo / Débito / Crédito first, then the matching method.
             FieldLabel("Método de pago")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                uiState.paymentMethods.forEach { method ->
-                    FilterChip(
-                        selected = uiState.paymentMethodId == method.id,
-                        onClick = {
+            PaymentMethodSelector(
+                methods = uiState.paymentMethods,
+                selectedId = uiState.paymentMethodId,
+                selectedNature = uiState.cardKind.toNature(),
+                onSelect = { id, nature ->
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    viewModel.onPaymentMethodSelect(id, if (id == null) null else nature.toCardKind())
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            // Recurrence — turns this into a repeating template (rent, subscriptions, salary...).
+            // Offered only when creating; editing an existing movement stays one-off.
+            if (uiState.canBeRecurring) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    FieldLabel("Se repite")
+                    Switch(
+                        checked = uiState.isRecurring,
+                        onCheckedChange = {
                             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            viewModel.onPaymentMethodSelect(method.id)
+                            viewModel.onRecurringChange(it)
                         },
-                        label = { Text(method.name) },
+                    )
+                }
+                AnimatedVisibility(visible = uiState.isRecurring) {
+                    RecurrenceEditor(
+                        value = uiState.recurrence,
+                        onValueChange = viewModel::onRecurrenceChange,
                     )
                 }
             }
@@ -240,12 +290,13 @@ fun AddEditScreen(
 
             AnimatedVisibility(visible = showDetails) {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-                    // Status: paid now vs pending (an upcoming payment)
-                    FieldLabel("Estado")
+                    // Payment state: paid now vs still owed (an upcoming payment). Framed as a
+                    // question so the choice reads as "have you paid?" rather than an abstract state.
+                    FieldLabel("¿Ya pagaste esto?")
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         val statuses = listOf(
-                            TransactionStatus.PAID to "Pagado",
-                            TransactionStatus.PENDING to "Pendiente",
+                            TransactionStatus.PAID to "Ya lo pagué",
+                            TransactionStatus.PENDING to "Aún no",
                         )
                         statuses.forEachIndexed { index, (value, label) ->
                             SegmentedButton(
@@ -287,6 +338,12 @@ fun AddEditScreen(
                         Text(uiState.date.toFullLabel())
                     }
 
+                    // For a pending charge, foreshadow exactly how the list will render it — so a
+                    // past due date reading as red "Vencido" is a visible consequence, not a surprise.
+                    if (uiState.isPending) {
+                        PendingStatusPreview(date = uiState.date)
+                    }
+
                     // Notes
                     OutlinedTextField(
                         value = uiState.notes,
@@ -298,14 +355,38 @@ fun AddEditScreen(
                 }
             }
 
+            val saveInteraction = remember { MutableInteractionSource() }
             Button(
                 onClick = viewModel::save,
-                enabled = uiState.canSave,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                enabled = uiState.canSave && !uiState.saved,
+                interactionSource = saveInteraction,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .pressScale(saveInteraction),
             ) {
-                Icon(Icons.Rounded.Check, contentDescription = null)
-                Spacer(Modifier.width(Spacing.sm))
-                Text("Guardar", style = MaterialTheme.typography.titleMedium)
+                AnimatedContent(
+                    targetState = uiState.saved,
+                    transitionSpec = {
+                        (fadeIn(Motion.effectsDefault()) +
+                            scaleIn(Motion.spatialDefault(), initialScale = 0.8f)) togetherWith
+                            fadeOut(Motion.effectsDefault())
+                    },
+                    label = "save-confirmation",
+                ) { saved ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (saved) Icons.Rounded.CheckCircle
+                            else Icons.Rounded.Check,
+                            contentDescription = null,
+                        )
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(
+                            text = if (saved) "Guardado" else "Guardar",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(Spacing.xl))
@@ -344,4 +425,48 @@ private fun FieldLabel(text: String) {
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+/**
+ * Mirrors how [pe.moneyflow.core.ui.component.TransactionRow] will render this pending charge:
+ * the same status pill plus a plain-language due phrase. When the chosen date is already past,
+ * it shows the red "Vencido" state up front, with a nudge to adjust the date.
+ */
+@Composable
+private fun PendingStatusPreview(date: LocalDate) {
+    val today = LocalDate.now()
+    val display = paymentDisplayStatus(TransactionStatus.PENDING, date, today)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(
+            text = "Así se verá en tu lista",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            PaymentStatusPill(display)
+            Text(
+                text = date.toDueRelativeLabel(today).replaceFirstChar { it.uppercase() },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (display == PaymentDisplayStatus.OVERDUE) {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = "La fecha ya pasó, así que aparecerá como “Vencido”. " +
+                        "Cámbiala si el pago aún no vence.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(Spacing.sm),
+                )
+            }
+        }
+    }
 }

@@ -18,9 +18,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Lightbulb
-import androidx.compose.material.icons.rounded.ReceiptLong
-import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
+import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,14 +45,13 @@ import pe.moneyflow.core.designsystem.component.ShimmerBox
 import pe.moneyflow.core.designsystem.component.StatTile
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.CategoryPalette
-import pe.moneyflow.core.designsystem.theme.NegativeRed
-import pe.moneyflow.core.designsystem.theme.PositiveGreen
 import pe.moneyflow.core.designsystem.theme.Spacing
+import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.DashboardData
-import pe.moneyflow.core.domain.model.Insight
-import pe.moneyflow.core.domain.model.InsightSeverity
+import pe.moneyflow.core.ui.component.AnimatedAmount
 import pe.moneyflow.core.ui.component.CategoryAvatar
+import pe.moneyflow.core.ui.component.InsightCard
 import pe.moneyflow.core.ui.component.TransactionRow
 import pe.moneyflow.core.ui.util.toMonthTitle
 import java.time.LocalDate
@@ -63,6 +62,7 @@ fun DashboardScreen(
     onTransactionClick: (String) -> Unit,
     onOpenUpcoming: () -> Unit,
     onOpenInsights: () -> Unit,
+    onOpenBudgets: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
@@ -73,6 +73,9 @@ fun DashboardScreen(
         onTransactionClick = onTransactionClick,
         onOpenUpcoming = onOpenUpcoming,
         onOpenInsights = onOpenInsights,
+        onOpenBudgets = onOpenBudgets,
+        onPreviousMonth = viewModel::showPreviousMonth,
+        onNextMonth = viewModel::showNextMonth,
         modifier = modifier,
     )
 }
@@ -84,6 +87,9 @@ private fun DashboardContent(
     onTransactionClick: (String) -> Unit,
     onOpenUpcoming: () -> Unit,
     onOpenInsights: () -> Unit,
+    onOpenBudgets: () -> Unit,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val data = state.data
@@ -97,23 +103,59 @@ private fun DashboardContent(
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
-        item { DashboardHeader() }
+        // The month title moved into the shell's collapsing app bar, and "Hola 👋" is gone with it —
+        // it carried no information, had no name to personalize with, and rendered inconsistently
+        // across OEM emoji fonts, all while occupying the most valuable space on the screen.
+        item {
+            MonthSelector(
+                month = data.month,
+                canGoForward = state.canGoForward,
+                onPrevious = onPreviousMonth,
+                onNext = onNextMonth,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         if (state.isLoading) {
             item { LoadingSkeleton() }
             return@LazyColumn
         }
 
-        item { HeroBalanceCard(data) }
+        item {
+            HeroBalanceCard(
+                data = data,
+                pace = state.pace,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         state.upcomingNudge?.let { nudge ->
             item { UpcomingNudgeCard(nudge = nudge, currencyCode = data.currencyCode, onClick = onOpenUpcoming) }
         }
 
+        // Budgets, promoted onto the dashboard. Previously the answer to "am I within budget?" — the
+        // primary question in an expense app — was three taps away behind "Más".
+        if (state.topBudgets.isNotEmpty()) {
+            item {
+                BudgetSummaryCard(
+                    budgets = state.topBudgets,
+                    onOpenBudgets = onOpenBudgets,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
         item { StatRow(data) }
 
         state.topInsight?.let { insight ->
-            item { InsightCard(insight = insight, onClick = onOpenInsights) }
+            item {
+                InsightCard(
+                    insight = insight,
+                    onClick = onOpenInsights,
+                    maxMessageLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         if (data.categoryBreakdown.isNotEmpty()) {
@@ -133,7 +175,7 @@ private fun DashboardContent(
             item {
                 MoneyCard(modifier = Modifier.fillMaxWidth(), shadowElevation = 0.dp) {
                     EmptyState(
-                        icon = Icons.Rounded.ReceiptLong,
+                        icon = Icons.AutoMirrored.Rounded.ReceiptLong,
                         title = "Aún no hay gastos",
                         subtitle = "Toca el botón + para registrar tu primer gasto.",
                         modifier = Modifier.fillMaxWidth(),
@@ -162,63 +204,15 @@ private fun DashboardContent(
 }
 
 @Composable
-private fun DashboardHeader() {
-    Column {
-        Text(
-            text = "Hola 👋",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = LocalDate.now().toMonthTitle(),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-@Composable
-private fun HeroBalanceCard(data: DashboardData) {
-    // Expense-first: the headline number is what you've spent this month. Income is a secondary
-    // detail that only surfaces when you've actually recorded some.
-    val hasIncome = data.monthIncomeMinor > 0
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "Gastado este mes",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-        )
-        Text(
-            text = Money.format(data.monthSpentMinor, data.currencyCode),
-            style = MaterialTheme.typography.displayMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        if (hasIncome) {
-            Spacer(Modifier.height(Spacing.lg))
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xl)) {
-                HeroStat(
-                    label = "Ingresos",
-                    value = Money.format(data.monthIncomeMinor, data.currencyCode),
-                    valueColor = PositiveGreen,
-                )
-                HeroStat(
-                    label = "Balance",
-                    value = Money.format(data.monthIncomeMinor - data.monthSpentMinor, data.currencyCode),
-                    valueColor = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun UpcomingNudgeCard(
     nudge: UpcomingNudge,
     currencyCode: String,
     onClick: () -> Unit,
 ) {
     val hasOverdue = nudge.overdueCount > 0
-    val accent = if (hasOverdue) NegativeRed else MaterialTheme.colorScheme.tertiary
+    val accent =
+        if (hasOverdue) MaterialTheme.moneyColors.negative
+        else MaterialTheme.colorScheme.tertiary
     val title = when {
         hasOverdue && nudge.dueSoonCount > 0 ->
             "${nudge.overdueCount} vencido(s) y ${nudge.dueSoonCount} por vencer"
@@ -267,71 +261,6 @@ private fun UpcomingNudgeCard(
 }
 
 @Composable
-private fun InsightCard(insight: Insight, onClick: () -> Unit) {
-    val accent = when (insight.severity) {
-        InsightSeverity.WARNING -> MaterialTheme.colorScheme.tertiary
-        InsightSeverity.POSITIVE -> PositiveGreen
-        InsightSeverity.INFO -> MaterialTheme.colorScheme.primary
-    }
-    MoneyCard(modifier = Modifier.fillMaxWidth(), shadowElevation = 0.dp) {
-        Row(
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(accent.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Lightbulb,
-                    contentDescription = null,
-                    tint = accent,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            Column(modifier = Modifier.weight(1f).padding(horizontal = Spacing.md)) {
-                Text(
-                    text = insight.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = insight.message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                )
-            }
-            Icon(
-                imageVector = Icons.Rounded.ChevronRight,
-                contentDescription = "Ver sugerencias",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HeroStat(label: String, value: String, valueColor: Color) {
-    Column {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            color = valueColor,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
 private fun StatRow(data: DashboardData) {
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         StatTile(
@@ -345,7 +274,7 @@ private fun StatRow(data: DashboardData) {
         StatTile(
             label = "Movimientos",
             value = data.monthTransactionCount.toString(),
-            icon = Icons.Rounded.TrendingUp,
+            icon = Icons.AutoMirrored.Rounded.TrendingUp,
             accent = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.weight(1f),
             shadowElevation = 0.dp,
@@ -369,17 +298,34 @@ private fun CategoryBreakdownCard(data: DashboardData) {
                 )
             }
             val topSpend = data.categoryBreakdown.first()
+            // Summed from the slices rather than taken from monthSpentMinor, so the center total is
+            // always consistent with the ring actually drawn.
+            val breakdownTotalMinor = data.categoryBreakdown.sumOf { it.amountMinor }
             DonutChart(
                 slices = slices,
                 diameter = 132.dp,
-                contentDescription = "Gasto por categoría. Mayor: ${topSpend.category.name}, " +
-                    "${(topSpend.fraction * 100).toInt()}%.",
+                contentDescription = "Gasto por categoría, total " +
+                    "${Money.format(breakdownTotalMinor, data.currencyCode)}. " +
+                    "Mayor: ${topSpend.category.name}, ${(topSpend.fraction * 100).toInt()}%.",
                 centerContent = {
-                    Text(
-                        text = "${data.categoryBreakdown.size}",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                    // The center is the most privileged spot in the chart, so it carries the total
+                    // spend. It previously showed the *count* of categories, which is close to the
+                    // least useful fact available here.
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = Money.format(breakdownTotalMinor, data.currencyCode),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                        )
+                        Text(
+                            text = if (data.categoryBreakdown.size == 1) "1 categoría"
+                            else "${data.categoryBreakdown.size} categorías",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 },
             )
             Spacer(Modifier.size(Spacing.xl))

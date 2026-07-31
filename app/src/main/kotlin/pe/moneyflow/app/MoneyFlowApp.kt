@@ -1,5 +1,8 @@
 package pe.moneyflow.app
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -7,21 +10,36 @@ import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.rounded.Savings
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -32,6 +50,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlinx.serialization.Serializable
+import pe.moneyflow.core.designsystem.component.pressScale
+import pe.moneyflow.core.ui.util.toMonthTitle
+import java.time.LocalDate
 import pe.moneyflow.app.backup.BackupScreen
 import pe.moneyflow.app.security.SecurityScreen
 import pe.moneyflow.app.legal.LegalScreen
@@ -39,7 +60,9 @@ import pe.moneyflow.app.settings.AppearanceScreen
 import pe.moneyflow.feature.accounts.AccountsRoute
 import pe.moneyflow.feature.accounts.accountsScreen
 import pe.moneyflow.feature.addedit.addEditScreen
+import pe.moneyflow.feature.addedit.movementDetailScreen
 import pe.moneyflow.feature.addedit.navigateToAddEdit
+import pe.moneyflow.feature.addedit.navigateToMovementDetail
 import pe.moneyflow.feature.analytics.AnalyticsRoute
 import pe.moneyflow.feature.analytics.analyticsScreen
 import pe.moneyflow.feature.currency.CurrencyRoute
@@ -78,53 +101,154 @@ data object AppearanceRoute
 @Serializable
 data object LegalRoute
 
-private enum class TopLevelDestination(
+internal enum class TopLevelDestination(
     val route: Any,
     val label: String,
     val icon: ImageVector,
+    /** App-bar title. Distinct from [label], which has to stay short enough for the nav bar. */
+    val title: String,
 ) {
-    DASHBOARD(DashboardRoute, "Inicio", Icons.Rounded.Home),
-    TRANSACTIONS(TransactionsRoute, "Movimientos", Icons.Rounded.ReceiptLong),
-    ANALYTICS(AnalyticsRoute, "Análisis", Icons.Rounded.BarChart),
-    UPCOMING(UpcomingRoute, "Próximos", Icons.Rounded.CalendarMonth),
-    MORE(MoreRoute, "Más", Icons.Rounded.Menu),
+    DASHBOARD(DashboardRoute, "Inicio", Icons.Rounded.Home, "Inicio"),
+    TRANSACTIONS(
+        TransactionsRoute,
+        "Movimientos",
+        Icons.AutoMirrored.Rounded.ReceiptLong,
+        "Movimientos",
+    ),
+    // Budgets holds a bottom-nav slot; Próximos does not.
+    //
+    // "Am I within budget?" is the primary question in an expense app and used to cost three taps
+    // (Más → Presupuestos), while a whole slot went to Próximos. Upcoming payments are still one tap
+    // away — the dashboard nudge card links straight to them, and unlike budgets that card *already*
+    // surfaced the information, so demoting the tab costs nothing. The overdue badge moves to the
+    // dashboard nudge accordingly.
+    //
+    // This is the one user-visible IA change in the redesign, and it is a single enum entry to revert.
+    BUDGETS(BudgetsRoute, "Presupuestos", Icons.Rounded.Savings, "Presupuestos"),
+    ANALYTICS(AnalyticsRoute, "Análisis", Icons.Rounded.BarChart, "Análisis y reportes"),
+    MORE(MoreRoute, "Más", Icons.Rounded.Menu, "Más"),
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MoneyFlowApp(startInAddTransaction: Boolean = false) {
+fun MoneyFlowApp(
+    startInAddTransaction: Boolean = false,
+    shellViewModel: AppShellViewModel = hiltViewModel(),
+) {
     val navController = rememberNavController()
     val haptics = LocalHapticFeedback.current
     val backStackEntry by navController.currentBackStackEntryAsState()
+    val overdueCount by shellViewModel.overdueCount.collectAsStateWithLifecycle()
 
     // Right after onboarding, drop the user straight into logging their first movement.
     LaunchedEffect(Unit) {
         if (startInAddTransaction) navController.navigateToAddEdit()
     }
     val currentDestination = backStackEntry?.destination
-    val isTopLevel = TopLevelDestination.entries.any { currentDestination.isRouteInHierarchy(it.route) }
+    val topLevel = TopLevelDestination.entries
+        .firstOrNull { currentDestination.isRouteInHierarchy(it.route) }
+    val isTopLevel = topLevel != null
 
+    // One collapsing app bar for all five top-level destinations, owned by the shell.
+    //
+    // The app previously had no rule here: dashboard, transactions, upcoming and "Más" printed their
+    // title as an ordinary scrolling list item while analytics used a small pinned TopAppBar — so a
+    // title scrolled away on some tabs and stayed put on others, with nothing a user could learn. It
+    // also meant nothing in the app responded to scroll, which is a large part of why it read as dated.
+    //
+    // MediumTopAppBar + exitUntilCollapsed gives the title real presence at rest and hands the space
+    // back to content on scroll. Pushed screens keep their own small pinned bars with a back arrow, so
+    // hierarchy stays legible: large title = a place, small title + arrow = somewhere you drilled into.
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+    // Navigation adapts to the window instead of always being a bottom bar.
+    //
+    // On a phone this is exactly the bottom bar it replaces. On a tablet or unfolded foldable it becomes
+    // a navigation rail — which is the whole point: the app previously rendered one stretched phone
+    // column with a full-width five-item bottom bar and enormous dead side margins, because there was
+    // no window-size handling anywhere in the codebase.
+    //
+    // `NavigationSuiteType.None` on detail screens keeps the existing behaviour of hiding navigation
+    // entirely once you've drilled in.
+    val navSuiteType = if (isTopLevel) {
+        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
+    } else {
+        NavigationSuiteType.None
+    }
+
+    NavigationSuiteScaffold(
+        layoutType = navSuiteType,
+        navigationSuiteItems = {
+            TopLevelDestination.entries.forEach { destination ->
+                // Overdue payments now surface on the dashboard, so the badge rides "Inicio".
+                val badgeCount =
+                    if (destination == TopLevelDestination.DASHBOARD) overdueCount else 0
+                item(
+                    selected = currentDestination.isRouteInHierarchy(destination.route),
+                    onClick = { navController.navigateToTopLevel(destination.route) },
+                    icon = {
+                        if (badgeCount > 0) {
+                            BadgedBox(
+                                badge = {
+                                    Badge(
+                                        modifier = Modifier.semantics {
+                                            contentDescription =
+                                                "$badgeCount pago(s) vencido(s)"
+                                        },
+                                    ) {
+                                        Text(text = if (badgeCount > 9) "9+" else "$badgeCount")
+                                    }
+                                },
+                            ) {
+                                Icon(destination.icon, contentDescription = null)
+                            }
+                        } else {
+                            Icon(destination.icon, contentDescription = null)
+                        }
+                    },
+                    label = { Text(destination.label) },
+                )
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+    ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            if (isTopLevel) {
-                NavigationBar {
-                    TopLevelDestination.entries.forEach { destination ->
-                        NavigationBarItem(
-                            selected = currentDestination.isRouteInHierarchy(destination.route),
-                            onClick = { navController.navigateToTopLevel(destination.route) },
-                            icon = { Icon(destination.icon, contentDescription = destination.label) },
-                            label = { Text(destination.label) },
-                        )
-                    }
+        // Only the top-level bar participates in scroll; nested screens manage themselves.
+        modifier = if (isTopLevel) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        else Modifier,
+        topBar = {
+            if (topLevel != null) {
+                // The dashboard's bar carries the *month*, not "Inicio". The bottom nav already says
+                // "Inicio" and highlights it, so repeating it in the app bar spends the most prominent
+                // text on the screen restating what's directly below it. The month is the context the
+                // user actually needs, and it's where a month selector belongs later.
+                val barTitle = if (topLevel == TopLevelDestination.DASHBOARD) {
+                    LocalDate.now().toMonthTitle()
+                } else {
+                    topLevel.title
                 }
+                MediumTopAppBar(
+                    title = { Text(barTitle) },
+                    scrollBehavior = scrollBehavior,
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+                )
             }
         },
         floatingActionButton = {
             if (isTopLevel) {
-                FloatingActionButton(onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    navController.navigateToAddEdit()
-                }) {
+                val fabInteraction = remember { MutableInteractionSource() }
+                FloatingActionButton(
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        navController.navigateToAddEdit()
+                    },
+                    interactionSource = fabInteraction,
+                    modifier = Modifier.pressScale(fabInteraction),
+                ) {
                     Icon(Icons.Rounded.Add, contentDescription = "Agregar movimiento")
                 }
             }
@@ -134,19 +258,58 @@ fun MoneyFlowApp(startInAddTransaction: Boolean = false) {
             navController = navController,
             startDestination = DashboardRoute,
             modifier = Modifier.padding(innerPadding),
+            // Every one of the 19 destinations previously used navigation-compose's default
+            // cross-fade, so nothing told the user whether they were moving deeper into the app or
+            // back out of it. Three cases, all decided here rather than per destination:
+            //
+            //  - Sibling tabs get a **fade-through**. They are peers, not a stack; sliding between
+            //    them would imply a spatial order the bottom bar doesn't have.
+            //  - Pushed screens get a **directional slide + fade**, so forward and back read as
+            //    opposite motions and depth is legible.
+            //  - Sheet-hosting destinations get **nothing** — see [isSheetDestination].
+            enterTransition = {
+                when {
+                    isSheetDestination(targetState) -> EnterTransition.None
+                    isPeerSwitch(initialState, targetState) -> fadeThroughIn()
+                    else -> slideInForward()
+                }
+            },
+            exitTransition = {
+                when {
+                    isSheetDestination(targetState) -> ExitTransition.None
+                    isPeerSwitch(initialState, targetState) -> fadeThroughOut()
+                    else -> slideOutForward()
+                }
+            },
+            popEnterTransition = {
+                when {
+                    isSheetDestination(initialState) -> EnterTransition.None
+                    isPeerSwitch(initialState, targetState) -> fadeThroughIn()
+                    else -> slideInBack()
+                }
+            },
+            popExitTransition = {
+                when {
+                    isSheetDestination(initialState) -> ExitTransition.None
+                    isPeerSwitch(initialState, targetState) -> fadeThroughOut()
+                    else -> slideOutBack()
+                }
+            },
         ) {
             dashboardScreen(
                 onSeeAllTransactions = { navController.navigateToTopLevel(TransactionsRoute) },
-                onTransactionClick = { id -> navController.navigateToAddEdit(id) },
-                onOpenUpcoming = { navController.navigateToTopLevel(UpcomingRoute) },
+                onTransactionClick = { id -> navController.navigateToMovementDetail(id) },
+                onOpenUpcoming = { navController.navigate(UpcomingRoute) },
                 onOpenInsights = { navController.navigate(InsightsRoute) },
+                onOpenBudgets = { navController.navigateToTopLevel(BudgetsRoute) },
             )
             transactionsScreen(
-                onTransactionClick = { id -> navController.navigateToAddEdit(id) },
+                onTransactionClick = { id -> navController.navigateToMovementDetail(id) },
             )
             budgetsScreen(onBack = { navController.popBackStack() })
             upcomingScreen(
-                onPaymentClick = { id -> navController.navigateToAddEdit(id) },
+                onPaymentClick = { id -> navController.navigateToMovementDetail(id) },
+                onOpenRecurring = { navController.navigate(RecurringRoute) },
             )
             composable<MoreRoute> {
                 MoreScreen(
@@ -156,7 +319,7 @@ fun MoneyFlowApp(startInAddTransaction: Boolean = false) {
                     onOpenCategories = { navController.navigate(CategoriesRoute) },
                     onOpenPaymentMethods = { navController.navigate(PaymentMethodsRoute) },
                     onOpenRecurring = { navController.navigate(RecurringRoute) },
-                    onOpenBudgets = { navController.navigate(BudgetsRoute) },
+                    onOpenUpcoming = { navController.navigate(UpcomingRoute) },
                     onOpenCurrency = { navController.navigate(CurrencyRoute) },
                     onOpenAppearance = { navController.navigate(AppearanceRoute) },
                     onOpenBackup = { navController.navigate(BackupRoute) },
@@ -169,7 +332,10 @@ fun MoneyFlowApp(startInAddTransaction: Boolean = false) {
             savingsScreen(onBack = { navController.popBackStack() })
             categoriesScreen(onBack = { navController.popBackStack() })
             paymentMethodsScreen(onBack = { navController.popBackStack() })
-            recurringScreen(onBack = { navController.popBackStack() })
+            recurringScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTransaction = { id -> navController.navigateToMovementDetail(id) },
+            )
             analyticsScreen()
             currencyScreen(onBack = { navController.popBackStack() })
             composable<AppearanceRoute> { AppearanceScreen(onBack = { navController.popBackStack() }) }
@@ -177,7 +343,12 @@ fun MoneyFlowApp(startInAddTransaction: Boolean = false) {
             composable<SecurityRoute> { SecurityScreen(onBack = { navController.popBackStack() }) }
             composable<LegalRoute> { LegalScreen(onBack = { navController.popBackStack() }) }
             addEditScreen(onDone = { navController.popBackStack() })
+            movementDetailScreen(
+                onEditAll = { id -> navController.navigateToAddEdit(id) },
+                onDone = { navController.popBackStack() },
+            )
         }
+    }
     }
 }
 

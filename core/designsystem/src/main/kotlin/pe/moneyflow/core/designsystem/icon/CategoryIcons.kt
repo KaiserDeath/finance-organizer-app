@@ -18,7 +18,7 @@ import androidx.compose.material.icons.rounded.MedicalServices
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Pets
-import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.RestaurantMenu
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material.icons.rounded.School
@@ -27,7 +27,7 @@ import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Subscriptions
-import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.Work
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -52,9 +52,9 @@ fun iconForKey(iconKey: String): ImageVector = when (iconKey) {
     "shield" -> Icons.Rounded.Shield
     "flight" -> Icons.Rounded.Flight
     "pets" -> Icons.Rounded.Pets
-    "receipt" -> Icons.Rounded.ReceiptLong
+    "receipt" -> Icons.AutoMirrored.Rounded.ReceiptLong
     "business" -> Icons.Rounded.BusinessCenter
-    "trending_up" -> Icons.Rounded.TrendingUp
+    "trending_up" -> Icons.AutoMirrored.Rounded.TrendingUp
     "savings" -> Icons.Rounded.Savings
     "payments", "cash" -> Icons.Rounded.Payments
     "work" -> Icons.Rounded.Work

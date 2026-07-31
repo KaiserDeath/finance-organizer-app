@@ -1,0 +1,35 @@
+package pe.moneyflow.core.database
+
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+
+/*
+ * Real migrations so a version bump keeps the user's data instead of wiping it. Each one applies the
+ * exact schema delta of that step; adding a nullable column is safe and needs no data backfill.
+ * Keep this list in lockstep with the entity/@Database version — every bump needs a migration here.
+ */
+
+/** v4 → v5: debit/credit kind on a card payment method. */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE payment_methods ADD COLUMN cardKind TEXT")
+    }
+}
+
+/** v5 → v6: no schema change (added the reseed-on-open callback only). */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Intentionally empty — schema identical to v5.
+    }
+}
+
+/** v6 → v7: record the debit/credit characteristic on each movement and recurring template. */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE transactions ADD COLUMN cardKind TEXT")
+        db.execSQL("ALTER TABLE recurring_expenses ADD COLUMN cardKind TEXT")
+    }
+}
+
+/** Every migration, in order, for the Room builder. */
+val ALL_MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)

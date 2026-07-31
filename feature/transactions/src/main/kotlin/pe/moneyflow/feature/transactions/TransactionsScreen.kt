@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Badge
@@ -61,7 +61,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pe.moneyflow.core.common.Money
+import pe.moneyflow.core.designsystem.component.animatedItem
 import pe.moneyflow.core.designsystem.component.EmptyState
+import pe.moneyflow.core.designsystem.illustration.Illustration
 import pe.moneyflow.core.designsystem.component.ShimmerBox
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.model.Category
@@ -102,7 +104,7 @@ fun TransactionsScreen(
             when {
                 uiState.isLoading -> LoadingList()
                 uiState.isEmpty && !uiState.isFilterActive -> EmptyState(
-                    icon = Icons.Rounded.ReceiptLong,
+                    illustration = Illustration.NoTransactions,
                     title = "Sin movimientos",
                     subtitle = "Registra un gasto con el botón + para verlo aquí.",
                     modifier = Modifier.fillMaxSize().padding(Spacing.xl),
@@ -142,15 +144,7 @@ private fun TransactionsList(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 96.dp, top = Spacing.md),
     ) {
-        item(key = "title") {
-            Text(
-                text = "Movimientos",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-            )
-        }
-
+        // Title now lives in the shell's collapsing app bar, not as a scrolling list item.
         item(key = "search") {
             SearchRow(
                 query = state.filter.query,
@@ -184,6 +178,7 @@ private fun TransactionsList(
                     category = tx.categoryId?.let { state.categoriesById[it] },
                     onClick = { onTransactionClick(tx.id) },
                     onDelete = onDelete,
+                    modifier = animatedItem(),
                 )
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -331,6 +326,7 @@ private fun SwipeableTransaction(
     category: pe.moneyflow.core.model.Category?,
     onClick: () -> Unit,
     onDelete: (Transaction) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
     val dismissState = rememberSwipeToDismissBoxState(
@@ -345,6 +341,7 @@ private fun SwipeableTransaction(
         },
     )
     SwipeToDismissBox(
+        modifier = modifier,
         state = dismissState,
         enableDismissFromStartToEnd = false,
         backgroundContent = { DeleteBackground() },

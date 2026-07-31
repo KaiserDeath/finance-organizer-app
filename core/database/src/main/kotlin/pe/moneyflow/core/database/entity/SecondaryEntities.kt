@@ -75,10 +75,13 @@ data class RecurringExpenseEntity(
     val currencyCode: String,
     val categoryId: String?,
     val paymentMethodId: String?,
+    val cardKind: String?,
     val accountId: String?,
     val type: String,
     val frequency: String,
     val interval: Int,
+    /** Comma-separated day-of-month anchors (0 = last day); empty string means interval mode. */
+    val daysOfMonth: String = "",
     val nextRunDate: LocalDate,
     val endDate: LocalDate?,
     val autoCreate: Boolean,

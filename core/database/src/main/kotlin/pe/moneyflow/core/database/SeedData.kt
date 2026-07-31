@@ -26,6 +26,8 @@ internal object SeedData {
         val icon: String,
         val color: String,
         val pkg: String? = null,
+        /** DEBIT/CREDIT for card methods; null for cash, wallets and banks. */
+        val cardKind: String? = null,
     )
 
     private val categories = listOf(
@@ -60,17 +62,36 @@ internal object SeedData {
 
     private val paymentMethods = listOf(
         SeedPayment("Efectivo", "CASH", "cash", "#66BB6A"),
-        SeedPayment("Visa", "CARD", "card", "#1A237E"),
-        SeedPayment("Mastercard", "CARD", "card", "#FF6F00"),
-        SeedPayment("American Express", "CARD", "card", "#2E7D32"),
+        SeedPayment("Visa débito", "CARD", "card", "#1A237E", cardKind = "DEBIT"),
+        SeedPayment("Visa crédito", "CARD", "card", "#283593", cardKind = "CREDIT"),
+        SeedPayment("Mastercard crédito", "CARD", "card", "#FF6F00", cardKind = "CREDIT"),
+        SeedPayment("American Express", "CARD", "card", "#2E7D32", cardKind = "CREDIT"),
         SeedPayment("Yape", "EWALLET", "wallet", "#6A1B9A", pkg = "com.bcp.innovacxion.yapeapp"),
         SeedPayment("Plin", "EWALLET", "wallet", "#00897B"),
+        SeedPayment("Tunki", "EWALLET", "wallet", "#00C2A8"),
         SeedPayment("BCP", "BANK", "account_balance", "#EA7600", pkg = "pe.com.bcp.bancamovil"),
         SeedPayment("Interbank", "BANK", "account_balance", "#00A94F", pkg = "pe.interbank.mobilebanking"),
         SeedPayment("BBVA", "BANK", "account_balance", "#1464A5", pkg = "com.bbva.nxt_peru"),
         SeedPayment("Scotiabank", "BANK", "account_balance", "#EC111A"),
         SeedPayment("Banco de la Nación", "BANK", "account_balance", "#E30613"),
     )
+
+    /**
+     * Reseeds defaults only when the database comes up completely bare — the state left by a
+     * destructive migration (which recreates empty tables without calling [seed] via onCreate).
+     * Requiring every core table to be empty means deliberately pruning one (e.g. deleting all
+     * payment methods) won't trigger an unwanted reseed.
+     */
+    fun seedIfEmpty(db: SupportSQLiteDatabase) {
+        if (isEmpty(db, "categories") && isEmpty(db, "payment_methods") && isEmpty(db, "accounts")) {
+            seed(db)
+        }
+    }
+
+    private fun isEmpty(db: SupportSQLiteDatabase, table: String): Boolean =
+        db.query("SELECT COUNT(*) FROM $table").use { cursor ->
+            !cursor.moveToFirst() || cursor.getInt(0) == 0
+        }
 
     fun seed(db: SupportSQLiteDatabase) {
         val now = System.currentTimeMillis()
@@ -96,12 +117,13 @@ internal object SeedData {
             val isDefault = if (p.name == "Efectivo") 1 else 0
             db.execSQL(
                 "INSERT INTO payment_methods " +
-                    "(id, name, type, iconKey, colorHex, accountId, deepLinkPackage, playStoreId, isDefault, sortOrder, archived) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+                    "(id, name, type, cardKind, iconKey, colorHex, accountId, deepLinkPackage, playStoreId, isDefault, sortOrder, archived) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
                 arrayOf(
                     UUID.randomUUID().toString(),
                     p.name,
                     p.type,
+                    p.cardKind,
                     p.icon,
                     p.color,
                     if (p.name == "Efectivo") cashAccountId else null,

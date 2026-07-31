@@ -14,6 +14,9 @@ enum class CategoryType { EXPENSE, INCOME }
 
 enum class PaymentMethodType { CASH, CARD, EWALLET, BANK }
 
+/** Whether a card draws from your own funds (DEBIT) or a credit line (CREDIT). */
+enum class CardKind { DEBIT, CREDIT }
+
 enum class BudgetPeriod { WEEKLY, MONTHLY, YEARLY }
 
 enum class RecurrenceFrequency { DAILY, WEEKLY, MONTHLY, YEARLY }

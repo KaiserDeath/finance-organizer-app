@@ -46,7 +46,27 @@ class MarkTransactionPaidUseCase @Inject constructor(
             transaction.copy(
                 status = TransactionStatus.PAID,
                 actualDate = LocalDate.now(clock),
-                updatedAt = Instant.now(),
+                updatedAt = Instant.now(clock),
+            ),
+        )
+    }
+}
+
+/**
+ * Reverts a paid charge back to pending, clearing the settled date. Backs the "Deshacer" action
+ * after a mistaken mark-paid in the upcoming-payments screen.
+ */
+class UnmarkTransactionPaidUseCase @Inject constructor(
+    private val repository: TransactionRepository,
+    private val clock: Clock,
+) {
+    suspend operator fun invoke(id: String) {
+        val transaction = repository.getById(id) ?: return
+        repository.upsert(
+            transaction.copy(
+                status = TransactionStatus.PENDING,
+                actualDate = null,
+                updatedAt = Instant.now(clock),
             ),
         )
     }

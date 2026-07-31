@@ -38,7 +38,9 @@ class SettingsRepositoryImpl @Inject constructor(
                 themeMode = prefs[Keys.THEME]
                     ?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
                     ?: ThemeMode.SYSTEM,
-                useDynamicColor = prefs[Keys.DYNAMIC_COLOR] ?: true,
+                // Defaults to off so the brand palette is the identity on a fresh install. Must stay
+                // in sync with UserPreferences.useDynamicColor and MoneyFlowTheme's parameter default.
+                useDynamicColor = prefs[Keys.DYNAMIC_COLOR] ?: false,
                 currencyCode = prefs[Keys.CURRENCY] ?: "PEN",
                 onboardingComplete = prefs[Keys.ONBOARDING] ?: false,
                 pinHash = prefs[Keys.PIN_HASH],

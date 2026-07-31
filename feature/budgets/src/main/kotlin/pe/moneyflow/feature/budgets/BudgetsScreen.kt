@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -31,7 +32,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -57,10 +57,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pe.moneyflow.core.common.Money
+import pe.moneyflow.core.designsystem.component.animatedItem
 import pe.moneyflow.core.designsystem.component.EmptyState
+import pe.moneyflow.core.designsystem.illustration.Illustration
 import pe.moneyflow.core.designsystem.component.MoneyCard
+import pe.moneyflow.core.designsystem.component.MoneyProgressBar
+import pe.moneyflow.core.designsystem.component.SkeletonBlocks
 import pe.moneyflow.core.designsystem.icon.iconForKey
-import pe.moneyflow.core.designsystem.theme.NegativeRed
+import pe.moneyflow.core.designsystem.theme.moneyColors
+import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.BudgetProgress
@@ -122,11 +127,13 @@ fun BudgetsScreen(
                 }
             }
 
-            if (uiState.isEmpty) {
+            if (uiState.isLoading) {
+                item { SkeletonBlocks(heroHeight = 116.dp, count = 3, blockHeight = 148.dp) }
+            } else if (uiState.isEmpty) {
                 item {
                     MoneyCard(modifier = Modifier.fillMaxWidth()) {
                         EmptyState(
-                            icon = Icons.Rounded.Savings,
+                            illustration = Illustration.NoBudgets,
                             title = "Sin presupuestos",
                             subtitle = "Crea un límite mensual por categoría para controlar tus gastos.",
                             modifier = Modifier.fillMaxWidth(),
@@ -142,7 +149,11 @@ fun BudgetsScreen(
                     )
                 }
                 items(uiState.items, key = { it.budget.id }) { progress ->
-                    BudgetCard(progress = progress, onDelete = { viewModel.delete(progress.budget.id) })
+                    BudgetCard(
+                        progress = progress,
+                        onDelete = { viewModel.delete(progress.budget.id) },
+                        modifier = animatedItem(),
+                    )
                 }
             }
         }
@@ -151,6 +162,7 @@ fun BudgetsScreen(
     if (showAddDialog) {
         AddBudgetSheet(
             categories = uiState.expenseCategories,
+            currencyCode = uiState.currencyCode,
             onDismiss = { showAddDialog = false },
             onConfirm = { name, categoryId, amount, period ->
                 viewModel.add(name, categoryId, amount, period)
@@ -175,25 +187,24 @@ private fun OverallCard(spentMinor: Long, limitMinor: Long, currencyCode: String
             color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(Modifier.height(Spacing.md))
-        LinearProgressIndicator(
-            progress = { fraction },
-            modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)),
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-        )
+        MoneyProgressBar(fraction = fraction, color = MaterialTheme.colorScheme.primary)
     }
 }
 
 @Composable
-private fun BudgetCard(progress: BudgetProgress, onDelete: () -> Unit) {
+private fun BudgetCard(
+    progress: BudgetProgress,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val barColor = when {
-        progress.isOverBudget -> NegativeRed
+        progress.isOverBudget -> MaterialTheme.moneyColors.negative
         progress.isNearLimit -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.primary
     }
     val accent = colorFromHex(progress.category?.colorHex, MaterialTheme.colorScheme.primary)
 
-    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+    MoneyCard(modifier = modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CategoryAvatar(
                 icon = iconForKey(progress.category?.iconKey ?: "savings"),
@@ -221,12 +232,7 @@ private fun BudgetCard(progress: BudgetProgress, onDelete: () -> Unit) {
         }
 
         Spacer(Modifier.height(Spacing.md))
-        LinearProgressIndicator(
-            progress = { progress.fraction },
-            modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)),
-            color = barColor,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-        )
+        MoneyProgressBar(fraction = progress.fraction, color = barColor)
         Spacer(Modifier.height(Spacing.sm))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -251,7 +257,7 @@ private fun BudgetCard(progress: BudgetProgress, onDelete: () -> Unit) {
                     Icons.Rounded.Warning,
                     contentDescription = null,
                     tint = barColor,
-                    modifier = Modifier.height(16.dp),
+                    modifier = Modifier.size(IconSize.sm),
                 )
                 Spacer(Modifier.padding(horizontal = Spacing.xxs))
                 Text(
@@ -273,6 +279,7 @@ private fun BudgetCard(progress: BudgetProgress, onDelete: () -> Unit) {
 private fun AddBudgetSheet(
     categories: List<pe.moneyflow.core.model.Category>,
     onDismiss: () -> Unit,
+    currencyCode: String,
     onConfirm: (name: String, categoryId: String?, amountMinor: Long, period: BudgetPeriod) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
@@ -313,7 +320,7 @@ private fun AddBudgetSheet(
                 value = amountText,
                 onValueChange = { amountText = it },
                 label = { Text("Monto") },
-                prefix = { Text("S/ ") },
+                prefix = { Text("${Money.symbolFor(currencyCode)} ") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),

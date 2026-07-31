@@ -21,6 +21,7 @@ data class PaymentMethodEntity(
     @PrimaryKey val id: String,
     val name: String,
     val type: String,
+    val cardKind: String?,
     val iconKey: String,
     val colorHex: String,
     val accountId: String?,

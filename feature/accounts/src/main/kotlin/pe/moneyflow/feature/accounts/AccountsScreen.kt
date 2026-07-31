@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -52,11 +53,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pe.moneyflow.core.common.Money
+import pe.moneyflow.core.designsystem.component.animatedItem
 import pe.moneyflow.core.designsystem.component.EmptyState
 import pe.moneyflow.core.designsystem.component.MoneyCard
+import pe.moneyflow.core.designsystem.component.SkeletonBlocks
 import pe.moneyflow.core.designsystem.icon.iconForKey
-import pe.moneyflow.core.designsystem.theme.NegativeRed
-import pe.moneyflow.core.designsystem.theme.PositiveGreen
+import pe.moneyflow.core.designsystem.theme.moneyColors
+import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.AccountBalance
@@ -124,7 +127,9 @@ fun AccountsScreen(
                 }
             }
 
-            if (uiState.isEmpty) {
+            if (uiState.isLoading) {
+                item { SkeletonBlocks(heroHeight = 150.dp, count = 4, blockHeight = 88.dp) }
+            } else if (uiState.isEmpty) {
                 item {
                     MoneyCard(modifier = Modifier.fillMaxWidth()) {
                         EmptyState(
@@ -137,7 +142,11 @@ fun AccountsScreen(
                 }
             } else {
                 items(uiState.netWorth?.balances.orEmpty(), key = { it.account.id }) { balance ->
-                    AccountCard(balance = balance, onArchive = { viewModel.archive(balance.account) })
+                    AccountCard(
+                        balance = balance,
+                        onArchive = { viewModel.archive(balance.account) },
+                        modifier = animatedItem(),
+                    )
                 }
             }
         }
@@ -194,8 +203,8 @@ private fun NetWorthCard(netWorth: NetWorth) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Spacing.xl),
         ) {
-            AmountPill("Activos", netWorth.assetsMinor, netWorth.currencyCode, PositiveGreen)
-            AmountPill("Pasivos", netWorth.liabilitiesMinor, netWorth.currencyCode, NegativeRed)
+            AmountPill("Activos", netWorth.assetsMinor, netWorth.currencyCode, MaterialTheme.moneyColors.positive)
+            AmountPill("Pasivos", netWorth.liabilitiesMinor, netWorth.currencyCode, MaterialTheme.moneyColors.negative)
         }
         if (netWorth.hasUnconvertible) {
             Spacer(Modifier.height(Spacing.sm))
@@ -225,12 +234,18 @@ private fun AmountPill(label: String, amountMinor: Long, currency: String, accen
 }
 
 @Composable
-private fun AccountCard(balance: AccountBalance, onArchive: () -> Unit) {
+private fun AccountCard(
+    balance: AccountBalance,
+    onArchive: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val account = balance.account
     val accent = colorFromHex(account.colorHex, MaterialTheme.colorScheme.primary)
-    val balanceColor = if (balance.currentBalanceMinor < 0) NegativeRed else MaterialTheme.colorScheme.onSurface
+    val balanceColor =
+        if (balance.currentBalanceMinor < 0) MaterialTheme.moneyColors.negative
+        else MaterialTheme.colorScheme.onSurface
 
-    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+    MoneyCard(modifier = modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CategoryAvatar(icon = iconForKey(account.iconKey), accent = accent)
             Column(modifier = Modifier.weight(1f).padding(horizontal = Spacing.md)) {
@@ -336,7 +351,7 @@ private fun AddAccountSheet(
                             Icon(
                                 imageVector = iconForKey(preset.iconKey),
                                 contentDescription = null,
-                                modifier = Modifier.height(18.dp),
+                                modifier = Modifier.size(IconSize.chip),
                             )
                         },
                     )

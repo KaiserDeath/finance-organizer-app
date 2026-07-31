@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Backup
@@ -60,7 +61,7 @@ fun MoreScreen(
     onOpenCategories: () -> Unit,
     onOpenPaymentMethods: () -> Unit,
     onOpenRecurring: () -> Unit,
-    onOpenBudgets: () -> Unit,
+    onOpenUpcoming: () -> Unit,
     onOpenCurrency: () -> Unit,
     onOpenAppearance: () -> Unit,
     onOpenBackup: () -> Unit,
@@ -90,11 +91,12 @@ fun MoreScreen(
                     "Metas de ahorro y aportes",
                     onOpenSavings,
                 ),
+                // Presupuestos moved to the bottom nav; Próximos took its place here.
                 MoreItem(
-                    Icons.Rounded.AccountBalance,
-                    "Presupuestos",
-                    "Límites de gasto por categoría",
-                    onOpenBudgets,
+                    Icons.Rounded.CalendarMonth,
+                    "Próximos pagos",
+                    "Lo que debes pagar este mes y el siguiente",
+                    onOpenUpcoming,
                 ),
             ),
         ),
@@ -168,13 +170,7 @@ fun MoreScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
-        item {
-            Text(
-                text = "Más",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
+        // Title now lives in the shell's collapsing app bar.
         sections.forEach { section ->
             item(key = section.label) {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {

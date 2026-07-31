@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
@@ -33,7 +34,12 @@ class MainActivity : FragmentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* result ignored */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Must be installed before super.onCreate so the splash owns the very first frame. Held until
+        // preferences resolve, which is what decides between onboarding, the lock screen, and the app
+        // — previously that decision window rendered nothing at all.
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        splashScreen.setKeepOnScreenCondition { viewModel.uiState.value.isLoading }
         maybeRequestNotificationPermission()
         enableEdgeToEdge()
         val activity = this
@@ -53,6 +59,8 @@ class MainActivity : FragmentActivity() {
             ) {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     when {
+                        // The system splash is still on screen for this branch (see
+                        // setKeepOnScreenCondition above), so there is nothing to draw underneath it.
                         state.isLoading -> Unit
                         state.showOnboarding -> OnboardingScreen(
                             onFinish = {

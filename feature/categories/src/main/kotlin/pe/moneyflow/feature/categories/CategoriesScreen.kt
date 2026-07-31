@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.Button
@@ -67,18 +68,21 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import pe.moneyflow.core.designsystem.component.animatedItem
 import pe.moneyflow.core.designsystem.component.SectionHeader
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.CategoryType
+import pe.moneyflow.core.designsystem.component.EmptyState
+import pe.moneyflow.core.designsystem.component.MoneyCard
+import pe.moneyflow.core.designsystem.component.SkeletonRows
 import pe.moneyflow.core.ui.component.CategoryAvatar
+import pe.moneyflow.core.ui.component.ColorSwatchPicker
+import pe.moneyflow.core.ui.component.IconChoicePicker
+import pe.moneyflow.core.ui.component.SwatchPalette
 
-private val PaletteHex = listOf(
-    "#4F46E5", "#0EA5A5", "#F59E0B", "#EC4899", "#8B5CF6", "#10B981",
-    "#EF4444", "#3B82F6", "#F97316", "#14B8A6", "#A855F7", "#84CC16",
-)
 private val IconChoices = listOf(
     "food", "restaurant", "transport", "fuel", "home", "shopping",
     "health", "movie", "school", "bolt", "pets", "flight",
@@ -140,16 +144,39 @@ fun CategoriesScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
-            if (uiState.expense.isNotEmpty()) {
-                item { SectionHeader(title = "Gastos", modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.sm)) }
-                items(uiState.expense, key = { it.id }) { category ->
-                    SwipeableCategory(category = category, onDelete = onDelete)
+            if (uiState.isLoading) {
+                item { SkeletonRows(modifier = Modifier.padding(top = Spacing.sm), count = 8) }
+            } else if (uiState.isEmpty) {
+                item {
+                    MoneyCard(modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)) {
+                        EmptyState(
+                            icon = Icons.Rounded.Category,
+                            title = "Sin categorías",
+                            subtitle = "Crea categorías para organizar en qué se va tu dinero.",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
-            }
-            if (uiState.income.isNotEmpty()) {
-                item { SectionHeader(title = "Ingresos", modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.sm)) }
-                items(uiState.income, key = { it.id }) { category ->
-                    SwipeableCategory(category = category, onDelete = onDelete)
+            } else {
+                if (uiState.expense.isNotEmpty()) {
+                    item { SectionHeader(title = "Gastos", modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.sm)) }
+                    items(uiState.expense, key = { it.id }) { category ->
+                        SwipeableCategory(
+                            category = category,
+                            onDelete = onDelete,
+                            modifier = animatedItem(),
+                        )
+                    }
+                }
+                if (uiState.income.isNotEmpty()) {
+                    item { SectionHeader(title = "Ingresos", modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.sm)) }
+                    items(uiState.income, key = { it.id }) { category ->
+                        SwipeableCategory(
+                            category = category,
+                            onDelete = onDelete,
+                            modifier = animatedItem(),
+                        )
+                    }
                 }
             }
         }
@@ -167,7 +194,11 @@ fun CategoriesScreen(
 }
 
 @Composable
-private fun SwipeableCategory(category: Category, onDelete: (Category) -> Unit) {
+private fun SwipeableCategory(
+    category: Category,
+    onDelete: (Category) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val haptics = LocalHapticFeedback.current
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -181,6 +212,7 @@ private fun SwipeableCategory(category: Category, onDelete: (Category) -> Unit) 
         },
     )
     SwipeToDismissBox(
+        modifier = modifier,
         state = dismissState,
         enableDismissFromStartToEnd = false,
         backgroundContent = { DeleteBackground() },
@@ -241,7 +273,7 @@ private fun AddCategorySheet(
 ) {
     var name by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(CategoryType.EXPENSE) }
-    var colorHex by remember { mutableStateOf(PaletteHex.first()) }
+    var colorHex by remember { mutableStateOf(SwatchPalette.first()) }
     var iconKey by remember { mutableStateOf(IconChoices.first()) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -285,49 +317,14 @@ private fun AddCategorySheet(
             }
 
             Text("Color", style = MaterialTheme.typography.labelLarge)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                PaletteHex.forEach { hex ->
-                    val color = colorFromHex(hex, MaterialTheme.colorScheme.primary)
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .clip(CircleShape)
-                            .background(color)
-                            .border(
-                                width = if (colorHex == hex) 3.dp else 0.dp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                shape = CircleShape,
-                            )
-                            .clickable { colorHex = hex },
-                    )
-                }
-            }
+            ColorSwatchPicker(selectedHex = colorHex, onSelect = { colorHex = it })
 
             Text("Ícono", style = MaterialTheme.typography.labelLarge)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                IconChoices.forEach { key ->
-                    val selected = iconKey == key
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (selected) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                            )
-                            .clickable { iconKey = key },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = iconForKey(key),
-                            contentDescription = null,
-                            tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-            }
+            IconChoicePicker(
+                choices = IconChoices,
+                selectedKey = iconKey,
+                onSelect = { iconKey = it },
+            )
 
             Button(
                 onClick = { onConfirm(name, colorHex, iconKey, type) },
