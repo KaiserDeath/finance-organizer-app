@@ -15,7 +15,6 @@ import pe.moneyflow.core.domain.usecase.DeleteTransactionUseCase
 import pe.moneyflow.core.domain.usecase.GetUpcomingPaymentsUseCase
 import pe.moneyflow.core.domain.usecase.MarkTransactionPaidUseCase
 import pe.moneyflow.core.domain.usecase.SaveTransactionUseCase
-import pe.moneyflow.core.domain.usecase.UnmarkTransactionPaidUseCase
 import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.Transaction
 import pe.moneyflow.core.model.TransactionStatus
@@ -49,6 +48,10 @@ data class UpcomingUiState(
     /** The method behind a payment, or null when unset/unknown. */
     fun methodFor(payment: UpcomingPayment): PaymentMethod? =
         payment.transaction.paymentMethodId?.let { methodsById[it] }
+
+    /** The method the pay sheet pre-selects: the payment's own, else the user's default. */
+    fun suggestedMethodFor(payment: UpcomingPayment): PaymentMethod? =
+        methodFor(payment) ?: methodsById.values.firstOrNull { it.isDefault }
 }
 
 @HiltViewModel
@@ -56,7 +59,6 @@ class UpcomingViewModel @Inject constructor(
     getUpcoming: GetUpcomingPaymentsUseCase,
     paymentMethodRepository: PaymentMethodRepository,
     private val markTransactionPaid: MarkTransactionPaidUseCase,
-    private val unmarkTransactionPaid: UnmarkTransactionPaidUseCase,
     private val saveTransaction: SaveTransactionUseCase,
     private val deleteTransaction: DeleteTransactionUseCase,
     private val clock: Clock,
@@ -80,33 +82,51 @@ class UpcomingViewModel @Inject constructor(
             initialValue = UpcomingUiState(),
         )
 
-    fun markPaid(id: String) {
-        viewModelScope.launch { markTransactionPaid(id) }
-    }
+    // How to revert the last settle: restore the original row (real payments) or delete the row
+    // that materialized (projections). Holding the undo as data keeps both cases symmetric.
+    private var lastSettleUndo: (suspend () -> Unit)? = null
 
     /**
-     * Settles a projected occurrence. It has no row yet, so this materializes the synthetic
-     * transaction as already paid — the one and only way a forecast turns into ledger data.
+     * Settles a payment as paid, optionally recording the method it was actually paid with —
+     * that memory is what makes the suggested method improve with use, so it is not optional
+     * on any path that knows the method.
+     *
+     * A real pending row is marked paid in place; a projected occurrence has no row yet, so it
+     * materializes the synthetic transaction as already paid — the one and only way a forecast
+     * turns into ledger data.
      */
-    fun payProjected(payment: UpcomingPayment) {
-        val today = LocalDate.now(clock)
-        val now = Instant.now(clock)
-        viewModelScope.launch {
-            saveTransaction(
-                payment.transaction.copy(
-                    id = UUID.randomUUID().toString(),
-                    status = TransactionStatus.PAID,
-                    actualDate = today,
-                    createdAt = now,
-                    updatedAt = now,
-                ),
-            )
+    fun settle(payment: UpcomingPayment, methodId: String? = null) {
+        val tx = payment.transaction
+        if (payment.isProjected) {
+            val today = LocalDate.now(clock)
+            val now = Instant.now(clock)
+            val newId = UUID.randomUUID().toString()
+            lastSettleUndo = { deleteTransaction(newId) }
+            viewModelScope.launch {
+                saveTransaction(
+                    tx.copy(
+                        id = newId,
+                        status = TransactionStatus.PAID,
+                        actualDate = today,
+                        paymentMethodId = methodId ?: tx.paymentMethodId,
+                        createdAt = now,
+                        updatedAt = now,
+                    ),
+                )
+            }
+        } else {
+            // `tx` is the row as it was before settling, so restoring it undoes both the status
+            // flip and any method change in one step.
+            lastSettleUndo = { saveTransaction(tx) }
+            viewModelScope.launch { markTransactionPaid(tx.id, methodId) }
         }
     }
 
-    /** Reverts a mistaken mark-paid back to pending (the "Deshacer" action). */
-    fun unmarkPaid(id: String) {
-        viewModelScope.launch { unmarkTransactionPaid(id) }
+    /** Reverts the last [settle] (the snackbar's "Deshacer"). */
+    fun undoSettle() {
+        val undo = lastSettleUndo ?: return
+        lastSettleUndo = null
+        viewModelScope.launch { undo() }
     }
 
     /** Removes a payment, stashing it so [undoDelete] can restore it. */

@@ -49,6 +49,9 @@ class GetDashboardUseCase @Inject constructor(
                 it.type == TransactionType.EXPENSE && it.status == TransactionStatus.PAID
             }
             val monthSpent = expenses.sumOf { it.amountMinor }
+            val monthPending = monthTx
+                .filter { it.type == TransactionType.EXPENSE && it.status == TransactionStatus.PENDING }
+                .sumOf { it.amountMinor }
             val monthIncome = monthTx
                 .filter { it.type == TransactionType.INCOME }
                 .sumOf { it.amountMinor }
@@ -79,6 +82,7 @@ class GetDashboardUseCase @Inject constructor(
                 todaySpentMinor = todaySpent,
                 monthIncomeMinor = monthIncome,
                 monthTransactionCount = monthTx.size,
+                monthPendingMinor = monthPending,
                 previousMonthSpentMinor = previousTx
                     .filter { it.type == TransactionType.EXPENSE && it.status == TransactionStatus.PAID }
                     .sumOf { it.amountMinor },

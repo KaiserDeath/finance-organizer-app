@@ -13,6 +13,8 @@ data class DashboardData(
     val monthIncomeMinor: Long,
     /** Number of transactions recorded in [month]. */
     val monthTransactionCount: Int = 0,
+    /** Committed-but-unpaid expense total for [month] — kept out of [monthSpentMinor] on purpose. */
+    val monthPendingMinor: Long = 0,
     /** Expense total for the month before [month], so the hero can show a real comparison. */
     val previousMonthSpentMinor: Long = 0,
     /** The single biggest expense in [month] — a high-signal, one-line fact. */

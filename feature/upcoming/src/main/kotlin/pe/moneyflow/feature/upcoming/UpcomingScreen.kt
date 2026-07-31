@@ -34,8 +34,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,6 +47,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pe.moneyflow.core.common.Money
@@ -57,6 +60,7 @@ import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.UpcomingPayment
+import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.ui.component.CategoryAvatar
 import pe.moneyflow.core.ui.preset.FinancePresets
 import pe.moneyflow.core.ui.util.launchPaymentApp
@@ -75,49 +79,36 @@ fun UpcomingScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // Opens the method's bank/wallet app (or its web/Play Store fallback), then offers to settle
-    // the charge on return — the same "close the loop" the detail sheet uses.
-    val onPay: (UpcomingPayment) -> Unit = { payment ->
-        val method = uiState.methodFor(payment)
-        if (method != null) {
-            val launched = launchPaymentApp(
-                context = context,
-                packageName = method.deepLinkPackage,
-                appName = method.name,
-                playStoreId = method.playStoreId,
-                webBankingUrl = FinancePresets.webUrlFor(method.deepLinkPackage),
+    // The pay sheet target (null = closed) and the payment we launched an external app for,
+    // waiting for the user to come back so we can settle it.
+    var paySheetFor by remember { mutableStateOf<UpcomingPayment?>(null) }
+    var awaitingReturn by remember { mutableStateOf<Pair<UpcomingPayment, PaymentMethod>?>(null) }
+    var wasPaused by remember { mutableStateOf(false) }
+
+    // Settling is a real mutation (status → PAID, stamps today, records the method): confirm it
+    // and offer a way back.
+    val settleWithUndo: (UpcomingPayment, PaymentMethod?) -> Unit = { payment, method ->
+        viewModel.settle(payment, method?.id)
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = if (method != null) "Pagado con ${method.name}" else "Pagado",
+                actionLabel = "Deshacer",
+                duration = SnackbarDuration.Long,
             )
-            if (launched) {
-                scope.launch {
-                    val result = snackbarHostState.showSnackbar(
-                        message = "¿Ya pagaste con ${method.name}?",
-                        actionLabel = "Marcar pagado",
-                        duration = SnackbarDuration.Long,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) {
-                        // A projected occurrence has no row yet, so settling it creates one.
-                        if (payment.isProjected) {
-                            viewModel.payProjected(payment)
-                        } else {
-                            viewModel.markPaid(payment.transaction.id)
-                        }
-                    }
-                }
-            }
+            if (result == SnackbarResult.ActionPerformed) viewModel.undoSettle()
         }
     }
 
-    // Mark-paid is a real mutation (status → PAID, stamps today): confirm it and offer a way back.
-    val onMarkPaid: (String) -> Unit = { id ->
-        viewModel.markPaid(id)
-        scope.launch {
-            val result = snackbarHostState.showSnackbar(
-                message = "Pagado",
-                actionLabel = "Deshacer",
-                duration = SnackbarDuration.Short,
-            )
-            if (result == SnackbarResult.ActionPerformed) viewModel.unmarkPaid(id)
+    // Coming back from the bank/wallet app settles the charge. The paused flag guards against
+    // the first resume (entering the screen) counting as a return.
+    LifecycleResumeEffect(Unit) {
+        val pending = awaitingReturn
+        if (wasPaused && pending != null) {
+            awaitingReturn = null
+            settleWithUndo(pending.first, pending.second)
         }
+        wasPaused = false
+        onPauseOrDispose { wasPaused = true }
     }
 
     val onDelete: (UpcomingPayment) -> Unit = { payment ->
@@ -195,7 +186,6 @@ fun UpcomingScreen(
                                 section.items.forEach { payment ->
                                     SwipeableUpcomingRow(
                                         payment = payment,
-                                        canPay = !uiState.methodFor(payment)?.deepLinkPackage.isNullOrBlank(),
                                         onClick = {
                                             // A projection has no detail screen; open its template.
                                             if (payment.isProjected) {
@@ -204,8 +194,10 @@ fun UpcomingScreen(
                                                 onPaymentClick(payment.transaction.id)
                                             }
                                         },
-                                        onPay = { onPay(payment) },
-                                        onMarkPaid = { onMarkPaid(payment.transaction.id) },
+                                        onPay = { paySheetFor = payment },
+                                        onMarkPaid = {
+                                            settleWithUndo(payment, uiState.suggestedMethodFor(payment))
+                                        },
                                         onDelete = { onDelete(payment) },
                                     )
                                 }
@@ -215,6 +207,34 @@ fun UpcomingScreen(
                 }
             }
         }
+    }
+
+    paySheetFor?.let { payment ->
+        PaySheet(
+            payment = payment,
+            methods = uiState.methodsById.values.toList(),
+            suggestedMethodId = uiState.suggestedMethodFor(payment)?.id,
+            onLaunchApp = { method ->
+                paySheetFor = null
+                val launched = launchPaymentApp(
+                    context = context,
+                    packageName = method.deepLinkPackage,
+                    appName = method.name,
+                    playStoreId = method.playStoreId,
+                    webBankingUrl = FinancePresets.webUrlFor(method.deepLinkPackage),
+                )
+                if (launched) {
+                    awaitingReturn = payment to method
+                } else {
+                    scope.launch { snackbarHostState.showSnackbar("No se pudo abrir ${method.name}") }
+                }
+            },
+            onSettle = { method ->
+                paySheetFor = null
+                settleWithUndo(payment, method)
+            },
+            onDismiss = { paySheetFor = null },
+        )
     }
 }
 
@@ -242,7 +262,6 @@ private fun SectionHeaderRow(label: String, total: String, isOverdue: Boolean) {
 @Composable
 private fun SwipeableUpcomingRow(
     payment: UpcomingPayment,
-    canPay: Boolean,
     onClick: () -> Unit,
     onPay: () -> Unit,
     onMarkPaid: () -> Unit,
@@ -251,7 +270,7 @@ private fun SwipeableUpcomingRow(
     // Projections have no row to delete, so they get no swipe affordance at all — that is the whole
     // safety story: a gesture can never destroy a schedule from this screen.
     if (payment.isProjected) {
-        UpcomingRow(payment = payment, canPay = canPay, onClick = onClick, onPay = onPay, onMarkPaid = onMarkPaid)
+        UpcomingRow(payment = payment, onClick = onClick, onPay = onPay, onMarkPaid = onMarkPaid)
         return
     }
 
@@ -274,7 +293,6 @@ private fun SwipeableUpcomingRow(
     ) {
         UpcomingRow(
             payment = payment,
-            canPay = canPay,
             onClick = onClick,
             onPay = onPay,
             onMarkPaid = onMarkPaid,
@@ -301,7 +319,6 @@ private fun DeleteBackground() {
 @Composable
 private fun UpcomingRow(
     payment: UpcomingPayment,
-    canPay: Boolean,
     onClick: () -> Unit,
     onPay: () -> Unit,
     onMarkPaid: () -> Unit,
@@ -354,18 +371,16 @@ private fun UpcomingRow(
             style = MaterialTheme.typography.titleMedium,
             color = titleColor,
         )
-        // Pay in the bank/wallet app (primary for a bill you actually owe); the check is the
-        // "already paid / paid another way" shortcut and stays as the secondary action.
-        if (canPay) {
-            FilledTonalIconButton(
-                onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onPay()
-                },
-                modifier = Modifier.padding(start = Spacing.sm),
-            ) {
-                Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = "Pagar en la app")
-            }
+        // Pagar opens the pay sheet for every pending row — the sheet itself explains when the
+        // method has no app to launch, instead of the affordance silently disappearing.
+        FilledTonalIconButton(
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onPay()
+            },
+            modifier = Modifier.padding(start = Spacing.sm),
+        ) {
+            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = "Pagar")
         }
         // Only real rows can be marked paid — there is no id to settle on a projection, and the
         // deep-link path above is the one place a forecast turns into ledger data.

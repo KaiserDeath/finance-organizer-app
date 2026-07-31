@@ -67,4 +67,20 @@ class MarkTransactionPaidUseCaseTest {
 
         assertEquals(TransactionStatus.PENDING, repo.getById("tx-1")!!.status)
     }
+
+    @Test
+    fun `mark paid with a method persists it`() = runTest {
+        val repo = UpsertingTxRepo(pending())
+        MarkTransactionPaidUseCase(repo, clock)("tx-1", paymentMethodId = "yape")
+
+        assertEquals("yape", repo.getById("tx-1")!!.paymentMethodId)
+    }
+
+    @Test
+    fun `mark paid without a method keeps the existing one`() = runTest {
+        val repo = UpsertingTxRepo(pending().copy(paymentMethodId = "bcp"))
+        MarkTransactionPaidUseCase(repo, clock)("tx-1")
+
+        assertEquals("bcp", repo.getById("tx-1")!!.paymentMethodId)
+    }
 }

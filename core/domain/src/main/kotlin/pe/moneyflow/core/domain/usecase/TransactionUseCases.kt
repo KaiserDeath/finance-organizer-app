@@ -35,17 +35,23 @@ class DeleteTransactionUseCase @Inject constructor(
     suspend operator fun invoke(id: String) = repository.delete(id)
 }
 
-/** Marks a pending payment as paid, stamping today's date. Used by the upcoming-payments screen. */
+/**
+ * Marks a pending payment as paid, stamping today's date. Used by the upcoming-payments screen.
+ *
+ * When [paymentMethodId] is given it is persisted with the payment — the only ground truth about
+ * what the user actually pays each bill with, and what makes the suggested method improve with use.
+ */
 class MarkTransactionPaidUseCase @Inject constructor(
     private val repository: TransactionRepository,
     private val clock: Clock,
 ) {
-    suspend operator fun invoke(id: String) {
+    suspend operator fun invoke(id: String, paymentMethodId: String? = null) {
         val transaction = repository.getById(id) ?: return
         repository.upsert(
             transaction.copy(
                 status = TransactionStatus.PAID,
                 actualDate = LocalDate.now(clock),
+                paymentMethodId = paymentMethodId ?: transaction.paymentMethodId,
                 updatedAt = Instant.now(clock),
             ),
         )
