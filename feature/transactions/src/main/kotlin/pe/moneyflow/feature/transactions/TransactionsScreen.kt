@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -100,23 +101,34 @@ fun TransactionsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            when {
-                uiState.isLoading -> LoadingList()
-                uiState.isEmpty && !uiState.isFilterActive -> EmptyState(
-                    illustration = Illustration.NoTransactions,
-                    title = "Sin movimientos",
-                    subtitle = "Registra un gasto con el botón + para verlo aquí.",
-                    modifier = Modifier.fillMaxSize().padding(Spacing.xl),
-                )
-
-                else -> TransactionsList(
+        // Search and filters live in a fixed header above the list, never inside it: a filter
+        // whose state scrolls out of view is a filter the user believes they didn't apply.
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            val showHeader = !uiState.isLoading && !(uiState.isEmpty && !uiState.isFilterActive)
+            if (showHeader) {
+                FiltersHeader(
                     state = uiState,
-                    onTransactionClick = onTransactionClick,
-                    onDelete = onDelete,
                     onQueryChange = viewModel::onQueryChange,
+                    onToggleCategory = viewModel::toggleCategory,
                     onOpenFilters = { showFilters = true },
                 )
+            }
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                when {
+                    uiState.isLoading -> LoadingList()
+                    uiState.isEmpty && !uiState.isFilterActive -> EmptyState(
+                        illustration = Illustration.NoTransactions,
+                        title = "Sin movimientos",
+                        subtitle = "Registra un gasto con el botón + para verlo aquí.",
+                        modifier = Modifier.fillMaxSize().padding(Spacing.xl),
+                    )
+
+                    else -> TransactionsList(
+                        state = uiState,
+                        onTransactionClick = onTransactionClick,
+                        onDelete = onDelete,
+                    )
+                }
             }
         }
     }
@@ -125,10 +137,53 @@ fun TransactionsScreen(
         FilterSheet(
             state = uiState,
             onToggleType = viewModel::toggleType,
-            onToggleCategory = viewModel::toggleCategory,
             onClearFilters = viewModel::clearFilters,
             onDismiss = { showFilters = false },
         )
+    }
+}
+
+@Composable
+private fun FiltersHeader(
+    state: TransactionsUiState,
+    onQueryChange: (String) -> Unit,
+    onToggleCategory: (String) -> Unit,
+    onOpenFilters: () -> Unit,
+) {
+    Column {
+        SearchRow(
+            query = state.filter.query,
+            // The type filters stay behind the Tune sheet; the badge only counts those now that
+            // category chips are visible on the header itself.
+            activeFilterCount = state.filter.types.size,
+            onQueryChange = onQueryChange,
+            onOpenFilters = onOpenFilters,
+        )
+        if (state.expenseCategories.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = Spacing.lg),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                item(key = "all") {
+                    val noneSelected = state.filter.categoryIds.isEmpty()
+                    FilterChip(
+                        selected = noneSelected,
+                        onClick = {
+                            // Deselect every active category; the ViewModel API stays untouched.
+                            state.filter.categoryIds.forEach(onToggleCategory)
+                        },
+                        label = { Text("Todas") },
+                    )
+                }
+                items(items = state.expenseCategories, key = { it.id }) { category ->
+                    FilterChip(
+                        selected = category.id in state.filter.categoryIds,
+                        onClick = { onToggleCategory(category.id) },
+                        label = { Text(category.name) },
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -137,23 +192,11 @@ private fun TransactionsList(
     state: TransactionsUiState,
     onTransactionClick: (String) -> Unit,
     onDelete: (Transaction) -> Unit,
-    onQueryChange: (String) -> Unit,
-    onOpenFilters: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 96.dp, top = Spacing.md),
     ) {
-        // Title now lives in the shell's collapsing app bar, not as a scrolling list item.
-        item(key = "search") {
-            SearchRow(
-                query = state.filter.query,
-                activeFilterCount = state.filter.types.size + state.filter.categoryIds.size,
-                onQueryChange = onQueryChange,
-                onOpenFilters = onOpenFilters,
-            )
-        }
-
         if (state.sections.isEmpty()) {
             item(key = "no-matches") {
                 EmptyState(
@@ -233,7 +276,6 @@ private fun SearchRow(
 private fun FilterSheet(
     state: TransactionsUiState,
     onToggleType: (TransactionType) -> Unit,
-    onToggleCategory: (String) -> Unit,
     onClearFilters: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -266,6 +308,8 @@ private fun FilterSheet(
                 }
             }
 
+            // Category chips moved to the fixed header, where their state is always visible;
+            // the sheet keeps only the type filters.
             Text("Tipo", style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 val typeLabels = listOf(
@@ -279,19 +323,6 @@ private fun FilterSheet(
                         onClick = { onToggleType(type) },
                         label = { Text(label) },
                     )
-                }
-            }
-
-            if (state.expenseCategories.isNotEmpty()) {
-                Text("Categoría", style = MaterialTheme.typography.labelLarge)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    state.expenseCategories.forEach { category ->
-                        FilterChip(
-                            selected = category.id in state.filter.categoryIds,
-                            onClick = { onToggleCategory(category.id) },
-                            label = { Text(category.name) },
-                        )
-                    }
                 }
             }
         }
