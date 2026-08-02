@@ -78,6 +78,10 @@ dependencies {
     implementation(libs.androidx.glance.material3)
 
     testImplementation(libs.junit)
+    // app is an application module, so AndroidFeatureConventionPlugin's test wiring doesn't reach
+    // it; MoneyViewModel's test needs these declared here.
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(project(":core:testing"))
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

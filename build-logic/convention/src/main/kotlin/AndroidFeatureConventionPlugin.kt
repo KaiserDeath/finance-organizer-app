@@ -40,6 +40,9 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
                 add("testImplementation", libs.findLibrary("junit").get())
                 add("testImplementation", libs.findLibrary("kotlinx-coroutines-test").get())
                 add("testImplementation", libs.findLibrary("turbine").get())
+                // Every feature ViewModel test needs MainDispatcherRule; wiring it here keeps that
+                // from being re-declared (or forgotten) in each feature's build file.
+                add("testImplementation", project(":core:testing"))
             }
         }
     }
