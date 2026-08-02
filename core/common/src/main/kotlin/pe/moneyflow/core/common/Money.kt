@@ -26,6 +26,20 @@ object Money {
         else -> currencyCode.uppercase(Locale.US)
     }
 
+    /**
+     * The discreet-mode stand-in for an amount, e.g. "S/ ••••••".
+     *
+     * Fixed width on purpose. A mask whose length tracked the number of digits would still tell a
+     * reader across the table whether you are looking at hundreds or tens of thousands, which is
+     * most of what the mask exists to withhold. The currency symbol stays: it identifies nothing
+     * and it keeps the row recognisable as money.
+     */
+    fun mask(currencyCode: String = "PEN"): String = "${symbolFor(currencyCode)} ••••••"
+
+    /** [format], or [mask] when discreet mode is on. The UI edge decides; nothing upstream changes. */
+    fun format(amountMinor: Long, currencyCode: String = "PEN", hidden: Boolean): String =
+        if (hidden) mask(currencyCode) else format(amountMinor, currencyCode)
+
     /** e.g. 123456 -> "S/ 1,234.56". */
     fun format(amountMinor: Long, currencyCode: String = "PEN"): String {
         val amount = BigDecimal(amountMinor).movePointLeft(2)

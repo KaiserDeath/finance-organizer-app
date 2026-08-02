@@ -47,6 +47,7 @@ class SettingsRepositoryImpl @Inject constructor(
         val MONTHLY_BUDGET = longPreferencesKey("monthly_budget_minor")
         val ACTIVE_METHOD_IDS = stringPreferencesKey("active_method_ids")
         val SHORTCUTS = stringPreferencesKey("shortcuts_json")
+        val AMOUNTS_HIDDEN = booleanPreferencesKey("amounts_hidden")
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -75,6 +76,7 @@ class SettingsRepositoryImpl @Inject constructor(
                         json.decodeFromString<List<ShortcutDto>>(raw).map { it.toModel() }
                     }.getOrNull()
                 } ?: emptyList(),
+                amountsHidden = prefs[Keys.AMOUNTS_HIDDEN] ?: false,
             )
         }
 
@@ -120,5 +122,9 @@ class SettingsRepositoryImpl @Inject constructor(
         dataStore.edit { prefs ->
             prefs[Keys.SHORTCUTS] = json.encodeToString(shortcuts.map { it.toDto() })
         }
+    }
+
+    override suspend fun setAmountsHidden(hidden: Boolean) {
+        dataStore.edit { it[Keys.AMOUNTS_HIDDEN] = hidden }
     }
 }

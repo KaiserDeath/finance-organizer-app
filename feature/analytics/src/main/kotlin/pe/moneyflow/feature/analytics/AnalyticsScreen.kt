@@ -84,6 +84,8 @@ import pe.moneyflow.core.domain.model.MonthlyReport
 import pe.moneyflow.core.ui.component.InsightCard
 import java.time.LocalDate
 import kotlin.math.abs
+import pe.moneyflow.core.ui.util.amountsHidden
+import pe.moneyflow.core.ui.util.money
 
 @Composable
 fun AnalyticsScreen(
@@ -328,9 +330,9 @@ private fun WorstOverrunCard(
         Spacer(Modifier.height(Spacing.xs))
         Text(
             text = if (isFixed) {
-                "Tu límite está corto por ${Money.format(overMinor, progress.currencyCode)}"
+                "Tu límite está corto por ${money(overMinor, progress.currencyCode)}"
             } else {
-                "Te pasaste por ${Money.format(overMinor, progress.currencyCode)}"
+                "Te pasaste por ${money(overMinor, progress.currencyCode)}"
             },
             style = MaterialTheme.typography.titleLarge,
             color = accent,
@@ -436,8 +438,8 @@ private fun NoOverrunCard(
         Spacer(Modifier.height(Spacing.xs))
         val daysLeft = LocalDate.now().let { it.lengthOfMonth() - it.dayOfMonth }
         Text(
-            text = "${Money.format(closest.spentMinor, closest.currencyCode)} de " +
-                "${Money.format(closest.budget.amountMinor, closest.currencyCode)} · " +
+            text = "${money(closest.spentMinor, closest.currencyCode)} de " +
+                "${money(closest.budget.amountMinor, closest.currencyCode)} · " +
                 "quedan $daysLeft día(s) de este mes.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -514,14 +516,14 @@ private fun SummaryStatRow(data: AnalyticsData) {
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         StatTile(
             label = "Gasto total",
-            value = Money.format(data.totalExpenseMinor, data.currencyCode),
+            value = money(data.totalExpenseMinor, data.currencyCode),
             icon = Icons.Rounded.Payments,
             accent = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f),
         )
         StatTile(
             label = "Promedio diario",
-            value = Money.format(data.avgDailyExpenseMinor, data.currencyCode),
+            value = money(data.avgDailyExpenseMinor, data.currencyCode),
             icon = Icons.AutoMirrored.Rounded.TrendingUp,
             accent = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.weight(1f),
@@ -535,6 +537,8 @@ private fun MonthlyTrendCard(data: AnalyticsData) {
         SectionHeader(title = "Gasto por mes", modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(Spacing.lg))
         val lastMonth = data.months.lastOrNull()?.month
+        // valueLabel is a plain lambda, so the flag is read here in composition and closed over.
+        val hidden = amountsHidden()
         BarChart(
             entries = data.months.map { point ->
                 BarChartEntry(
@@ -544,7 +548,7 @@ private fun MonthlyTrendCard(data: AnalyticsData) {
                 )
             },
             contentDescription = "Gasto por mes.",
-            valueLabel = { Money.format(it.value, data.currencyCode) },
+            valueLabel = { Money.format(it.value, data.currencyCode, hidden = hidden) },
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -572,7 +576,7 @@ private fun CategoryBreakdownCard(data: AnalyticsData) {
                 diameter = 132.dp,
                 contentDescription = buildString {
                     append("Gasto por categoría, total ")
-                    append(Money.format(breakdownTotalMinor, data.currencyCode))
+                    append(money(breakdownTotalMinor, data.currencyCode))
                     append(".")
                     if (topSpend != null) {
                         append(" Mayor: ${topSpend.category.name}, ")
@@ -584,7 +588,7 @@ private fun CategoryBreakdownCard(data: AnalyticsData) {
                     // worth the most privileged position in the chart.
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = Money.format(breakdownTotalMinor, data.currencyCode),
+                            text = money(breakdownTotalMinor, data.currencyCode),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center,
@@ -607,7 +611,7 @@ private fun CategoryBreakdownCard(data: AnalyticsData) {
                 data.categoryBreakdown.take(5).forEachIndexed { index, spend ->
                     LegendRow(
                         name = spend.category.name,
-                        amount = Money.format(spend.amountMinor, data.currencyCode),
+                        amount = money(spend.amountMinor, data.currencyCode),
                         percent = spend.fraction,
                         color = colorFromHex(
                             spend.category.colorHex,
@@ -656,6 +660,7 @@ private fun WeekdayCard(data: AnalyticsData) {
     MoneyCard(modifier = Modifier.fillMaxWidth()) {
         SectionHeader(title = "Por día de la semana", modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(Spacing.lg))
+        val hidden = amountsHidden()
         BarChart(
             entries = data.weekdays.map { day ->
                 BarChartEntry(
@@ -664,7 +669,7 @@ private fun WeekdayCard(data: AnalyticsData) {
                 )
             },
             contentDescription = "Gasto por día de la semana.",
-            valueLabel = { Money.format(it.value, data.currencyCode) },
+            valueLabel = { Money.format(it.value, data.currencyCode, hidden = hidden) },
             barColor = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.fillMaxWidth(),
             barHeight = 110.dp,
@@ -733,7 +738,7 @@ private fun MonthComparisonCard(report: MonthlyReport) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = Money.format(report.currentExpenseMinor, report.currencyCode),
+            text = money(report.currentExpenseMinor, report.currencyCode),
             style = MaterialTheme.typography.displaySmall,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -749,12 +754,12 @@ private fun MonthComparisonCard(report: MonthlyReport) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xl)) {
             MiniStat(
                 label = "Ingresos",
-                value = Money.format(report.currentIncomeMinor, report.currencyCode),
+                value = money(report.currentIncomeMinor, report.currencyCode),
                 valueColor = MaterialTheme.moneyColors.positive,
             )
             MiniStat(
                 label = "Balance",
-                value = Money.format(report.balanceMinor, report.currencyCode),
+                value = money(report.balanceMinor, report.currencyCode),
                 valueColor = if (report.balanceMinor >= 0) MaterialTheme.moneyColors.positive
                 else MaterialTheme.moneyColors.negative,
             )
@@ -812,7 +817,7 @@ private fun DeltaChip(
         )
         Spacer(Modifier.size(Spacing.xxs))
         Text(
-            text = "${Money.format(abs(deltaMinor), currencyCode)}$percentText vs mes pasado",
+            text = "${money(abs(deltaMinor), currencyCode)}$percentText vs mes pasado",
             style = MaterialTheme.typography.labelLarge,
             color = color,
         )
@@ -835,21 +840,21 @@ private fun CategoryDeltaRow(delta: CategoryDelta, currencyCode: String) {
                 maxLines = 1,
             )
             Text(
-                text = "Antes ${Money.format(delta.previousMinor, currencyCode)}",
+                text = "Antes ${money(delta.previousMinor, currencyCode)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = Money.format(delta.currentMinor, currencyCode),
+                text = money(delta.currentMinor, currencyCode),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             val d = delta.deltaMinor
             if (d != 0L) {
                 Text(
-                    text = (if (d > 0) "+" else "-") + Money.format(abs(d), currencyCode),
+                    text = (if (d > 0) "+" else "-") + money(abs(d), currencyCode),
                     style = MaterialTheme.typography.labelSmall,
                     color = if (d > 0) MaterialTheme.moneyColors.negative
                     else MaterialTheme.moneyColors.positive,

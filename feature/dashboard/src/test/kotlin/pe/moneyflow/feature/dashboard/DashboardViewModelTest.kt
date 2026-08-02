@@ -80,12 +80,12 @@ class DashboardViewModelTest {
         repo: FakeTransactionRepository = FakeTransactionRepository(),
         shortcuts: List<QuickShortcut> = emptyList(),
         monthlyBudgetMinor: Long? = null,
-    ): DashboardViewModel {
-        val catRepo = FakeCategoryRepository(listOf(comida))
-        val settings = FakeSettingsRepository(
+        settings: FakeSettingsRepository = FakeSettingsRepository(
             monthlyBudgetMinor = monthlyBudgetMinor,
             shortcuts = shortcuts,
-        )
+        ),
+    ): DashboardViewModel {
+        val catRepo = FakeCategoryRepository(listOf(comida))
         return DashboardViewModel(
             getDashboard = GetDashboardUseCase(repo, catRepo, settings, clock),
             getUpcoming = GetUpcomingPaymentsUseCase(
@@ -216,6 +216,24 @@ class DashboardViewModelTest {
         val state = vm.uiState.first { !it.isLoading && !it.isCurrentMonth }
 
         assertEquals(false, state.isFirstRun)
+    }
+
+    /**
+     * Discreet mode is persisted, not held in the ViewModel, so the toggle has to reach the store —
+     * a flag kept in memory would look identical until the app restarted.
+     */
+    @Test
+    fun `toggling discreet mode writes through to settings`() = runTest {
+        val settings = FakeSettingsRepository()
+        val vm = viewModel(settings = settings)
+
+        vm.toggleAmountsHidden()
+        advanceUntilIdle()
+        assertEquals(true, settings.current.amountsHidden)
+
+        vm.toggleAmountsHidden()
+        advanceUntilIdle()
+        assertEquals(false, settings.current.amountsHidden)
     }
 
     @Test

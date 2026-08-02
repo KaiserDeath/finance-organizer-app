@@ -69,6 +69,7 @@ import pe.moneyflow.core.model.AccountType
 import pe.moneyflow.core.model.PaymentMethodType
 import pe.moneyflow.core.ui.component.CategoryAvatar
 import pe.moneyflow.core.ui.preset.FinancePresets
+import pe.moneyflow.core.ui.util.money
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -193,7 +194,7 @@ private fun NetWorthCard(netWorth: NetWorth) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = Money.format(netWorth.totalMinor, netWorth.currencyCode),
+            text = money(netWorth.totalMinor, netWorth.currencyCode),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -226,7 +227,7 @@ private fun AmountPill(label: String, amountMinor: Long, currency: String, accen
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = Money.format(amountMinor, currency),
+            text = money(amountMinor, currency),
             style = MaterialTheme.typography.titleMedium,
             color = accent,
         )
@@ -262,7 +263,7 @@ private fun AccountCard(
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = Money.format(balance.currentBalanceMinor, account.currencyCode),
+                    text = money(balance.currentBalanceMinor, account.currencyCode),
                     style = MaterialTheme.typography.titleMedium,
                     color = balanceColor,
                 )

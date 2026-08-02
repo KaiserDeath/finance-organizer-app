@@ -16,6 +16,54 @@ They stay. What testing rejected was a comparison occupying prime space on a scr
 ask for it on. A retrospective report is the one place a comparison is the entire point, and it now
 sits behind a deliberate tap.
 
+## Discreet mode — persisted, everywhere, one tap
+
+Inicio opens with a 32sp figure on a saturated band: the most readable-over-a-shoulder element in
+the product, on a phone that gets handed around. The eye toggle in the band's own corner masks
+every amount. Three questions were open before it was built; these are the answers it implements.
+
+**It persists.** Stored in `SettingsRepository` as `amountsHidden`, read at the theme so it is
+restored before the first frame. A mask that reset each session would be off exactly when the phone
+is picked up cold, which is when it is most likely to be handed over.
+
+**It covers everything, including outside the app.** The flag lives on `LocalAmountsHidden`,
+provided by `MoneyFlowTheme`, and `money()` in `core/ui/util/MoneyDisplay.kt` is what screens call
+instead of `Money.format`. Reading it from the composition means a screen has to opt *out*
+deliberately — the opposite default from a boolean threaded screen by screen, where the one place
+you forget is the place that defeats the feature. The home-screen widget cannot see the composition,
+so it reads the flag directly; leaving it out would have been the worst hole of the lot.
+
+**One tap, no PIN.** The lock screen's PIN and biometrics are untouched and unrelated. Asking for a
+credential to reveal a number the owner already knows is friction dressed as security, and it would
+make the toggle too slow to use in the moment it is for.
+
+### What stays visible, and why
+
+Percentages, day counts and the streak survive the mask. They do not identify what you have, and
+they are what keeps the screen useful while hidden — a fully blanked Inicio would just be turned
+off. Where a figure was the whole content of a line, the line becomes qualitative rather than a row
+of dots: "Quedan S/ 819.50" reads "Vas al ritmo justo", and the budget denominator becomes "de tu
+presupuesto del mes".
+
+The mask is fixed-width (`S/ ••••••`) on purpose. A mask that grew with the number would still tell
+a reader across the table whether they are looking at hundreds or tens of thousands.
+
+### Deliberately not masked
+
+- **PDF and CSV exports.** A masked export is a broken file, and an export is explicitly requested —
+  the same ambient-versus-requested line the month-over-month rule draws above.
+- **The add/edit amount field and the shortcuts picker.** You are entering or choosing those values;
+  masking them makes the control unusable rather than private.
+- **Onboarding.** It runs before the setting can have been turned on.
+
+### Known weak point
+
+Insight messages are assembled in `core/domain` with amounts already formatted into Spanish prose,
+so there is no number left for the UI to mask. `redactAmounts` patches them at the render edge by
+matching the shape `Money.format` emits. It works and it is tested, but it is a stopgap: the
+structural fix is for `InsightEngine` to carry the amount and let the UI format it. Anyone changing
+the money format should check that helper.
+
 ## Navigation: what follows the spec, and the one thing that does not
 
 The 2026-08-02 audit listed two navigation changes as "undocumented structural changes to confirm",

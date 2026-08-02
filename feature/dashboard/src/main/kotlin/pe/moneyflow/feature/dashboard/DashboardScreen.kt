@@ -60,6 +60,7 @@ import pe.moneyflow.core.domain.model.DashboardData
 import pe.moneyflow.core.domain.model.SpendingPace
 import pe.moneyflow.core.model.QuickShortcut
 import pe.moneyflow.core.ui.component.TransactionRow
+import pe.moneyflow.core.ui.util.money
 
 @Composable
 fun DashboardScreen(
@@ -106,6 +107,7 @@ fun DashboardScreen(
             onPreviousMonth = viewModel::showPreviousMonth,
             onNextMonth = viewModel::showNextMonth,
             onShortcut = onShortcut,
+            onToggleAmountsHidden = viewModel::toggleAmountsHidden,
             modifier = Modifier.padding(innerPadding),
         )
     }
@@ -123,6 +125,7 @@ private fun DashboardContent(
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onShortcut: (QuickShortcut) -> Unit,
+    onToggleAmountsHidden: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val data = state.data
@@ -155,6 +158,7 @@ private fun DashboardContent(
                 streak = if (state.isLoading) emptyList() else state.streak,
                 onOpenBudgets = onOpenBudgets,
                 isFirstRun = state.isFirstRun,
+                onToggleAmountsHidden = onToggleAmountsHidden,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -357,7 +361,7 @@ private fun UpcomingNudgeCard(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Total ${Money.format(nudge.totalAmountMinor, currencyCode)}",
+                    text = "Total ${money(nudge.totalAmountMinor, currencyCode)}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -384,7 +388,7 @@ private fun StatRow(data: DashboardData, pace: SpendingPace?, modifier: Modifier
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         StatTile(
             label = "Hoy",
-            value = Money.format(data.todaySpentMinor, data.currencyCode),
+            value = money(data.todaySpentMinor, data.currencyCode),
             icon = Icons.Rounded.CalendarToday,
             accent = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f),
@@ -394,7 +398,7 @@ private fun StatRow(data: DashboardData, pace: SpendingPace?, modifier: Modifier
         // month still owes — in amber, and deliberately outside the spent total.
         StatTile(
             label = "Por pagar",
-            value = Money.format(pendingMinor, data.currencyCode),
+            value = money(pendingMinor, data.currencyCode),
             icon = Icons.Rounded.Schedule,
             accent = MaterialTheme.colorScheme.tertiary,
             modifier = Modifier.weight(1f),

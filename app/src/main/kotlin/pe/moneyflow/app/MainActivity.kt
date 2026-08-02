@@ -53,7 +53,13 @@ class MainActivity : FragmentActivity() {
                 ThemeMode.DARK -> true
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
-            MoneyFlowTheme(darkTheme = darkTheme) {
+            // Discreet mode enters at the theme so every amount below inherits it; a screen has to
+            // opt out deliberately rather than opt in. Read from the same preferences flow as the
+            // theme mode, so it is restored before the first frame.
+            MoneyFlowTheme(
+                darkTheme = darkTheme,
+                amountsHidden = state.preferences.amountsHidden,
+            ) {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     when {
                         // The system splash is still on screen for this branch (see

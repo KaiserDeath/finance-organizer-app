@@ -74,6 +74,7 @@ import pe.moneyflow.core.ui.component.CategoryAvatar
 import pe.moneyflow.core.ui.preset.FinancePresets
 import pe.moneyflow.core.ui.util.launchPaymentApp
 import pe.moneyflow.core.ui.util.toShortLabel
+import pe.moneyflow.core.ui.util.money
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -204,7 +205,7 @@ fun UpcomingScreen(
                         item(key = "header-${section.bucket}") {
                             SectionHeaderRow(
                                 label = section.label,
-                                total = Money.format(section.totalMinor, uiState.currencyCode),
+                                total = money(section.totalMinor, uiState.currencyCode),
                                 isOverdue = section.items.any { it.isOverdue },
                             )
                         }
@@ -450,7 +451,7 @@ internal fun UpcomingRow(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                text = Money.format(tx.amountMinor, tx.currencyCode),
+                text = money(tx.amountMinor, tx.currencyCode),
                 style = MaterialTheme.typography.titleMedium,
                 color = titleColor,
             )

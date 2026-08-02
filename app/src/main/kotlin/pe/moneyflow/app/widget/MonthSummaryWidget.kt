@@ -43,12 +43,16 @@ class MonthSummaryWidget : GlanceAppWidget() {
             WidgetEntryPoint::class.java,
         )
         val data = entryPoint.getDashboardUseCase().invoke().first()
-        provideContent { WidgetContent(data) }
+        // Glance runs outside the app's composition, so LocalAmountsHidden cannot reach it. The
+        // flag is read here and passed down — a widget that kept printing the balance would be the
+        // worst hole of all, since it is on the home screen with the phone locked to nobody.
+        val hidden = entryPoint.settingsRepository().preferences.first().amountsHidden
+        provideContent { WidgetContent(data, hidden) }
     }
 }
 
 @Composable
-private fun WidgetContent(data: DashboardData) {
+private fun WidgetContent(data: DashboardData, hidden: Boolean) {
     val balance = data.monthIncomeMinor - data.monthSpentMinor
     val context = LocalContext.current
     GlanceTheme {
@@ -65,7 +69,7 @@ private fun WidgetContent(data: DashboardData) {
             )
             Spacer(GlanceModifier.height(4.dp))
             Text(
-                text = Money.format(balance, data.currencyCode),
+                text = Money.format(balance, data.currencyCode, hidden = hidden),
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurface,
                     fontSize = 24.sp,
@@ -74,23 +78,33 @@ private fun WidgetContent(data: DashboardData) {
             )
             Spacer(GlanceModifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                MetricColumn(label = "Gastos", amountMinor = data.monthSpentMinor, currency = data.currencyCode)
+                MetricColumn(
+                    label = "Gastos",
+                    amountMinor = data.monthSpentMinor,
+                    currency = data.currencyCode,
+                    hidden = hidden,
+                )
                 Spacer(GlanceModifier.width(20.dp))
-                MetricColumn(label = "Ingresos", amountMinor = data.monthIncomeMinor, currency = data.currencyCode)
+                MetricColumn(
+                    label = "Ingresos",
+                    amountMinor = data.monthIncomeMinor,
+                    currency = data.currencyCode,
+                    hidden = hidden,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun MetricColumn(label: String, amountMinor: Long, currency: String) {
+private fun MetricColumn(label: String, amountMinor: Long, currency: String, hidden: Boolean) {
     Column {
         Text(
             text = label,
             style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
         )
         Text(
-            text = Money.format(amountMinor, currency),
+            text = Money.format(amountMinor, currency, hidden = hidden),
             style = TextStyle(
                 color = GlanceTheme.colors.onSurface,
                 fontSize = 15.sp,

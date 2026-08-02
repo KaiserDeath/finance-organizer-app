@@ -60,6 +60,7 @@ class HeroAndShortcutsTest {
                 streak = streak,
                 onOpenBudgets = onOpenBudgets,
                 isFirstRun = isFirstRun,
+                onToggleAmountsHidden = {},
             )
         }
     }

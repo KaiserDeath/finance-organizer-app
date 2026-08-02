@@ -19,12 +19,18 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
@@ -43,6 +49,8 @@ import pe.moneyflow.core.ui.component.AnimatedAmount
 import pe.moneyflow.core.ui.util.toMonthNameOnly
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import pe.moneyflow.core.ui.util.amountsHidden
+import pe.moneyflow.core.ui.util.money
 
 /**
  * The dashboard hero — a full-bleed brand header rather than a card.
@@ -84,6 +92,7 @@ fun HeroBalanceCard(
     streak: List<StreakDay>,
     onOpenBudgets: () -> Unit,
     isFirstRun: Boolean,
+    onToggleAmountsHidden: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val brand = MaterialTheme.brandSurface
@@ -110,15 +119,36 @@ fun HeroBalanceCard(
                     bottom = Spacing.xl,
                 ),
         ) {
-            MonthSelector(
-                month = data.month,
-                canGoForward = canGoForward,
-                onPrevious = onPreviousMonth,
-                onNext = onNextMonth,
-                contentColor = onBand,
-                mutedColor = onBandMuted,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // The mask toggle rides in the band's own corner rather than adding a row of chrome
+            // above the figure it hides. One tap, no PIN: biometrics for a number the owner
+            // already knows is friction dressed as security.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MonthSelector(
+                    month = data.month,
+                    canGoForward = canGoForward,
+                    onPrevious = onPreviousMonth,
+                    onNext = onNextMonth,
+                    contentColor = onBand,
+                    mutedColor = onBandMuted,
+                    modifier = Modifier.weight(1f),
+                )
+                val hiddenNow = amountsHidden()
+                IconButton(onClick = onToggleAmountsHidden) {
+                    Icon(
+                        imageVector = if (hiddenNow) {
+                            Icons.Rounded.VisibilityOff
+                        } else {
+                            Icons.Rounded.Visibility
+                        },
+                        contentDescription = if (hiddenNow) {
+                            "Mostrar los montos"
+                        } else {
+                            "Ocultar los montos"
+                        },
+                        tint = onBand,
+                    )
+                }
+            }
 
             Text(
                 text = if (pace == null) {
@@ -178,7 +208,7 @@ fun HeroBalanceCard(
                         color = onBandMuted,
                     )
                     Text(
-                        text = Money.format(data.balanceMinor, data.currencyCode),
+                        text = money(data.balanceMinor, data.currencyCode),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = onBand,
@@ -221,15 +251,17 @@ private fun HeroProgressBar(pace: SpendingPace, currencyCode: String, onOpenBudg
     val barColor = if (pace.isOverBudget || pace.isProjectedOverBudget) alert else onBand
     val percentUsed = ((pace.budgetFraction ?: 0f) * 100).roundToInt()
     val remaining = pace.remainingBudgetMinor
+    val hidden = amountsHidden()
     // One label for the block: a reader using TalkBack gets the verdict, not four orphan fragments.
+    // Masked, it drops the figure with everything else — a screen reader is audible to the room.
     val label = buildString {
         append("$percentUsed% del presupuesto usado")
-        if (remaining != null) {
+        if (remaining != null && !hidden) {
             append(
                 if (remaining >= 0) {
-                    ", quedan ${Money.format(remaining, currencyCode)}"
+                    ", quedan ${money(remaining, currencyCode)}"
                 } else {
-                    ", excedido por ${Money.format(abs(remaining), currencyCode)}"
+                    ", excedido por ${money(abs(remaining), currencyCode)}"
                 },
             )
         }
@@ -245,7 +277,11 @@ private fun HeroProgressBar(pace: SpendingPace, currencyCode: String, onOpenBudg
             .semantics(mergeDescendants = true) { contentDescription = label },
     ) {
         Text(
-            text = "de ${Money.format(pace.monthBudgetMinor ?: 0L, currencyCode)} presupuestado",
+            text = if (hidden) {
+                "de tu presupuesto del mes"
+            } else {
+                "de ${money(pace.monthBudgetMinor ?: 0L, currencyCode)} presupuestado"
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = mutedColor,
         )
@@ -269,10 +305,14 @@ private fun HeroProgressBar(pace: SpendingPace, currencyCode: String, onOpenBudg
             )
             if (remaining != null) {
                 Text(
-                    text = if (remaining >= 0) {
-                        "Quedan ${Money.format(remaining, currencyCode)}"
-                    } else {
-                        "Excedido por ${Money.format(abs(remaining), currencyCode)}"
+                    text = when {
+                        // Masked, "Quedan S/ ••••••" says nothing at all. The pace verdict is the
+                        // part that was useful, and it identifies nothing.
+                        hidden && remaining >= 0 && !pace.isProjectedOverBudget -> "Vas al ritmo justo"
+                        hidden && remaining >= 0 -> "Vas por encima del ritmo"
+                        hidden -> "Presupuesto excedido"
+                        remaining >= 0 -> "Quedan ${money(remaining, currencyCode)}"
+                        else -> "Excedido por ${money(abs(remaining), currencyCode)}"
                     },
                     style = MaterialTheme.typography.labelMedium,
                     color = if (remaining >= 0) mutedColor else alert,
@@ -293,13 +333,13 @@ private fun HeroPaceRow(pace: SpendingPace, currencyCode: String, mutedColor: Co
     val allowance = pace.remainingDailyAllowanceMinor
     Column {
         Text(
-            text = "A este ritmo: ${Money.format(pace.projectedMonthEndMinor, currencyCode)} " +
+            text = "A este ritmo: ${money(pace.projectedMonthEndMinor, currencyCode)} " +
                 "al cierre del mes",
             style = MaterialTheme.typography.bodyMedium,
         )
         if (allowance != null) {
             Text(
-                text = "Puedes gastar ${Money.format(allowance, currencyCode)} por día " +
+                text = "Puedes gastar ${money(allowance, currencyCode)} por día " +
                     "(${pace.daysRemaining} ${if (pace.daysRemaining == 1) "día" else "días"} restantes)",
                 style = MaterialTheme.typography.labelMedium,
                 color = mutedColor,

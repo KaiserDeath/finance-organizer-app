@@ -53,6 +53,7 @@ private fun HeroBalanceCardStatesPreview() {
                 streak = emptyList(),
                 onOpenBudgets = {},
                 isFirstRun = false,
+                onToggleAmountsHidden = {},
                 modifier = Modifier.fillMaxWidth(),
             )
             // Heading for trouble: still under the limit, but the rate says otherwise (amber).
@@ -65,6 +66,7 @@ private fun HeroBalanceCardStatesPreview() {
                 streak = emptyList(),
                 onOpenBudgets = {},
                 isFirstRun = false,
+                onToggleAmountsHidden = {},
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -85,6 +87,7 @@ private fun HeroOverBudgetPreview() {
             streak = emptyList(),
             onOpenBudgets = {},
             isFirstRun = false,
+            onToggleAmountsHidden = {},
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -104,6 +107,7 @@ private fun HeroNoBudgetPreview() {
             streak = emptyList(),
             onOpenBudgets = {},
             isFirstRun = false,
+            onToggleAmountsHidden = {},
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -127,6 +131,7 @@ private fun HeroPastMonthPreview() {
             streak = emptyList(),
             onOpenBudgets = {},
             isFirstRun = false,
+            onToggleAmountsHidden = {},
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -146,6 +151,7 @@ private fun HeroNoHistoryPreview() {
             streak = emptyList(),
             onOpenBudgets = {},
             isFirstRun = false,
+            onToggleAmountsHidden = {},
             modifier = Modifier.fillMaxWidth(),
         )
     }

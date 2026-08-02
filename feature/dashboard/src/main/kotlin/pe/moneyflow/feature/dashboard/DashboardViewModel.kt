@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -105,7 +106,7 @@ class DashboardViewModel @Inject constructor(
     getBudgetsProgress: GetBudgetsProgressUseCase,
     getFrequentShortcuts: GetFrequentShortcutsUseCase,
     observeTransactions: ObserveTransactionsUseCase,
-    settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository,
     private val saveTransaction: SaveTransactionUseCase,
     private val deleteTransaction: DeleteTransactionUseCase,
     private val clock: Clock,
@@ -124,6 +125,20 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun showCurrentMonth() = selectedMonth.update { YearMonth.now(clock) }
+
+    /**
+     * Flips discreet mode and persists it, so a masked screen stays masked across launches.
+     *
+     * Reads the current value from the store rather than from [uiState] so the write is against
+     * what is actually saved, not against a frame that may have been composed before the last one
+     * landed. Presentation only — nothing here touches what is stored or computed.
+     */
+    fun toggleAmountsHidden() {
+        viewModelScope.launch {
+            val current = settingsRepository.preferences.first().amountsHidden
+            settingsRepository.setAmountsHidden(!current)
+        }
+    }
 
     val uiState: StateFlow<DashboardUiState> = selectedMonth
         .flatMapLatest { month ->

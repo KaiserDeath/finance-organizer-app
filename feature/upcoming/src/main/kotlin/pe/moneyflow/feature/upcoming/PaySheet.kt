@@ -42,6 +42,7 @@ import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.domain.model.UpcomingPayment
 import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.ui.util.toShortLabel
+import pe.moneyflow.core.ui.util.money
 
 /**
  * The pay flow: amount, due date, and the method — then the user actually pays, instead of the
@@ -97,7 +98,7 @@ internal fun PaySheet(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = Money.format(tx.amountMinor, tx.currencyCode),
+                    text = money(tx.amountMinor, tx.currencyCode),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -231,7 +232,7 @@ internal fun PayBatchSheet(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = Money.format(totalMinor, currencyCode),
+                    text = money(totalMinor, currencyCode),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,

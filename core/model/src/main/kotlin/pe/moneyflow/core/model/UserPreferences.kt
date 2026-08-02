@@ -15,6 +15,11 @@ data class UserPreferences(
     val activeMethodIds: Set<String>? = null,
     /** One-tap expense presets for the dashboard; empty until onboarding or 30 days of history. */
     val shortcuts: List<QuickShortcut> = emptyList(),
+    /**
+     * Discreet mode: every amount renders masked. Presentation only — nothing about what is stored
+     * or computed changes, so turning it off shows the same figures again.
+     */
+    val amountsHidden: Boolean = false,
 ) {
     /** The app is locked behind a PIN (and optionally biometrics) when a PIN hash exists. */
     val appLockEnabled: Boolean get() = pinHash != null

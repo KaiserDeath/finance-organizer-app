@@ -77,6 +77,8 @@ class SettingsRepositoryTest {
         assertEquals("PEN", prefs.currencyCode)
         assertEquals(false, prefs.onboardingComplete)
         assertEquals(false, prefs.biometricEnabled)
+        // Discreet mode is off until asked for; a store that came up masked would look broken.
+        assertEquals(false, prefs.amountsHidden)
         assertNull(prefs.pinHash)
         assertNull(prefs.monthlyBudgetMinor)
         // null and empty mean different things here: null is "no restriction", so it must not
@@ -93,6 +95,7 @@ class SettingsRepositoryTest {
         repository.setPinHash("hash-abc")
         repository.setBiometricEnabled(true)
         repository.setMonthlyBudget(400_000)
+        repository.setAmountsHidden(true)
 
         val prefs = reread()
 
@@ -102,6 +105,16 @@ class SettingsRepositoryTest {
         assertEquals("hash-abc", prefs.pinHash)
         assertEquals(true, prefs.biometricEnabled)
         assertEquals(400_000L, prefs.monthlyBudgetMinor)
+        // The whole point of persisting the mask: a masked screen stays masked across launches.
+        assertEquals(true, prefs.amountsHidden)
+    }
+
+    @Test
+    fun `discreetModeTogglesBackOff`() = runTest {
+        repository.setAmountsHidden(true)
+        repository.setAmountsHidden(false)
+
+        assertEquals(false, reread().amountsHidden)
     }
 
     /**

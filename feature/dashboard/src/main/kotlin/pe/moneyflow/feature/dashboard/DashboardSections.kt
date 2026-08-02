@@ -72,6 +72,7 @@ import pe.moneyflow.core.ui.util.toMonthTitle
 import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
+import pe.moneyflow.core.ui.util.money
 
 /**
  * Month navigation for the dashboard.
@@ -259,7 +260,7 @@ fun ShortcutsRow(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            text = Money.format(shortcut.amountMinor, currencyCode),
+                            text = money(shortcut.amountMinor, currencyCode),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                         )

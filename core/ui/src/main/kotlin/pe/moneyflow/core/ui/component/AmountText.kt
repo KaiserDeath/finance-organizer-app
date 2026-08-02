@@ -8,10 +8,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.theme.TabularFigures
 import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.model.TransactionType
+import pe.moneyflow.core.ui.util.money
 
 /**
  * Formats a minor-unit amount for display, signed and colored by [type]
@@ -31,7 +31,7 @@ fun AmountText(
     showSign: Boolean = true,
     color: Color? = null,
 ) {
-    val formatted = Money.format(amountMinor, currencyCode)
+    val formatted = money(amountMinor, currencyCode)
     val sign = when {
         !showSign -> ""
         type == TransactionType.INCOME -> "+ "
