@@ -3,7 +3,11 @@ package pe.moneyflow.app
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Add
@@ -20,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -213,6 +218,14 @@ fun MoneyFlowApp(
         // Only the top-level bar participates in scroll; nested screens manage themselves.
         modifier = if (isTopLevel) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
         else Modifier,
+        // Inicio draws its brand band under the status bar, so it must not be inset from the top —
+        // it applies `statusBarsPadding()` to the band's *content* instead, which is what puts the
+        // colour behind the clock. Every other destination keeps the default.
+        contentWindowInsets = if (topLevel == TopLevelDestination.DASHBOARD) {
+            WindowInsets.systemBars.only(WindowInsetsSides.Bottom)
+        } else {
+            ScaffoldDefaults.contentWindowInsets
+        },
         topBar = {
             // The dashboard has no app bar: its hero header *is* the top of the screen, and it owns
             // the month selector. The bar used to print the month too, which both duplicated the

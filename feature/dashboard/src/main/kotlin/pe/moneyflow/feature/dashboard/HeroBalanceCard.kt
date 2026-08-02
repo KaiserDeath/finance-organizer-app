@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -86,15 +87,18 @@ fun HeroBalanceCard(
         // Only the bottom corners round: the band runs to the top edge, under the status bar.
         shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp),
     ) {
-        // No statusBarsPadding here: the shell's Scaffold already consumes the top inset for this
-        // destination, and applying it again left a band of dead space above the month selector.
+        // The band itself runs under the status bar — the shell hands this destination the top inset
+        // rather than consuming it — so the padding goes on the *content*, keeping brand colour
+        // behind the clock instead of a strip of page background above it.
         Column(
-            modifier = Modifier.padding(
-                start = Spacing.xl,
-                end = Spacing.xl,
-                top = Spacing.xs,
-                bottom = Spacing.xl,
-            ),
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(
+                    start = Spacing.xl,
+                    end = Spacing.xl,
+                    top = Spacing.xs,
+                    bottom = Spacing.xl,
+                ),
         ) {
             MonthSelector(
                 month = data.month,

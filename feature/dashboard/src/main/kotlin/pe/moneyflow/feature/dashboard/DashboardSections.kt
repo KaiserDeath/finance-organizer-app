@@ -266,6 +266,39 @@ fun ShortcutsRow(
 }
 
 /**
+ * The "no shortcuts yet" counterpart to [ShortcutsRow].
+ *
+ * States the actual rule rather than a placeholder, because the rule is the whole answer to "why is
+ * this empty?" — `GetFrequentShortcutsUseCase` returns nothing until the oldest movement in the
+ * ledger is 30 days old, so a two-week-old install has no shortcuts no matter how repetitive its
+ * spending is. There is no action to offer: shortcuts are only chosen during onboarding, and the
+ * prototype defines no screen for editing them afterwards.
+ */
+@Composable
+fun ShortcutsEmptyCard(modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(
+            text = "De un toque",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = Spacing.xs),
+        )
+        MoneyCard(
+            modifier = Modifier.fillMaxWidth(),
+            shadowElevation = 0.dp,
+            contentPadding = PaddingValues(Spacing.lg),
+        ) {
+            Text(
+                text = "Tus gastos más repetidos aparecerán aquí para registrarlos en un toque. " +
+                    "Se activan cuando tu historial cumpla 30 días.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
  * Seven dots, one per day, against that day's variable allowance.
  *
  * The only non-actionable element left on the dashboard, kept on purpose: it doesn't inform a
