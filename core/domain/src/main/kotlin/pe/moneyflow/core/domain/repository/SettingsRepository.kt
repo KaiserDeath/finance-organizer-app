@@ -10,8 +10,6 @@ interface SettingsRepository {
 
     suspend fun setThemeMode(mode: ThemeMode)
 
-    suspend fun setDynamicColor(enabled: Boolean)
-
     suspend fun setCurrency(code: String)
 
     suspend fun setOnboardingComplete(complete: Boolean)

@@ -3,7 +3,6 @@ package pe.moneyflow.core.model
 /** User-tunable app preferences, persisted in DataStore. */
 data class UserPreferences(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val useDynamicColor: Boolean = false,
     val currencyCode: String = "PEN",
     val onboardingComplete: Boolean = false,
     /** SHA-256 hash of the app-lock PIN, or null when no PIN is set. */

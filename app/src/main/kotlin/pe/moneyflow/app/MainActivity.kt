@@ -53,10 +53,7 @@ class MainActivity : FragmentActivity() {
                 ThemeMode.DARK -> true
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
-            MoneyFlowTheme(
-                darkTheme = darkTheme,
-                dynamicColor = state.preferences.useDynamicColor,
-            ) {
+            MoneyFlowTheme(darkTheme = darkTheme) {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     when {
                         // The system splash is still on screen for this branch (see

@@ -44,7 +44,7 @@ class AccessibilityTest {
         CompositionLocalProvider(
             LocalDensity provides Density(density = base.density, fontScale = fontScale),
         ) {
-            MoneyFlowTheme(darkTheme = false, dynamicColor = false) { content() }
+            MoneyFlowTheme(darkTheme = false) { content() }
         }
     }
 

@@ -38,7 +38,8 @@ class SettingsRepositoryImpl @Inject constructor(
 
     private object Keys {
         val THEME = stringPreferencesKey("theme_mode")
-        val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+        // "dynamic_color" was removed with the Material You option. Installs that had it set keep an
+        // orphaned key; it is never read, so it costs nothing and clears on the next data wipe.
         val CURRENCY = stringPreferencesKey("currency_code")
         val ONBOARDING = booleanPreferencesKey("onboarding_complete")
         val PIN_HASH = stringPreferencesKey("pin_hash")
@@ -60,9 +61,6 @@ class SettingsRepositoryImpl @Inject constructor(
                 themeMode = prefs[Keys.THEME]
                     ?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
                     ?: ThemeMode.SYSTEM,
-                // Defaults to off so the brand palette is the identity on a fresh install. Must stay
-                // in sync with UserPreferences.useDynamicColor and MoneyFlowTheme's parameter default.
-                useDynamicColor = prefs[Keys.DYNAMIC_COLOR] ?: false,
                 currencyCode = prefs[Keys.CURRENCY] ?: "PEN",
                 onboardingComplete = prefs[Keys.ONBOARDING] ?: false,
                 pinHash = prefs[Keys.PIN_HASH],
@@ -82,10 +80,6 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.edit { it[Keys.THEME] = mode.name }
-    }
-
-    override suspend fun setDynamicColor(enabled: Boolean) {
-        dataStore.edit { it[Keys.DYNAMIC_COLOR] = enabled }
     }
 
     override suspend fun setCurrency(code: String) {

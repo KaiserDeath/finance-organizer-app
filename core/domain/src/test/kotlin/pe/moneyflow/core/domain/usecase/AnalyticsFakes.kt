@@ -56,7 +56,6 @@ internal class FakeSettings(
     override val preferences: Flow<UserPreferences> =
         flowOf(UserPreferences(currencyCode = currency, pinHash = pinHash))
     override suspend fun setThemeMode(mode: ThemeMode) = Unit
-    override suspend fun setDynamicColor(enabled: Boolean) = Unit
     override suspend fun setCurrency(code: String) = Unit
     override suspend fun setOnboardingComplete(complete: Boolean) = Unit
     override suspend fun setPinHash(hash: String?) = Unit

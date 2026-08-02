@@ -15,8 +15,7 @@ import pe.moneyflow.core.designsystem.theme.Spacing
 /**
  * Wrapper for `@Preview` composables.
  *
- * Pins `dynamicColor = false` so previews always show the brand palette rather than the IDE's
- * wallpaper stand-in, and paints the real `background` behind the content so surface/container
+ * Paints the real `background` behind the content so surface/container
  * colors can be judged in context. [darkTheme] follows the preview's `uiMode`, which is what makes
  * [ThemePreviews] work.
  */
@@ -26,7 +25,7 @@ fun MoneyFlowPreviewTheme(
     padded: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    MoneyFlowTheme(darkTheme = darkTheme, dynamicColor = false) {
+    MoneyFlowTheme(darkTheme = darkTheme) {
         Surface(color = MaterialTheme.colorScheme.background) {
             Box(modifier = if (padded) Modifier.padding(Spacing.lg) else Modifier) {
                 content()

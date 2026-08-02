@@ -99,7 +99,6 @@ private class FakeCategoryRepository(private val items: List<Category>) : Catego
 private class FakeSettingsRepository : SettingsRepository {
     override val preferences: Flow<UserPreferences> = flowOf(UserPreferences(currencyCode = "PEN"))
     override suspend fun setThemeMode(mode: ThemeMode) = Unit
-    override suspend fun setDynamicColor(enabled: Boolean) = Unit
     override suspend fun setCurrency(code: String) = Unit
     override suspend fun setOnboardingComplete(complete: Boolean) = Unit
     override suspend fun setPinHash(hash: String?) = Unit

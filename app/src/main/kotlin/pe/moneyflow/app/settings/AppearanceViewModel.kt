@@ -14,7 +14,6 @@ import javax.inject.Inject
 
 data class AppearanceUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val useDynamicColor: Boolean = false,
 )
 
 @HiltViewModel
@@ -24,14 +23,10 @@ class AppearanceViewModel @Inject constructor(
 
     val uiState: StateFlow<AppearanceUiState> =
         settingsRepository.preferences
-            .map { AppearanceUiState(themeMode = it.themeMode, useDynamicColor = it.useDynamicColor) }
+            .map { AppearanceUiState(themeMode = it.themeMode) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppearanceUiState())
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { settingsRepository.setThemeMode(mode) }
-    }
-
-    fun setDynamicColor(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.setDynamicColor(enabled) }
     }
 }
