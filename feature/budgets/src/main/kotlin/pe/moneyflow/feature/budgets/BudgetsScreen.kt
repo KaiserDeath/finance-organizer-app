@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -50,6 +51,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -85,6 +87,7 @@ import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.BudgetProgress
 import pe.moneyflow.core.model.BudgetPeriod
 import pe.moneyflow.core.ui.component.CategoryAvatar
+import java.time.YearMonth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,6 +101,7 @@ fun BudgetsScreen(
     val scope = rememberCoroutineScope()
     // null = closed; Editing(null) = creating; Editing(progress) = editing that budget.
     var editorTarget by remember { mutableStateOf<EditorTarget?>(null) }
+    var monthBudgetOpen by remember { mutableStateOf(false) }
     var consumedInitialEdit by remember { mutableStateOf(false) }
 
     // "Ajustar el límite" arrives with the budget id in the route: open its editor as soon as
@@ -151,8 +155,12 @@ fun BudgetsScreen(
             } else if (uiState.isEmpty) {
                 // Shown above the empty state too: with no category budgets yet, "you set aside X
                 // and have assigned none of it" is precisely the thing the screen should say.
-                if (uiState.hasRollup) {
-                    item { MonthAllocationCard(state = uiState) }
+                item {
+                    if (uiState.hasRollup) {
+                        MonthAllocationCard(state = uiState, onEdit = { monthBudgetOpen = true })
+                    } else {
+                        NoMonthBudgetCard(uiState.month, onSet = { monthBudgetOpen = true })
+                    }
                 }
                 item {
                     MoneyCard(modifier = Modifier.fillMaxWidth()) {
@@ -165,8 +173,12 @@ fun BudgetsScreen(
                     }
                 }
             } else {
-                if (uiState.hasRollup) {
-                    item { MonthAllocationCard(state = uiState) }
+                item {
+                    if (uiState.hasRollup) {
+                        MonthAllocationCard(state = uiState, onEdit = { monthBudgetOpen = true })
+                    } else {
+                        NoMonthBudgetCard(uiState.month, onSet = { monthBudgetOpen = true })
+                    }
                 }
                 item {
                     OverallCard(
@@ -210,6 +222,35 @@ fun BudgetsScreen(
             },
         )
     }
+
+    if (monthBudgetOpen) {
+        val hadBudget = uiState.monthlyBudgetMinor != null
+        MonthBudgetSheet(
+            currentMinor = uiState.monthlyBudgetMinor,
+            currencyCode = uiState.currencyCode,
+            onDismiss = { monthBudgetOpen = false },
+            onConfirm = { minor ->
+                viewModel.setMonthlyBudget(minor)
+                monthBudgetOpen = false
+                // Undo on a change or a clear, not on setting one for the first time — there is
+                // nothing to go back to, and offering it would imply there were.
+                if (hadBudget) {
+                    scope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = if (minor == null) {
+                                "Presupuesto del mes quitado"
+                            } else {
+                                "Presupuesto del mes actualizado"
+                            },
+                            actionLabel = "Deshacer",
+                            duration = SnackbarDuration.Long,
+                        )
+                        if (result == SnackbarResult.ActionPerformed) viewModel.undoMonthlyBudget()
+                    }
+                }
+            },
+        )
+    }
 }
 
 /** Wrapper so "open the create sheet" (null progress) is distinguishable from "closed". */
@@ -227,22 +268,31 @@ private data class EditorTarget(val progress: BudgetProgress?)
  * every budget is normal, and the month total still counts it.
  */
 @Composable
-private fun MonthAllocationCard(state: BudgetsUiState) {
+private fun MonthAllocationCard(state: BudgetsUiState, onEdit: () -> Unit) {
     val monthly = state.monthlyBudgetMinor ?: return
     val currency = state.currencyCode
 
     MoneyCard(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "Presupuesto de ${state.month.toMonthNameOnly()}",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = Money.format(monthly, currency),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Presupuesto de ${state.month.toMonthNameOnly()}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = Money.format(monthly, currency),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            // An explicit control rather than a tappable card: the figure sits above two rows that
+            // are pure readout, so "this one is editable" has to be visible, not discovered.
+            TextButton(onClick = onEdit, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text("Editar")
+            }
+        }
 
         Spacer(Modifier.height(Spacing.lg))
         AllocationRow(
@@ -270,6 +320,34 @@ private fun MonthAllocationCard(state: BudgetsUiState) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/**
+ * The way in when no month budget exists.
+ *
+ * Without this the gap is unrecoverable: the value could only ever be set during onboarding, so
+ * skipping that step left the hero denominator, the daily allowance and the roll-up permanently
+ * absent with no explanation and nowhere to go.
+ */
+@Composable
+private fun NoMonthBudgetCard(month: YearMonth, onSet: () -> Unit) {
+    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Sin presupuesto de ${month.toMonthNameOnly()}",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = "Defínelo para ver cuánto te queda, tu permitido diario y cuánto has repartido " +
+                "entre categorías.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        Button(onClick = onSet, modifier = Modifier.heightIn(min = 48.dp)) {
+            Text("Definir presupuesto")
         }
     }
 }
@@ -405,6 +483,68 @@ private fun BudgetCard(
                     style = MaterialTheme.typography.labelMedium,
                     color = barColor,
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MonthBudgetSheet(
+    currentMinor: Long?,
+    currencyCode: String,
+    onDismiss: () -> Unit,
+    onConfirm: (Long?) -> Unit,
+) {
+    var amountText by remember {
+        mutableStateOf(currentMinor?.let(Money::formatPlain) ?: "")
+    }
+    val amountMinor = Money.parseToMinor(amountText)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Text(
+                text = "Presupuesto del mes",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Es el total con el que cuentas cada mes. De él salen el denominador del " +
+                    "inicio y tu permitido diario.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = amountText,
+                onValueChange = { amountText = it },
+                label = { Text("Monto ($currencyCode)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(
+                onClick = { onConfirm(amountMinor) },
+                enabled = amountMinor != null && amountMinor > 0,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) { Text("Guardar") }
+
+            // Clearing is offered only when there is something to clear, and it is the destructive
+            // path — hence the undo the caller wires to it.
+            if (currentMinor != null) {
+                TextButton(
+                    onClick = { onConfirm(null) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) { Text("Quitar presupuesto del mes") }
             }
         }
     }

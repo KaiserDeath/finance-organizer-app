@@ -64,7 +64,7 @@ class BudgetsViewModel @Inject constructor(
     getBudgetsProgress: GetBudgetsProgressUseCase,
     observeCategories: ObserveCategoriesUseCase,
     observeTransactions: ObserveTransactionsUseCase,
-    settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository,
     private val saveBudget: SaveBudgetUseCase,
     private val deleteBudget: DeleteBudgetUseCase,
     private val clock: Clock,
@@ -76,6 +76,9 @@ class BudgetsViewModel @Inject constructor(
 
     /** The budget as it was before the last edit, for the snackbar's deshacer. */
     private var editedPrevious: Budget? = null
+
+    /** Same idea for the month budget, whose "clear" is destructive enough to need a way back. */
+    private var previousMonthlyBudget: Long? = null
 
     val uiState: StateFlow<BudgetsUiState> =
         combine(
@@ -146,5 +149,24 @@ class BudgetsViewModel @Inject constructor(
 
     fun delete(id: String) {
         viewModelScope.launch { deleteBudget(id) }
+    }
+
+    /**
+     * Sets the month budget, or clears it with a null [minor].
+     *
+     * This is the only way to change it after onboarding. It used to be the *only* way full stop —
+     * `setMonthlyBudget` had a single caller in `OnboardingViewModel`, so skipping that step left
+     * the value null permanently, and with it the hero's denominator, the daily allowance and this
+     * screen's roll-up. All three simply never appeared, with nothing explaining why.
+     */
+    fun setMonthlyBudget(minor: Long?) {
+        previousMonthlyBudget = uiState.value.monthlyBudgetMinor
+        viewModelScope.launch { settingsRepository.setMonthlyBudget(minor) }
+    }
+
+    fun undoMonthlyBudget() {
+        val previous = previousMonthlyBudget
+        previousMonthlyBudget = null
+        viewModelScope.launch { settingsRepository.setMonthlyBudget(previous) }
     }
 }
