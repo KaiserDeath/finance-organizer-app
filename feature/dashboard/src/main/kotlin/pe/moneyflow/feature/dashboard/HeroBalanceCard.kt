@@ -255,14 +255,9 @@ private fun HeroPaceRow(pace: SpendingPace, currencyCode: String, mutedColor: Co
                 color = mutedColor,
             )
         }
-        if (pace.committedRemainingMinor > 0) {
-            Text(
-                text = "Ya comprometido: " +
-                    Money.format(pace.committedRemainingMinor, currencyCode),
-                style = MaterialTheme.typography.labelMedium,
-                color = mutedColor,
-            )
-        }
+        // committedRemainingMinor is deliberately absent: the "Por pagar" StatTile below prints the
+        // same figure, in amber, beside "Hoy" where the reader is already scanning for numbers.
+        // Saying it twice, two cards apart, only made the band longer.
     }
 }
 

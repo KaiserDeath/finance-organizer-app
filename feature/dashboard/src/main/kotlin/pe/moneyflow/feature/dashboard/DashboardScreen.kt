@@ -344,9 +344,10 @@ private fun StatRow(data: DashboardData, pace: SpendingPace?, modifier: Modifier
     // What the month still owes. Takes the *committed* figure rather than `monthPendingMinor`,
     // which counts only pending rows that exist in the ledger and so ignores occurrences still
     // projected from recurring templates. That made the tile read "S/ 0.00" on a month where the
-    // hero said "Ya comprometido: S/ 10,279" and Próximos listed the same S/ 10,279 — three
-    // numbers about one month, with this one disagreeing. Past months have no pace, and nothing
-    // is "still owed" in a month already gone, so they fall back to the materialized total.
+    // band and Próximos both said S/ 10,279 — three numbers about one month, with this one
+    // disagreeing. The band no longer prints it at all (this tile is the one place it lives now).
+    // Past months have no pace, and nothing is "still owed" in a month already gone, so they fall
+    // back to the materialized total.
     val pendingMinor = pace?.committedRemainingMinor ?: data.monthPendingMinor
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         StatTile(

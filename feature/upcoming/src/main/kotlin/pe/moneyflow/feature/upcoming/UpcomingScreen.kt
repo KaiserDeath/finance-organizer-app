@@ -10,17 +10,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.material.icons.rounded.EventRepeat
 import androidx.compose.material.icons.rounded.Payments
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +61,7 @@ import pe.moneyflow.core.designsystem.illustration.Illustration
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.component.SkeletonBlocks
 import pe.moneyflow.core.designsystem.icon.iconForKey
+import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
@@ -203,9 +207,6 @@ fun UpcomingScreen(
                                             }
                                         },
                                         onPay = { paySheetFor = payment },
-                                        onMarkPaid = {
-                                            settleWithUndo(payment, uiState.suggestedMethodFor(payment))
-                                        },
                                         onDelete = { onDelete(payment) },
                                     )
                                 }
@@ -272,13 +273,12 @@ private fun SwipeableUpcomingRow(
     payment: UpcomingPayment,
     onClick: () -> Unit,
     onPay: () -> Unit,
-    onMarkPaid: () -> Unit,
     onDelete: () -> Unit,
 ) {
     // Projections have no row to delete, so they get no swipe affordance at all — that is the whole
     // safety story: a gesture can never destroy a schedule from this screen.
     if (payment.isProjected) {
-        UpcomingRow(payment = payment, onClick = onClick, onPay = onPay, onMarkPaid = onMarkPaid)
+        UpcomingRow(payment = payment, onClick = onClick, onPay = onPay)
         return
     }
 
@@ -299,12 +299,7 @@ private fun SwipeableUpcomingRow(
         enableDismissFromStartToEnd = false,
         backgroundContent = { DeleteBackground() },
     ) {
-        UpcomingRow(
-            payment = payment,
-            onClick = onClick,
-            onPay = onPay,
-            onMarkPaid = onMarkPaid,
-        )
+        UpcomingRow(payment = payment, onClick = onClick, onPay = onPay)
     }
 }
 
@@ -329,7 +324,6 @@ private fun UpcomingRow(
     payment: UpcomingPayment,
     onClick: () -> Unit,
     onPay: () -> Unit,
-    onMarkPaid: () -> Unit,
 ) {
     val tx = payment.transaction
     val isOverdue = payment.isOverdue
@@ -374,38 +368,56 @@ private fun UpcomingRow(
                 color = if (isOverdue) MaterialTheme.moneyColors.negative else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Text(
-            text = Money.format(tx.amountMinor, tx.currencyCode),
-            style = MaterialTheme.typography.titleMedium,
-            color = titleColor,
-        )
-        // Pagar opens the pay sheet for every pending row — the sheet itself explains when the
-        // method has no app to launch, instead of the affordance silently disappearing. The glyph
-        // is Payments, not OpenInNew: a cash row leaves this app for nothing.
-        FilledTonalIconButton(
-            onClick = {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                onPay()
-            },
+        // Amount and action stack rather than sitting inline: inline, the 16sp title truncated to
+        // roughly 100dp ("Internet — Mov…"), and the label is what the action was missing.
+        Column(
             modifier = Modifier.padding(start = Spacing.sm),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(Icons.Rounded.Payments, contentDescription = "Pagar")
-        }
-        // Only real rows can be marked paid — there is no id to settle on a projection, and the
-        // deep-link path above is the one place a forecast turns into ledger data.
-        if (!isProjected) {
-            IconButton(
-                onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onMarkPaid()
-                },
-                modifier = Modifier.padding(start = Spacing.xs),
+            Text(
+                text = Money.format(tx.amountMinor, tx.currencyCode),
+                style = MaterialTheme.typography.titleMedium,
+                color = titleColor,
+            )
+            // One primary control per row. Settling used to live here too, as a second icon button
+            // doing what the sheet's "Ya pagué por fuera" already does with a label, a recorded
+            // method and undo — two controls, one behaviour, no way to tell them apart.
+            //
+            // The pill draws at 32dp but is hit-tested at 48dp: the touch target is not allowed to
+            // shrink to match the drawing.
+            Box(
+                modifier = Modifier.heightIn(min = 48.dp),
+                contentAlignment = Alignment.CenterEnd,
             ) {
-                Icon(
-                    Icons.Rounded.Check,
-                    contentDescription = "Marcar como pagado",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Button(
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onPay()
+                    },
+                    modifier = Modifier.heightIn(min = 32.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+                    contentPadding = PaddingValues(
+                        horizontal = Spacing.md,
+                        vertical = Spacing.xxs,
+                    ),
+                ) {
+                    // Payments, not OpenInNew: a cash row leaves this app for nothing.
+                    Icon(
+                        imageVector = Icons.Rounded.Payments,
+                        contentDescription = null,
+                        modifier = Modifier.size(IconSize.chip),
+                    )
+                    Text(
+                        text = "Pagar",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(start = Spacing.xs),
+                    )
+                }
             }
         }
     }
