@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+
+jobs:
+  unit:
+    name: Unit tests and compilation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # `test`, not `testDebugUnitTest`: core:common and core:domain are pure-JVM
+      # modules whose task is plain `test`, so the Android-only task silently skips
+      # them — including core:domain's 19 test files.
+      - name: Unit tests
+        run: ./gradlew test --stacktrace
+
+      # `compileDebugKotlin` does not build androidTest. A composable gaining a
+      # parameter therefore leaves the main source set green while every UI test that
+      # constructs it fails to compile — which is only discovered at the next device
+      # run. That happened twice on 2026-08-02, so it gets its own step rather than
+      # being left to the emulator job, which is slower and easier to skip.
+      - name: Compile instrumented sources
+        run: ./gradlew compileDebugAndroidTestKotlin --stacktrace
+
+      - name: Assert unit tests actually ran
+        if: always()
+        run: python3 .github/scripts/check_test_counts.py unit
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: unit-test-reports
+          path: '**/build/reports/tests/**'
+          retention-days: 7
+
+  instrumented:
+    name: Instrumented tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # The emulator needs hardware acceleration; without this it falls back to a
+      # software renderer and the Compose tests time out rather than fail cleanly.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          # An animating device makes Compose's idling resource wait forever.
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: ./gradlew connectedDebugAndroidTest --stacktrace
+
+      # The step above reports success when a module runs no tests at all, which is
+      # exactly how core/ui's accessibility suite sat dead for months. Counting the
+      # result XMLs is the only way to tell a passing suite from an absent one.
+      - name: Assert instrumented tests actually ran
+        if: always()
+        run: python3 .github/scripts/check_test_counts.py instrumented
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: instrumented-test-reports
+          path: |
+            **/build/reports/androidTests/**
+            **/build/outputs/androidTest-results/**
+          retention-days: 7
