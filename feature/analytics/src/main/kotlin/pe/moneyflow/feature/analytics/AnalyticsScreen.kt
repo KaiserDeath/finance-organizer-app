@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarMonth
@@ -25,6 +27,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.TrendingUp
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -32,16 +36,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,92 +65,102 @@ import pe.moneyflow.core.designsystem.component.BarChartEntry
 import pe.moneyflow.core.designsystem.component.DonutChart
 import pe.moneyflow.core.designsystem.component.DonutSlice
 import pe.moneyflow.core.designsystem.component.EmptyState
+import pe.moneyflow.core.designsystem.illustration.Illustration
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.component.SectionHeader
 import pe.moneyflow.core.designsystem.component.ShimmerBox
 import pe.moneyflow.core.designsystem.component.StatTile
 import pe.moneyflow.core.designsystem.theme.CategoryPalette
-import pe.moneyflow.core.designsystem.theme.NegativeRed
-import pe.moneyflow.core.designsystem.theme.PositiveGreen
+import pe.moneyflow.core.designsystem.theme.moneyColors
+import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.AnalyticsData
+import pe.moneyflow.core.domain.model.BudgetProgress
 import pe.moneyflow.core.domain.model.CategoryDelta
+import pe.moneyflow.core.domain.model.Insight
 import pe.moneyflow.core.domain.model.MonthlyReport
+import pe.moneyflow.core.ui.component.InsightCard
+import java.time.LocalDate
 import kotlin.math.abs
 
 @Composable
 fun AnalyticsScreen(
-    onBack: () -> Unit,
+    onAdjustBudget: (String) -> Unit,
+    onSeeExpenses: (String) -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: AnalyticsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(viewModel) {
-        viewModel.eventFlow.collectLatest { event ->
-            when (event) {
-                is AnalyticsEvent.ShareCsv -> runShare(context) { CsvExporter.share(context, event.csv, event.fileName) }
-                is AnalyticsEvent.SharePdf -> runShare(context) { PdfReportExporter.share(context, event.report, event.fileName) }
-                is AnalyticsEvent.ExportFailed ->
-                    android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_LONG).show()
-                AnalyticsEvent.NothingToExport ->
-                    android.widget.Toast.makeText(
-                        context,
-                        "No hay movimientos para exportar este mes",
-                        android.widget.Toast.LENGTH_SHORT,
-                    ).show()
-            }
-        }
-    }
-
+    // No export handling here: exporting moved to MonthlyReportScreen along with the report itself,
+    // and this screen has no action that can raise an AnalyticsEvent.
     AnalyticsContent(
         state = uiState,
         onBack = onBack,
-        onExportCsv = viewModel::exportCurrentMonth,
-        onExportPdf = viewModel::exportPdfReport,
+        onAdjustBudget = onAdjustBudget,
+        onSeeExpenses = onSeeExpenses,
+        snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
 }
 
-/** Runs a share action, surfacing any file/intent failure as a toast instead of crashing. */
-private inline fun runShare(context: android.content.Context, block: () -> Unit) {
+/** Runs a share action, surfacing any file/intent failure inline instead of crashing. */
+private suspend inline fun runShare(
+    snackbarHostState: SnackbarHostState,
+    noinline onRetry: (() -> Unit)?,
+    block: () -> Unit,
+) {
     try {
         block()
     } catch (e: Exception) {
-        android.widget.Toast.makeText(
-            context,
-            e.message ?: "No se pudo compartir el archivo",
-            android.widget.Toast.LENGTH_LONG,
-        ).show()
+        snackbarHostState.showRetryable(
+            message = e.message ?: "No se pudo compartir el archivo",
+            onRetry = onRetry,
+        )
     }
+}
+
+/** Shows [message], offering a retry action when there is something meaningful to retry. */
+private suspend fun SnackbarHostState.showRetryable(message: String, onRetry: (() -> Unit)?) {
+    val result = showSnackbar(
+        message = message,
+        actionLabel = if (onRetry != null) "Reintentar" else null,
+        duration = SnackbarDuration.Long,
+    )
+    if (result == SnackbarResult.ActionPerformed) onRetry?.invoke()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AnalyticsContent(
     state: AnalyticsUiState,
-    onBack: () -> Unit,
-    onExportCsv: () -> Unit,
-    onExportPdf: () -> Unit,
+    onBack: (() -> Unit)?,
+    onAdjustBudget: (String) -> Unit,
+    onSeeExpenses: (String) -> Unit,
+    snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
 ) {
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-
     Scaffold(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        // No topBar: as a bottom-nav destination the shell supplies the collapsing app bar. A back
+        // arrow only makes sense if this screen is ever pushed, which the graph doesn't currently do.
         topBar = {
-            TopAppBar(
-                title = { Text("Análisis y reportes") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
-                    }
-                },
-            )
+            if (onBack != null) {
+                TopAppBar(
+                    title = { Text("Análisis y reportes") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
+                        }
+                    },
+                )
+            }
         },
     ) { innerPadding ->
     LazyColumn(
@@ -157,18 +173,23 @@ private fun AnalyticsContent(
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
-        item {
-            TabRow(selectedTabIndex = selectedTab, containerColor = Color.Transparent) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text("Tendencias") },
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text("Reporte") },
-                )
+        // The screen opens with where you overspent and what to do about it, not with a chart:
+        // a number that doesn't lead anywhere is noise formatted as data.
+        val worst = state.worstOverrun
+        if (!state.isLoading) {
+            item(key = "worst-overrun") {
+                if (worst != null) {
+                    WorstOverrunCard(
+                        progress = worst,
+                        onAdjustBudget = { onAdjustBudget(worst.budget.id) },
+                        onSeeExpenses = worst.budget.categoryId?.let { id -> { onSeeExpenses(id) } },
+                    )
+                } else {
+                    // Says so rather than collapsing. When this slot rendered nothing, the screen
+                    // opened on summary tiles and read as though the actionable card had never been
+                    // built — the absence of bad news is itself the answer this screen owes you.
+                    NoOverrunCard()
+                }
             }
         }
 
@@ -177,17 +198,183 @@ private fun AnalyticsContent(
             return@LazyColumn
         }
 
-        if (selectedTab == 0) {
-            trendsTab(state.analytics)
-        } else {
+        // The monthly report used to be the second half of a `Tendencias | Reporte` tab pair. The
+        // tabs were removed: they put a navigation layer above the one card on this screen that is
+        // meant to lead, and the prototype has no tab row here. The report is now a stacked
+        // destination behind the app bar's action — a place you deliberately go, not a mode this
+        // screen sits in half the time.
+        trendsTab(state.analytics, state.insights)
+    }
+    }
+}
+
+/**
+ * The monthly report, as a destination rather than a tab.
+ *
+ * Reuses [AnalyticsViewModel] — the report, the export state and the share events all already live
+ * there, and a second ViewModel would duplicate the export pipeline to save recomputing figures this
+ * screen ignores. The cost is that opening the report also spins up the trends/budgets/insights
+ * flows; worth splitting if this screen ever gets heavier.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MonthlyReportScreen(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: AnalyticsViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    var lastExport by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    LaunchedEffect(viewModel) {
+        viewModel.eventFlow.collectLatest { event ->
+            when (event) {
+                is AnalyticsEvent.ShareCsv -> runShare(snackbarHostState, lastExport) {
+                    CsvExporter.share(context, event.csv, event.fileName)
+                }
+
+                is AnalyticsEvent.SharePdf -> runShare(snackbarHostState, lastExport) {
+                    PdfReportExporter.share(context, event.report, event.fileName)
+                }
+
+                is AnalyticsEvent.ExportFailed ->
+                    snackbarHostState.showRetryable(event.message, lastExport)
+
+                AnalyticsEvent.NothingToExport ->
+                    snackbarHostState.showSnackbar("No hay movimientos para exportar este mes")
+            }
+        }
+    }
+
+    Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Reporte mensual") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentPadding = PaddingValues(
+                start = Spacing.lg,
+                end = Spacing.lg,
+                top = Spacing.md,
+                bottom = 96.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
             reportTab(
-                report = state.report,
-                isExporting = state.isExporting,
-                onExportCsv = onExportCsv,
-                onExportPdf = onExportPdf,
+                report = uiState.report,
+                isExporting = uiState.isExporting,
+                onExportCsv = {
+                    lastExport = viewModel::exportCurrentMonth
+                    viewModel.exportCurrentMonth()
+                },
+                onExportPdf = {
+                    lastExport = viewModel::exportPdfReport
+                    viewModel.exportPdfReport()
+                },
             )
         }
     }
+}
+
+/**
+ * The worst overrun with its two exits: fix the limit, or look at the spending.
+ *
+ * The fixed-expense variant keeps a neutral tone and drops the days-left pressure — rent that
+ * blew its budget doesn't get cut, so the honest message is "your limit is short", and the only
+ * useful action is correcting it.
+ */
+@Composable
+private fun WorstOverrunCard(
+    progress: BudgetProgress,
+    onAdjustBudget: () -> Unit,
+    onSeeExpenses: (() -> Unit)?,
+) {
+    val isFixed = progress.isFixedExpense
+    val overMinor = progress.spentMinor - progress.budget.amountMinor
+    val accent = if (isFixed) MaterialTheme.colorScheme.primary else MaterialTheme.moneyColors.negative
+
+    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = progress.category?.name ?: progress.budget.name,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            text = if (isFixed) {
+                "Tu límite está corto por ${Money.format(overMinor, progress.currencyCode)}"
+            } else {
+                "Te pasaste por ${Money.format(overMinor, progress.currencyCode)}"
+            },
+            style = MaterialTheme.typography.titleLarge,
+            color = accent,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            text = if (isFixed) {
+                "Es un gasto fijo: no se recorta, se corrige el límite."
+            } else {
+                val daysLeft = LocalDate.now().let { it.lengthOfMonth() - it.dayOfMonth }
+                "Quedan $daysLeft día(s) de este mes."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.lg))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Button(
+                onClick = onAdjustBudget,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+            ) { Text("Ajustar el límite") }
+            if (onSeeExpenses != null) {
+                OutlinedButton(
+                    onClick = onSeeExpenses,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) { Text("Ver esos gastos") }
+            }
+        }
+    }
+}
+
+/** The "nothing is over its limit" counterpart to [WorstOverrunCard]. */
+@Composable
+private fun NoOverrunCard() {
+    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Rounded.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.moneyColors.positive,
+                modifier = Modifier.size(IconSize.md),
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Column {
+                Text(
+                    text = "Ningún límite excedido",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Todas tus categorías están dentro de su presupuesto este mes.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -195,13 +382,16 @@ private fun AnalyticsContent(
 // Trends tab
 // ---------------------------------------------------------------------------------------------
 
-private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(data: AnalyticsData) {
+private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(
+    data: AnalyticsData,
+    insights: List<Insight>,
+) {
     val hasData = data.totalExpenseMinor > 0 || data.totalIncomeMinor > 0
     if (!hasData) {
         item {
             MoneyCard(modifier = Modifier.fillMaxWidth()) {
                 EmptyState(
-                    icon = Icons.Rounded.Insights,
+                    illustration = Illustration.NoBreakdown,
                     title = "Aún no hay datos",
                     subtitle = "Registra gastos para ver tus tendencias de los últimos meses.",
                     modifier = Modifier.fillMaxWidth(),
@@ -212,11 +402,27 @@ private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(data: Analy
     }
 
     item { SummaryStatRow(data) }
-    item { MonthlyTrendCard(data) }
+    // Breakdown before the historical charts: the prototype's Análisis leads with the month total and
+    // where it went, because that is what a category limit gets adjusted against. The month-over-month
+    // cash-flow curve that used to lead here was removed — the user sessions found the comparison
+    // against last month irrelevant, the same finding that took the delta out of the hero.
     if (data.categoryBreakdown.isNotEmpty()) {
         item { CategoryBreakdownCard(data) }
     }
+    item { MonthlyTrendCard(data) }
     item { WeekdayCard(data) }
+    // Sugerencias landed here from the old Más drawer: an insight is a number with an action
+    // behind it, which is this screen's whole premise.
+    if (insights.isNotEmpty()) {
+        item(key = "insights-header") {
+            SectionHeader(title = "Sugerencias", modifier = Modifier.fillMaxWidth())
+        }
+        insights.forEach { insight ->
+            item(key = "insight-${insight.id}") {
+                InsightCard(insight = insight, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
 }
 
 @Composable
@@ -253,6 +459,8 @@ private fun MonthlyTrendCard(data: AnalyticsData) {
                     highlighted = point.month == lastMonth,
                 )
             },
+            contentDescription = "Gasto por mes.",
+            valueLabel = { Money.format(it.value, data.currencyCode) },
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -273,15 +481,38 @@ private fun CategoryBreakdownCard(data: AnalyticsData) {
                     ),
                 )
             }
+            val breakdownTotalMinor = data.categoryBreakdown.sumOf { it.amountMinor }
+            val topSpend = data.categoryBreakdown.firstOrNull()
             DonutChart(
                 slices = slices,
                 diameter = 132.dp,
+                contentDescription = buildString {
+                    append("Gasto por categoría, total ")
+                    append(Money.format(breakdownTotalMinor, data.currencyCode))
+                    append(".")
+                    if (topSpend != null) {
+                        append(" Mayor: ${topSpend.category.name}, ")
+                        append("${(topSpend.fraction * 100).toInt()}%.")
+                    }
+                },
                 centerContent = {
-                    Text(
-                        text = "${data.categoryBreakdown.size}",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                    // Total spend, matching the dashboard — the count of categories is not the fact
+                    // worth the most privileged position in the chart.
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = Money.format(breakdownTotalMinor, data.currencyCode),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                        )
+                        Text(
+                            text = if (data.categoryBreakdown.size == 1) "1 categoría"
+                            else "${data.categoryBreakdown.size} categorías",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 },
             )
             Spacer(Modifier.size(Spacing.xl))
@@ -348,6 +579,8 @@ private fun WeekdayCard(data: AnalyticsData) {
                     value = day.amountMinor,
                 )
             },
+            contentDescription = "Gasto por día de la semana.",
+            valueLabel = { Money.format(it.value, data.currencyCode) },
             barColor = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.fillMaxWidth(),
             barHeight = 110.dp,
@@ -433,12 +666,13 @@ private fun MonthComparisonCard(report: MonthlyReport) {
             MiniStat(
                 label = "Ingresos",
                 value = Money.format(report.currentIncomeMinor, report.currencyCode),
-                valueColor = PositiveGreen,
+                valueColor = MaterialTheme.moneyColors.positive,
             )
             MiniStat(
                 label = "Balance",
                 value = Money.format(report.balanceMinor, report.currencyCode),
-                valueColor = if (report.balanceMinor >= 0) PositiveGreen else NegativeRed,
+                valueColor = if (report.balanceMinor >= 0) MaterialTheme.moneyColors.positive
+                else MaterialTheme.moneyColors.negative,
             )
             MiniStat(
                 label = "Movimientos",
@@ -483,7 +717,7 @@ private fun DeltaChip(
     }
     val up = deltaMinor > 0
     val isBad = if (invertColor) up else !up
-    val color = if (isBad) NegativeRed else PositiveGreen
+    val color = if (isBad) MaterialTheme.moneyColors.negative else MaterialTheme.moneyColors.positive
     val percentText = fraction?.let { " (${(abs(it) * 100).toInt()}%)" }.orEmpty()
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
@@ -533,7 +767,8 @@ private fun CategoryDeltaRow(delta: CategoryDelta, currencyCode: String) {
                 Text(
                     text = (if (d > 0) "+" else "-") + Money.format(abs(d), currencyCode),
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (d > 0) NegativeRed else PositiveGreen,
+                    color = if (d > 0) MaterialTheme.moneyColors.negative
+                    else MaterialTheme.moneyColors.positive,
                 )
             }
         }

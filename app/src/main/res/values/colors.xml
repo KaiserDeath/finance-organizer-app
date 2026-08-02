@@ -2,4 +2,7 @@
 <resources>
     <color name="window_background">#FFF7F7FB</color>
     <color name="ic_launcher_background">#4F46E5</color>
+    <!-- Splash uses the brand indigo in both light and dark: the launch surface is where brand
+         recognition matters most, so it deliberately does not follow the system theme. -->
+    <color name="splash_background">#4F46E5</color>
 </resources>

@@ -87,6 +87,72 @@ class GenerateDueRecurringUseCaseTest {
     }
 
     @Test
+    fun `semi-monthly template fires on the 15th and last day of the month`() = runTest {
+        // Start on Jul 1: within July, occurrences are the 15th and the 31st — both on/before today
+        // only counts the 15th (today is Jul 15). Advancing lands next on Jul 31.
+        val template = RecurringExpense(
+            id = "sm",
+            title = "Sueldo",
+            amountMinor = 200000,
+            daysOfMonth = listOf(15, RecurringExpense.LAST_DAY_OF_MONTH),
+            interval = 1,
+            nextRunDate = LocalDate.of(2026, 7, 15),
+        )
+        val recurring = InMemoryRecurringRepository(listOf(template))
+        val transactions = RecordingTransactionRepository()
+
+        val created = useCase(recurring, transactions).invoke()
+
+        assertEquals(1, created)
+        assertEquals(LocalDate.of(2026, 7, 15), transactions.saved.single().estimatedDate)
+        // Next occurrence is the last day of July.
+        assertEquals(LocalDate.of(2026, 7, 31), recurring.byId("sm").nextRunDate)
+    }
+
+    @Test
+    fun `day-of-month template with a two-month stride skips the in-between month`() = runTest {
+        val template = RecurringExpense(
+            id = "bi",
+            title = "Seguro",
+            amountMinor = 15000,
+            daysOfMonth = listOf(15),
+            interval = 2, // every two months
+            nextRunDate = today, // due today (Jul 15)
+        )
+        val recurring = InMemoryRecurringRepository(listOf(template))
+        val transactions = RecordingTransactionRepository()
+
+        val created = useCase(recurring, transactions).invoke()
+
+        assertEquals(1, created)
+        // Aug is skipped; next run is Sep 15.
+        assertEquals(LocalDate.of(2026, 9, 15), recurring.byId("bi").nextRunDate)
+    }
+
+    @Test
+    fun `last-day-of-month clamps to the real last day of short months`() = runTest {
+        // Starting Jan 31, the monthly last-day occurrences backfill up to today (Jul 15):
+        // Jan 31, Feb 28, Mar 31, Apr 30, May 31, Jun 30 — six occurrences, next is Jul 31.
+        val template = RecurringExpense(
+            id = "eom",
+            title = "Renta",
+            amountMinor = 90000,
+            daysOfMonth = listOf(RecurringExpense.LAST_DAY_OF_MONTH),
+            interval = 1,
+            nextRunDate = LocalDate.of(2026, 1, 31),
+        )
+        val recurring = InMemoryRecurringRepository(listOf(template))
+        val transactions = RecordingTransactionRepository()
+
+        val created = useCase(recurring, transactions).invoke()
+
+        assertEquals(6, created)
+        // February clamped to the 28th (2026 is not a leap year) rather than being skipped.
+        assertTrue(transactions.saved.any { it.estimatedDate == LocalDate.of(2026, 2, 28) })
+        assertEquals(LocalDate.of(2026, 7, 31), recurring.byId("eom").nextRunDate)
+    }
+
+    @Test
     fun `stops at end date`() = runTest {
         val template = RecurringExpense(
             id = "r4",

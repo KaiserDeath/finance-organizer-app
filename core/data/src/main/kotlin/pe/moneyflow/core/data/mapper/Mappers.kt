@@ -12,6 +12,7 @@ import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.AccountType
 import pe.moneyflow.core.model.Budget
 import pe.moneyflow.core.model.BudgetPeriod
+import pe.moneyflow.core.model.CardKind
 import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.CategoryType
 import pe.moneyflow.core.model.ExchangeRate
@@ -39,6 +40,7 @@ fun TransactionEntity.toDomain(): Transaction = Transaction(
     currencyCode = currencyCode,
     categoryId = categoryId,
     paymentMethodId = paymentMethodId,
+    cardKind = cardKind?.let { enumOr(it, CardKind.DEBIT) },
     accountId = accountId,
     transferAccountId = transferAccountId,
     type = enumOr(type, TransactionType.EXPENSE),
@@ -63,6 +65,7 @@ fun Transaction.toEntity(): TransactionEntity = TransactionEntity(
     currencyCode = currencyCode,
     categoryId = categoryId,
     paymentMethodId = paymentMethodId,
+    cardKind = cardKind?.name,
     accountId = accountId,
     transferAccountId = transferAccountId,
     type = type.name,
@@ -91,6 +94,7 @@ fun CategoryEntity.toDomain(): Category = Category(
     isDefault = isDefault,
     sortOrder = sortOrder,
     archived = archived,
+    isFixed = isFixed,
 )
 
 fun Category.toEntity(): CategoryEntity = CategoryEntity(
@@ -103,6 +107,7 @@ fun Category.toEntity(): CategoryEntity = CategoryEntity(
     isDefault = isDefault,
     sortOrder = sortOrder,
     archived = archived,
+    isFixed = isFixed,
 )
 
 // --- PaymentMethod ---
@@ -111,6 +116,7 @@ fun PaymentMethodEntity.toDomain(): PaymentMethod = PaymentMethod(
     id = id,
     name = name,
     type = enumOr(type, PaymentMethodType.CASH),
+    cardKind = cardKind?.let { enumOr(it, CardKind.DEBIT) },
     iconKey = iconKey,
     colorHex = colorHex,
     accountId = accountId,
@@ -125,6 +131,7 @@ fun PaymentMethod.toEntity(): PaymentMethodEntity = PaymentMethodEntity(
     id = id,
     name = name,
     type = type.name,
+    cardKind = cardKind?.name,
     iconKey = iconKey,
     colorHex = colorHex,
     accountId = accountId,
@@ -194,10 +201,12 @@ fun RecurringExpenseEntity.toDomain(): RecurringExpense = RecurringExpense(
     currencyCode = currencyCode,
     categoryId = categoryId,
     paymentMethodId = paymentMethodId,
+    cardKind = cardKind?.let { enumOr(it, CardKind.DEBIT) },
     accountId = accountId,
     type = enumOr(type, TransactionType.EXPENSE),
     frequency = enumOr(frequency, RecurrenceFrequency.MONTHLY),
     interval = interval,
+    daysOfMonth = daysOfMonth.split(",").mapNotNull { it.trim().toIntOrNull() },
     nextRunDate = nextRunDate,
     endDate = endDate,
     autoCreate = autoCreate,
@@ -211,10 +220,12 @@ fun RecurringExpense.toEntity(): RecurringExpenseEntity = RecurringExpenseEntity
     currencyCode = currencyCode,
     categoryId = categoryId,
     paymentMethodId = paymentMethodId,
+    cardKind = cardKind?.name,
     accountId = accountId,
     type = type.name,
     frequency = frequency.name,
     interval = interval,
+    daysOfMonth = daysOfMonth.joinToString(","),
     nextRunDate = nextRunDate,
     endDate = endDate,
     autoCreate = autoCreate,

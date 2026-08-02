@@ -7,14 +7,21 @@ import pe.moneyflow.core.domain.model.DashboardData
 import pe.moneyflow.core.domain.repository.CategoryRepository
 import pe.moneyflow.core.domain.repository.SettingsRepository
 import pe.moneyflow.core.domain.repository.TransactionRepository
+import pe.moneyflow.core.model.TransactionStatus
 import pe.moneyflow.core.model.TransactionType
 import java.time.Clock
 import java.time.LocalDate
+import java.time.YearMonth
 import javax.inject.Inject
 
 /**
- * Computes the dashboard snapshot for the current calendar month by combining the month's
- * transactions, the full recent list, categories and user preferences.
+ * Computes the dashboard snapshot for [month] by combining that month's transactions, the full recent
+ * list, categories and user preferences.
+ *
+ * Takes an explicit [month] rather than always reading "now". The dashboard previously hardcoded the
+ * current month, so "how did last month go?" — a top-three question for an expense app — had no answer
+ * anywhere in the UI. It also fixes a subtler issue: `today` used to be captured once when the flow was
+ * built, so a session left open across midnight kept reporting the old day's spend.
  */
 class GetDashboardUseCase @Inject constructor(
     private val transactionRepository: TransactionRepository,
@@ -22,10 +29,9 @@ class GetDashboardUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val clock: Clock,
 ) {
-    operator fun invoke(): Flow<DashboardData> {
-        val today = LocalDate.now(clock)
-        val monthStart = today.withDayOfMonth(1)
-        val monthEnd = today.withDayOfMonth(today.lengthOfMonth())
+    operator fun invoke(month: YearMonth = YearMonth.now(clock)): Flow<DashboardData> {
+        val monthStart = month.atDay(1)
+        val monthEnd = month.atEndOfMonth()
 
         return combine(
             transactionRepository.observeBetween(monthStart, monthEnd),
@@ -33,14 +39,26 @@ class GetDashboardUseCase @Inject constructor(
             categoryRepository.observeAll(),
             settingsRepository.preferences,
         ) { monthTx, allTx, categories, prefs ->
-            val expenses = monthTx.filter { it.type == TransactionType.EXPENSE }
+            val today = LocalDate.now(clock)
+            // One definition of "total del mes": what was actually spent, pending excluded.
+            // Pending rows already surface separately (committed/nudge); counting them here both
+            // inflated the hero and double-counted them against committedRemaining.
+            val expenses = monthTx.filter {
+                it.type == TransactionType.EXPENSE && it.status == TransactionStatus.PAID
+            }
             val monthSpent = expenses.sumOf { it.amountMinor }
+            val monthPending = monthTx
+                .filter { it.type == TransactionType.EXPENSE && it.status == TransactionStatus.PENDING }
+                .sumOf { it.amountMinor }
             val monthIncome = monthTx
                 .filter { it.type == TransactionType.INCOME }
                 .sumOf { it.amountMinor }
-            val todaySpent = expenses
-                .filter { it.effectiveDate == today }
-                .sumOf { it.amountMinor }
+            // "Today" only exists inside the month being viewed; a past month has no today.
+            val todaySpent = if (YearMonth.from(today) == month) {
+                expenses.filter { it.effectiveDate == today }.sumOf { it.amountMinor }
+            } else {
+                0L
+            }
 
             val breakdown = expenses
                 .groupBy { it.categoryId }
@@ -57,10 +75,13 @@ class GetDashboardUseCase @Inject constructor(
                 .sortedByDescending { it.amountMinor }
 
             DashboardData(
+                month = month,
                 monthSpentMinor = monthSpent,
                 todaySpentMinor = todaySpent,
                 monthIncomeMinor = monthIncome,
-                remainingBudgetMinor = null,
+                monthTransactionCount = monthTx.size,
+                monthPendingMinor = monthPending,
+                largestExpense = expenses.maxByOrNull { it.amountMinor },
                 recent = allTx.sortedByDescending { it.createdAt }.take(6),
                 categoryBreakdown = breakdown,
                 categoriesById = categories.associateBy { it.id },

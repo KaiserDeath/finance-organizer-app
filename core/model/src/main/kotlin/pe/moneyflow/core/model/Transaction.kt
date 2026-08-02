@@ -15,6 +15,8 @@ data class Transaction(
     val currencyCode: String = "PEN",
     val categoryId: String? = null,
     val paymentMethodId: String? = null,
+    /** How the method was used for this movement: debit or credit (null = efectivo/n-a). */
+    val cardKind: CardKind? = null,
     val accountId: String? = null,
     /** For a [TransactionType.TRANSFER]: the destination account money moves into. */
     val transferAccountId: String? = null,

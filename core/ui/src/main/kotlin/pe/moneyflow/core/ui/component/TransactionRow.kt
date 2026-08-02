@@ -1,18 +1,22 @@
 package pe.moneyflow.core.ui.component
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.EventRepeat
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import pe.moneyflow.core.designsystem.icon.iconForKey
+import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.model.Category
@@ -29,6 +33,15 @@ fun TransactionRow(
 ) {
     val accent = colorFromHex(category?.colorHex, MaterialTheme.colorScheme.primary)
     val icon = iconForKey(category?.iconKey ?: "category")
+
+    // A not-yet-paid movement reads differently: it's money owed, not spent. The shared resolver
+    // flags it and, when its due date has passed, escalates to "Vencido".
+    val display = paymentDisplayStatus(transaction.status, transaction.effectiveDate)
+    val isUnsettled = display != PaymentDisplayStatus.PAID
+
+    // Marks rows generated from a recurring template. Presentation only — nothing here knows or
+    // cares how the template is stored or scheduled.
+    val isRecurring = transaction.recurringId != null
 
     val meta = buildString {
         category?.let { append(it.name) }
@@ -57,14 +70,33 @@ fun TransactionRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (meta.isNotEmpty()) {
-                Text(
-                    text = meta,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            if (isUnsettled || isRecurring || meta.isNotEmpty()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    PaymentStatusPill(display)
+                    // A glyph rather than another pill: "Vencido" is the thing to act on, and a
+                    // second text badge beside it would compete for the same attention. Recurrence
+                    // is context — it explains why the row is here, it isn't a call to action.
+                    if (isRecurring) {
+                        Icon(
+                            imageVector = Icons.Rounded.EventRepeat,
+                            contentDescription = "Gasto recurrente",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(IconSize.sm),
+                        )
+                    }
+                    if (meta.isNotEmpty()) {
+                        Text(
+                            text = meta,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
         AmountText(
@@ -72,6 +104,8 @@ fun TransactionRow(
             currencyCode = transaction.currencyCode,
             type = transaction.type,
             style = MaterialTheme.typography.titleMedium,
+            // Mute a not-yet-paid amount so it doesn't read like money already spent.
+            color = if (isUnsettled) MaterialTheme.colorScheme.onSurfaceVariant else null,
         )
     }
 }

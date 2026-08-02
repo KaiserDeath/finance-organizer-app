@@ -10,11 +10,15 @@ data object DashboardRoute
 fun NavGraphBuilder.dashboardScreen(
     onSeeAllTransactions: () -> Unit,
     onTransactionClick: (String) -> Unit,
+    onOpenUpcoming: () -> Unit,
+    onOpenBudgets: () -> Unit,
 ) {
     composable<DashboardRoute> {
         DashboardScreen(
             onSeeAllTransactions = onSeeAllTransactions,
             onTransactionClick = onTransactionClick,
+            onOpenUpcoming = onOpenUpcoming,
+            onOpenBudgets = onOpenBudgets,
         )
     }
 }

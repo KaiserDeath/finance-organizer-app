@@ -20,7 +20,10 @@ data class CategoriesUiState(
     val isLoading: Boolean = true,
     val expense: List<Category> = emptyList(),
     val income: List<Category> = emptyList(),
-)
+) {
+    /** Both lists genuinely empty, as opposed to not having loaded yet. */
+    val isEmpty: Boolean get() = !isLoading && expense.isEmpty() && income.isEmpty()
+}
 
 @HiltViewModel
 class CategoriesViewModel @Inject constructor(
@@ -28,6 +31,8 @@ class CategoriesViewModel @Inject constructor(
     private val saveCategory: SaveCategoryUseCase,
     private val deleteCategory: DeleteCategoryUseCase,
 ) : ViewModel() {
+
+    private var recentlyDeleted: Category? = null
 
     val uiState: StateFlow<CategoriesUiState> = observeCategories()
         .map { categories ->
@@ -43,7 +48,7 @@ class CategoriesViewModel @Inject constructor(
             initialValue = CategoriesUiState(),
         )
 
-    fun add(name: String, colorHex: String, iconKey: String, type: CategoryType) {
+    fun add(name: String, colorHex: String, iconKey: String, type: CategoryType, isFixed: Boolean = false) {
         if (name.isBlank()) return
         viewModelScope.launch {
             saveCategory(
@@ -55,12 +60,26 @@ class CategoriesViewModel @Inject constructor(
                     type = type,
                     isDefault = false,
                     sortOrder = 999,
+                    isFixed = isFixed,
                 ),
             )
         }
     }
 
+    /** Marks/unmarks a category as fixed expense (rent-like: an overrun means the limit is short). */
+    fun setFixed(id: String, fixed: Boolean) {
+        val category = uiState.value.expense.firstOrNull { it.id == id } ?: return
+        viewModelScope.launch { saveCategory(category.copy(isFixed = fixed)) }
+    }
+
     fun delete(id: String) {
+        recentlyDeleted = (uiState.value.expense + uiState.value.income).firstOrNull { it.id == id }
         viewModelScope.launch { deleteCategory(id) }
+    }
+
+    fun undoDelete() {
+        val toRestore = recentlyDeleted ?: return
+        recentlyDeleted = null
+        viewModelScope.launch { saveCategory(toRestore) }
     }
 }

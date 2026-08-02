@@ -5,10 +5,13 @@ import androidx.navigation.compose.composable
 import kotlinx.serialization.Serializable
 
 @Serializable
-data object BudgetsRoute
+data class BudgetsRoute(
+    /** Opens the editor for this budget on arrival — how "Ajustar el límite" lands here. */
+    val editBudgetId: String? = null,
+)
 
-fun NavGraphBuilder.budgetsScreen() {
+fun NavGraphBuilder.budgetsScreen(onBack: () -> Unit) {
     composable<BudgetsRoute> {
-        BudgetsScreen()
+        BudgetsScreen(onBack = onBack)
     }
 }

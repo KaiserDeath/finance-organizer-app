@@ -35,11 +35,8 @@ class RecurringGenerationWorker @AssistedInject constructor(
 
     private suspend fun notifyImminent() {
         val payments = getUpcomingPayments().first()
-        val imminent = payments.filter {
-            it.bucket == UpcomingBucket.OVERDUE ||
-                it.bucket == UpcomingBucket.TODAY ||
-                it.bucket == UpcomingBucket.TOMORROW
-        }
+        // Only real rows: a projected occurrence is a forecast, not something to nag about.
+        val imminent = payments.filter { !it.isProjected && it.bucket == UpcomingBucket.DUE_NOW }
         if (imminent.isEmpty()) return
 
         val totalMinor = imminent.sumOf { it.transaction.amountMinor }
@@ -59,5 +56,8 @@ class RecurringGenerationWorker @AssistedInject constructor(
 
     companion object {
         const val WORK_NAME = "recurring-generation"
+
+        /** One-shot catch-up enqueued on cold start, so an idle stretch can't leave data stale. */
+        const val CATCH_UP_WORK_NAME = "recurring-generation-catch-up"
     }
 }

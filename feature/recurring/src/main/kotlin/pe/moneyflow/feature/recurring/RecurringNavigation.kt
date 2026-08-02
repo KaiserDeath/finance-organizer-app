@@ -9,8 +9,9 @@ data object RecurringRoute
 
 fun NavGraphBuilder.recurringScreen(
     onBack: () -> Unit,
+    onOpenTransaction: (String) -> Unit,
 ) {
     composable<RecurringRoute> {
-        RecurringScreen(onBack = onBack)
+        RecurringScreen(onBack = onBack, onOpenTransaction = onOpenTransaction)
     }
 }

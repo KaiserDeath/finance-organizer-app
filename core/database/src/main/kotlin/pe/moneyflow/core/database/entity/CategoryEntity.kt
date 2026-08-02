@@ -19,4 +19,6 @@ data class CategoryEntity(
     val isDefault: Boolean,
     val sortOrder: Int,
     val archived: Boolean,
+    /** Fixed expenses (rent, utilities) get calmer over-budget messaging: the limit gets corrected, not the spend. */
+    val isFixed: Boolean = false,
 )

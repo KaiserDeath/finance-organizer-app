@@ -11,6 +11,8 @@ data class PaymentMethod(
     val id: String,
     val name: String,
     val type: PaymentMethodType = PaymentMethodType.CASH,
+    /** For [PaymentMethodType.CARD], whether it's a debit or credit card; null otherwise. */
+    val cardKind: CardKind? = null,
     val iconKey: String,
     val colorHex: String,
     val accountId: String? = null,

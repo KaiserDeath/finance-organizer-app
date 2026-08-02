@@ -24,4 +24,10 @@ data class BudgetProgress(
 
     /** True once spending crosses 80% of the limit (warning threshold). */
     val isNearLimit: Boolean get() = !isOverBudget && fraction >= 0.8f
+
+    /**
+     * A budget over a fixed-expense category (rent, utilities…). Its overrun reads differently:
+     * the spend can't be cut, so the limit is what needs correcting.
+     */
+    val isFixedExpense: Boolean get() = category?.isFixed == true
 }

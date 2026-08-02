@@ -64,6 +64,7 @@ class GenerateDueRecurringUseCase @Inject constructor(
                         currencyCode = template.currencyCode,
                         categoryId = template.categoryId,
                         paymentMethodId = template.paymentMethodId,
+                        cardKind = template.cardKind,
                         accountId = template.accountId,
                         type = template.type,
                         status = TransactionStatus.PENDING,

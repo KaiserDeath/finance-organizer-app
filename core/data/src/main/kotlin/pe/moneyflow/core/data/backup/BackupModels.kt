@@ -12,6 +12,7 @@ import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.AccountType
 import pe.moneyflow.core.model.Budget
 import pe.moneyflow.core.model.BudgetPeriod
+import pe.moneyflow.core.model.CardKind
 import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.CategoryType
 import pe.moneyflow.core.model.ExchangeRate
@@ -69,6 +70,7 @@ internal data class TransactionDto(
     val currencyCode: String,
     val categoryId: String? = null,
     val paymentMethodId: String? = null,
+    val cardKind: String? = null,
     val accountId: String? = null,
     val transferAccountId: String? = null,
     val type: String,
@@ -96,6 +98,8 @@ internal data class CategoryDto(
     val isDefault: Boolean = false,
     val sortOrder: Int = 0,
     val archived: Boolean = false,
+    // Default keeps backups from before the fixed-expense flag restorable.
+    val isFixed: Boolean = false,
 )
 
 @Serializable
@@ -103,6 +107,7 @@ internal data class PaymentMethodDto(
     val id: String,
     val name: String,
     val type: String,
+    val cardKind: String? = null,
     val iconKey: String,
     val colorHex: String,
     val accountId: String? = null,
@@ -146,6 +151,7 @@ internal data class RecurringDto(
     val currencyCode: String,
     val categoryId: String? = null,
     val paymentMethodId: String? = null,
+    val cardKind: String? = null,
     val accountId: String? = null,
     val type: String,
     val frequency: String,
@@ -189,6 +195,7 @@ internal val backupJson: Json = Json {
 internal fun Transaction.toDto() = TransactionDto(
     id = id, title = title, description = description, amountMinor = amountMinor,
     currencyCode = currencyCode, categoryId = categoryId, paymentMethodId = paymentMethodId,
+    cardKind = cardKind?.name,
     accountId = accountId, transferAccountId = transferAccountId, type = type.name,
     status = status.name, priority = priority.name, estimatedDate = estimatedDate,
     actualDate = actualDate, recurringId = recurringId, installmentPlanId = installmentPlanId,
@@ -199,10 +206,11 @@ internal fun Transaction.toDto() = TransactionDto(
 internal fun Category.toDto() = CategoryDto(
     id = id, name = name, iconKey = iconKey, colorHex = colorHex, parentId = parentId,
     type = type.name, isDefault = isDefault, sortOrder = sortOrder, archived = archived,
+    isFixed = isFixed,
 )
 
 internal fun PaymentMethod.toDto() = PaymentMethodDto(
-    id = id, name = name, type = type.name, iconKey = iconKey, colorHex = colorHex,
+    id = id, name = name, type = type.name, cardKind = cardKind?.name, iconKey = iconKey, colorHex = colorHex,
     accountId = accountId, deepLinkPackage = deepLinkPackage, playStoreId = playStoreId,
     isDefault = isDefault, sortOrder = sortOrder, archived = archived,
 )
@@ -220,7 +228,8 @@ internal fun Budget.toDto() = BudgetDto(
 
 internal fun RecurringExpense.toDto() = RecurringDto(
     id = id, title = title, amountMinor = amountMinor, currencyCode = currencyCode,
-    categoryId = categoryId, paymentMethodId = paymentMethodId, accountId = accountId,
+    categoryId = categoryId, paymentMethodId = paymentMethodId, cardKind = cardKind?.name,
+    accountId = accountId,
     type = type.name, frequency = frequency.name, interval = interval, nextRunDate = nextRunDate,
     endDate = endDate, autoCreate = autoCreate, lastGeneratedDate = lastGeneratedDate,
 )
@@ -240,6 +249,7 @@ internal fun ExchangeRate.toDto() = ExchangeRateDto(
 internal fun TransactionDto.toDomain() = Transaction(
     id = id, title = title, description = description, amountMinor = amountMinor,
     currencyCode = currencyCode, categoryId = categoryId, paymentMethodId = paymentMethodId,
+    cardKind = cardKind?.let { enumOr(it, CardKind.DEBIT) },
     accountId = accountId, transferAccountId = transferAccountId,
     type = enumOr(type, TransactionType.EXPENSE), status = enumOr(status, TransactionStatus.PAID),
     priority = enumOr(priority, Priority.NORMAL), estimatedDate = estimatedDate,
@@ -251,11 +261,12 @@ internal fun TransactionDto.toDomain() = Transaction(
 internal fun CategoryDto.toDomain() = Category(
     id = id, name = name, iconKey = iconKey, colorHex = colorHex, parentId = parentId,
     type = enumOr(type, CategoryType.EXPENSE), isDefault = isDefault, sortOrder = sortOrder,
-    archived = archived,
+    archived = archived, isFixed = isFixed,
 )
 
 internal fun PaymentMethodDto.toDomain() = PaymentMethod(
-    id = id, name = name, type = enumOr(type, PaymentMethodType.CASH), iconKey = iconKey,
+    id = id, name = name, type = enumOr(type, PaymentMethodType.CASH),
+    cardKind = cardKind?.let { enumOr(it, CardKind.DEBIT) }, iconKey = iconKey,
     colorHex = colorHex, accountId = accountId, deepLinkPackage = deepLinkPackage,
     playStoreId = playStoreId, isDefault = isDefault, sortOrder = sortOrder, archived = archived,
 )
@@ -274,7 +285,8 @@ internal fun BudgetDto.toDomain() = Budget(
 
 internal fun RecurringDto.toDomain() = RecurringExpense(
     id = id, title = title, amountMinor = amountMinor, currencyCode = currencyCode,
-    categoryId = categoryId, paymentMethodId = paymentMethodId, accountId = accountId,
+    categoryId = categoryId, paymentMethodId = paymentMethodId,
+    cardKind = cardKind?.let { enumOr(it, CardKind.DEBIT) }, accountId = accountId,
     type = enumOr(type, TransactionType.EXPENSE),
     frequency = enumOr(frequency, RecurrenceFrequency.MONTHLY), interval = interval,
     nextRunDate = nextRunDate, endDate = endDate, autoCreate = autoCreate,

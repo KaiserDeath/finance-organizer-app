@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
@@ -29,17 +31,30 @@ class MoneyFlowApplication : Application(), Configuration.Provider {
         scheduleRecurringGeneration()
     }
 
-    /** Enqueues the once-a-day recurring generation + reminder pass, keeping any existing schedule. */
+    /**
+     * Enqueues the once-a-day recurring generation + reminder pass, keeping any existing schedule,
+     * plus a one-shot catch-up run.
+     *
+     * The catch-up matters because the periodic pass alone leaves the ledger stale after an idle
+     * stretch — opening the app would show missing due items until Work next fires. Generation is
+     * idempotent per day, so running it on every cold start is safe.
+     */
     private fun scheduleRecurringGeneration() {
-        val request = PeriodicWorkRequestBuilder<RecurringGenerationWorker>(
+        val periodic = PeriodicWorkRequestBuilder<RecurringGenerationWorker>(
             repeatInterval = 1,
             repeatIntervalTimeUnit = TimeUnit.DAYS,
         ).build()
 
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+        val workManager = WorkManager.getInstance(this)
+        workManager.enqueueUniquePeriodicWork(
             RecurringGenerationWorker.WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
-            request,
+            periodic,
+        )
+        workManager.enqueueUniqueWork(
+            RecurringGenerationWorker.CATCH_UP_WORK_NAME,
+            ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<RecurringGenerationWorker>().build(),
         )
     }
 }

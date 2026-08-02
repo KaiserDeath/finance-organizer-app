@@ -13,17 +13,26 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -35,20 +44,27 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pe.moneyflow.core.common.Money
+import pe.moneyflow.core.designsystem.component.animatedItem
 import pe.moneyflow.core.designsystem.component.EmptyState
+import pe.moneyflow.core.designsystem.illustration.Illustration
 import pe.moneyflow.core.designsystem.component.ShimmerBox
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.model.Category
@@ -65,6 +81,7 @@ fun TransactionsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var showFilters by remember { mutableStateOf(false) }
 
     val onDelete: (Transaction) -> Unit = { tx ->
         viewModel.delete(tx.id)
@@ -84,25 +101,87 @@ fun TransactionsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            when {
-                uiState.isLoading -> LoadingList()
-                uiState.isEmpty && !uiState.isFilterActive -> EmptyState(
-                    icon = Icons.Rounded.ReceiptLong,
-                    title = "Sin movimientos",
-                    subtitle = "Registra un gasto con el botón + para verlo aquí.",
-                    modifier = Modifier.fillMaxSize().padding(Spacing.xl),
-                )
-
-                else -> TransactionsList(
+        // Search and filters live in a fixed header above the list, never inside it: a filter
+        // whose state scrolls out of view is a filter the user believes they didn't apply.
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            val showHeader = !uiState.isLoading && !(uiState.isEmpty && !uiState.isFilterActive)
+            if (showHeader) {
+                FiltersHeader(
                     state = uiState,
-                    onTransactionClick = onTransactionClick,
-                    onDelete = onDelete,
                     onQueryChange = viewModel::onQueryChange,
-                    onToggleType = viewModel::toggleType,
                     onToggleCategory = viewModel::toggleCategory,
-                    onClearFilters = viewModel::clearFilters,
+                    onOpenFilters = { showFilters = true },
                 )
+            }
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                when {
+                    uiState.isLoading -> LoadingList()
+                    uiState.isEmpty && !uiState.isFilterActive -> EmptyState(
+                        illustration = Illustration.NoTransactions,
+                        title = "Sin movimientos",
+                        subtitle = "Registra un gasto con el botón + para verlo aquí.",
+                        modifier = Modifier.fillMaxSize().padding(Spacing.xl),
+                    )
+
+                    else -> TransactionsList(
+                        state = uiState,
+                        onTransactionClick = onTransactionClick,
+                        onDelete = onDelete,
+                    )
+                }
+            }
+        }
+    }
+
+    if (showFilters) {
+        FilterSheet(
+            state = uiState,
+            onToggleType = viewModel::toggleType,
+            onClearFilters = viewModel::clearFilters,
+            onDismiss = { showFilters = false },
+        )
+    }
+}
+
+@Composable
+private fun FiltersHeader(
+    state: TransactionsUiState,
+    onQueryChange: (String) -> Unit,
+    onToggleCategory: (String) -> Unit,
+    onOpenFilters: () -> Unit,
+) {
+    Column {
+        SearchRow(
+            query = state.filter.query,
+            // The type filters stay behind the Tune sheet; the badge only counts those now that
+            // category chips are visible on the header itself.
+            activeFilterCount = state.filter.types.size,
+            onQueryChange = onQueryChange,
+            onOpenFilters = onOpenFilters,
+        )
+        if (state.expenseCategories.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = Spacing.lg),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                item(key = "all") {
+                    val noneSelected = state.filter.categoryIds.isEmpty()
+                    FilterChip(
+                        selected = noneSelected,
+                        onClick = {
+                            // Deselect every active category; the ViewModel API stays untouched.
+                            state.filter.categoryIds.forEach(onToggleCategory)
+                        },
+                        label = { Text("Todas") },
+                    )
+                }
+                items(items = state.expenseCategories, key = { it.id }) { category ->
+                    FilterChip(
+                        selected = category.id in state.filter.categoryIds,
+                        onClick = { onToggleCategory(category.id) },
+                        label = { Text(category.name) },
+                    )
+                }
             }
         }
     }
@@ -113,34 +192,11 @@ private fun TransactionsList(
     state: TransactionsUiState,
     onTransactionClick: (String) -> Unit,
     onDelete: (Transaction) -> Unit,
-    onQueryChange: (String) -> Unit,
-    onToggleType: (TransactionType) -> Unit,
-    onToggleCategory: (String) -> Unit,
-    onClearFilters: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 96.dp, top = Spacing.md),
     ) {
-        item(key = "title") {
-            Text(
-                text = "Movimientos",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-            )
-        }
-
-        item(key = "filters") {
-            FiltersHeader(
-                state = state,
-                onQueryChange = onQueryChange,
-                onToggleType = onToggleType,
-                onToggleCategory = onToggleCategory,
-                onClearFilters = onClearFilters,
-            )
-        }
-
         if (state.sections.isEmpty()) {
             item(key = "no-matches") {
                 EmptyState(
@@ -165,6 +221,7 @@ private fun TransactionsList(
                     category = tx.categoryId?.let { state.categoriesById[it] },
                     onClick = { onTransactionClick(tx.id) },
                     onDelete = onDelete,
+                    modifier = animatedItem(),
                 )
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -175,68 +232,98 @@ private fun TransactionsList(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FiltersHeader(
-    state: TransactionsUiState,
+private fun SearchRow(
+    query: String,
+    activeFilterCount: Int,
     onQueryChange: (String) -> Unit,
-    onToggleType: (TransactionType) -> Unit,
-    onToggleCategory: (String) -> Unit,
-    onClearFilters: () -> Unit,
+    onOpenFilters: () -> Unit,
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         OutlinedTextField(
-            value = state.filter.query,
+            value = query,
             onValueChange = onQueryChange,
             label = { Text("Buscar") },
             singleLine = true,
             leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
             trailingIcon = {
-                if (state.filter.query.isNotEmpty()) {
+                if (query.isNotEmpty()) {
                     IconButton(onClick = { onQueryChange("") }) {
                         Icon(Icons.Rounded.Close, contentDescription = "Limpiar búsqueda")
                     }
                 }
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f),
         )
-
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            val typeLabels = listOf(
-                TransactionType.EXPENSE to "Gastos",
-                TransactionType.INCOME to "Ingresos",
-                TransactionType.TRANSFER to "Transferencias",
-            )
-            typeLabels.forEach { (type, label) ->
-                FilterChip(
-                    selected = type in state.filter.types,
-                    onClick = { onToggleType(type) },
-                    label = { Text(label) },
-                )
+        BadgedBox(
+            badge = { if (activeFilterCount > 0) Badge { Text(activeFilterCount.toString()) } },
+        ) {
+            FilledTonalIconButton(onClick = onOpenFilters) {
+                Icon(Icons.Rounded.Tune, contentDescription = "Filtros")
             }
         }
+    }
+}
 
-        if (state.expenseCategories.isNotEmpty()) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                state.expenseCategories.forEach { category ->
-                    FilterChip(
-                        selected = category.id in state.filter.categoryIds,
-                        onClick = { onToggleCategory(category.id) },
-                        label = { Text(category.name) },
-                    )
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterSheet(
+    state: TransactionsUiState,
+    onToggleType: (TransactionType) -> Unit,
+    onClearFilters: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Filtros",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (state.isFilterActive) {
+                    TextButton(onClick = onClearFilters) {
+                        Icon(Icons.Rounded.Close, contentDescription = null)
+                        Text("  Limpiar")
+                    }
                 }
             }
-        }
 
-        if (state.isFilterActive) {
-            TextButton(onClick = onClearFilters) {
-                Icon(Icons.Rounded.Close, contentDescription = null)
-                Text("  Limpiar filtros")
+            // Category chips moved to the fixed header, where their state is always visible;
+            // the sheet keeps only the type filters.
+            Text("Tipo", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                val typeLabels = listOf(
+                    TransactionType.EXPENSE to "Gastos",
+                    TransactionType.INCOME to "Ingresos",
+                    TransactionType.TRANSFER to "Transferencias",
+                )
+                typeLabels.forEach { (type, label) ->
+                    FilterChip(
+                        selected = type in state.filter.types,
+                        onClick = { onToggleType(type) },
+                        label = { Text(label) },
+                    )
+                }
             }
         }
     }
@@ -270,10 +357,13 @@ private fun SwipeableTransaction(
     category: pe.moneyflow.core.model.Category?,
     onClick: () -> Unit,
     onDelete: (Transaction) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    val haptics = LocalHapticFeedback.current
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 onDelete(transaction)
                 true
             } else {
@@ -282,6 +372,7 @@ private fun SwipeableTransaction(
         },
     )
     SwipeToDismissBox(
+        modifier = modifier,
         state = dismissState,
         enableDismissFromStartToEnd = false,
         backgroundContent = { DeleteBackground() },

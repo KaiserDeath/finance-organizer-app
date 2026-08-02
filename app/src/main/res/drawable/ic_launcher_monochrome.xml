@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Monochrome layer for themed icons (Android 13+). The system tints this single-color silhouette to
+  match the user's wallpaper palette, so it must not rely on the background layer showing through —
+  the launcher foreground fakes the card pocket with an indigo fill, which would vanish here. Instead
+  the body and pocket are one evenOdd path, making the pocket a genuine hole, with the clasp dot
+  nested inside it as a third subpath (odd crossing count, so it still fills).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M32,40 L76,40 A8,8 0 0 1 84,48 L84,68 A8,8 0 0 1 76,76 L32,76 A8,8 0 0 1 24,68 L24,48 A8,8 0 0 1 32,40 Z M84,55 L67,55 A6.5,6.5 0 0 0 67,68 L84,68 Z M72,61.5 m-3,0 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z" />
+</vector>

@@ -6,4 +6,16 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+
+    <!--
+      Launch theme. MainActivity starts here and hands off to Theme.MoneyFlow once the first frame
+      is ready. Without this, launch went windowBackground -> a blank frame (the activity rendered
+      nothing while preferences loaded) -> content; the splash now covers that gap, so the first
+      thing the user sees is branding rather than an empty rectangle.
+    -->
+    <style name="Theme.MoneyFlow.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.MoneyFlow</item>
+    </style>
 </resources>

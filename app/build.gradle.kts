@@ -50,16 +50,17 @@ dependencies {
     implementation(project(":feature:accounts"))
     implementation(project(":feature:savings"))
     implementation(project(":feature:currency"))
-    implementation(project(":feature:insights"))
 
     // Android / Compose
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.kotlinx.serialization.json)
 
@@ -77,6 +78,10 @@ dependencies {
     implementation(libs.androidx.glance.material3)
 
     testImplementation(libs.junit)
+    // app is an application module, so AndroidFeatureConventionPlugin's test wiring doesn't reach
+    // it; MoneyViewModel's test needs these declared here.
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(project(":core:testing"))
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

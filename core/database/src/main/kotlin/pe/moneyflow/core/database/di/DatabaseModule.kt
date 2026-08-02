@@ -9,6 +9,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import pe.moneyflow.core.database.ALL_MIGRATIONS
 import pe.moneyflow.core.database.MoneyFlowDatabase
 import pe.moneyflow.core.database.SeedData
 import pe.moneyflow.core.database.dao.AccountDao
@@ -39,8 +40,19 @@ object DatabaseModule {
                 super.onCreate(db)
                 SeedData.seed(db)
             }
+
+            // A destructive migration recreates empty tables without calling onCreate (and the
+            // onDestructiveMigration hook fires before the tables exist). Reseed here — after the
+            // DB is open — whenever it comes up bare, so a version bump can't strand the user with
+            // no categories, payment methods or accounts.
+            override fun onOpen(db: SupportSQLiteDatabase) {
+                super.onOpen(db)
+                SeedData.seedIfEmpty(db)
+            }
         })
-        // Pre-release schema is still evolving; drop and reseed rather than ship migrations yet.
+        // Real migrations preserve the user's data across version bumps; destructive fallback stays
+        // only as a last resort for a step with no migration (which reseeds via onOpen).
+        .addMigrations(*ALL_MIGRATIONS)
         .fallbackToDestructiveMigration()
         .build()
 
