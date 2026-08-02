@@ -129,7 +129,8 @@ internal enum class TopLevelDestination(
     // Budgets left the bar: its headline number now shows on the "Tu dinero" row without entering,
     // which was the argument that promoted it in the first place — and four tabs keep the bar
     // legible on 5-inch screens. It stacks under Tu dinero (and under Inicio's "Ver todo") instead.
-    // This is a deliberate divergence from the prototype's nav; see docs/design-decisions.md.
+    // This follows Propuesta C §2, not a divergence from it; see docs/design/ and
+    // docs/design-decisions.md.
     MONEY(MoneyRoute, "Tu dinero", Icons.Rounded.AccountBalanceWallet, "Tu dinero"),
 }
 

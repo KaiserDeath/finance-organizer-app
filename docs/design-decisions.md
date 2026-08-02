@@ -16,43 +16,48 @@ They stay. What testing rejected was a comparison occupying prime space on a scr
 ask for it on. A retrospective report is the one place a comparison is the entire point, and it now
 sits behind a deliberate tap.
 
-## Navigation diverges from the prototype's eight screens, deliberately
+## Navigation: what follows the spec, and the one thing that does not
 
-Two structural changes landed that no phase asked for. Both were argued in code comments and
-nowhere else, which is what the 2026-08-02 audit flagged: a divergence you chose is a decision, and
-the same divergence undocumented is indistinguishable from drift. Recorded here as decisions.
+The 2026-08-02 audit listed two navigation changes as "undocumented structural changes to confirm",
+describing both as moving away from the prototype. Checked against the spec — now committed at
+`docs/design/` — that is right about one and wrong about the other.
 
-> **Not verified against the prototype.** The audit asked for these to be confirmed against the
-> prototype's navigation before recording. The Propuesta C spec and prototype still live outside
-> version control (audit item D9), so that comparison could not be made. What follows documents
-> what the code does and why. If the prototype disagrees, this section is the thing to revisit —
-> it is not evidence that the prototype was consulted.
+### Four bottom-nav destinations — this *is* the spec, not a divergence
 
-### Bottom nav carries four destinations, not five
+`TopLevelDestination` is Inicio, Movimientos, Análisis, Tu dinero, with Presupuestos as a stacked
+destination. Spec §2 ("Navegación — de doce destinos a seis") specifies exactly this: *"La barra
+inferior pasa de cinco pestañas a cuatro"*, *"quitar BUDGETS del enum TopLevelDestination"*, and
+*"BudgetsRoute deja de ser top-level y pasa a destino apilado con onBack obligatorio"*.
 
-`TopLevelDestination` is Inicio, Movimientos, Análisis, Tu dinero. Presupuestos was demoted to a
-stacked destination.
+It also gives the same reason the code comment gives, independently: Presupuestos comes off the bar
+because its figure is now visible without entering, which was the argument that put it there, and
+because four tabs stay legible where five crowd.
 
-The argument that promoted Presupuestos to a tab was that its headline number should be reachable
-without entering the screen. That number now renders on the "Tu dinero" row directly, so the tab
-was paying for something already delivered — and four tabs keep the bar legible on a 5-inch screen
-where five crowd it.
+So there is nothing to confirm and nothing to justify — the implementation followed the handoff.
+Recorded here only because the audit raised it, and a reader who finds that entry should not go
+looking for a decision that was never made.
 
-Demotion is not a loss of reach. `BudgetsRoute` is entered from four places: the Tu dinero row,
-Inicio's "Ver todo" on the budgets card, Inicio's hero budget bar (audit item U2), and Análisis's
-primary action on both the overrun and no-overrun cards (U3). It gained traffic on the same change
-that removed its tab, which reads as a contradiction and is not one — a tab is a permanent claim on
-scarce space, while those four entries are offered where the number that leads to them is already
-on screen.
+Demotion did not cost reach. `BudgetsRoute` is entered from four places: the Tu dinero row, Inicio's
+"Ver todo", Inicio's hero budget bar (audit item U2) and Análisis's cards (U3).
 
-### Ajustes sits two levels below Tu dinero
+### Deleting the Apariencia destination — this *is* the divergence
 
-Tu dinero → Ajustes. The audit recorded this as three levels — Tu dinero → Ajustes → Apariencia —
-and that third level is gone: U1 deleted the Apariencia destination and inlined its one segmented
-control into the Ajustes list, so changing the theme is one tap rather than three.
+Spec §7 puts Apariencia in the Ajustes list as one of seven configuration screens: *"La app
+(Categorías, Moneda, Apariencia) y Tus datos (Recurrentes, Copia de seguridad, Seguridad, Legal)"*.
+That is a destination, and it makes Tu dinero → Ajustes → Apariencia three levels — as specified.
 
-The remaining rows under Ajustes (Categorías, Moneda, Atajos de un toque, Pagos recurrentes, Copia
-de seguridad, Seguridad, Acerca de) do open their own screens, so those leaves are three levels
-deep. That is deliberate and different in kind: each is a screen with its own content and its own
-work to do, not a wrapper around a single control. The rule the U1 deletion establishes is the one
-worth keeping — **a destination has to hold more than one control to deserve being a destination.**
+Audit item U1 deleted it. The screen existed to host one `SingleChoiceSegmentedButtonRow` of three
+options behind an app bar, a back arrow and a navigation transition; the control now sits in the
+Ajustes list as its own card, and changing the theme costs one tap instead of three.
+
+**This is the change that diverges from the spec, and it is deliberate.** The spec's own rule is
+that a decision whose premise breaks is a different decision, to be reopened rather than
+half-implemented. The premise here was that Apariencia is a configuration *screen* like the other
+six. It is not: the other six each hold their own content and their own work, while this one held a
+single control. The rule worth carrying forward — **a destination has to hold more than one control
+to deserve being a destination** — is what the other six still satisfy and what this one never did.
+
+The remaining Ajustes rows (Categorías, Moneda, Atajos de un toque, Pagos recurrentes, Copia de
+seguridad, Seguridad, Acerca de) stay as their own screens, three levels below Tu dinero, per spec.
+Atajos de un toque is new (audit item U5) and follows the same rule: it is a picker with real
+content, not a wrapper.
