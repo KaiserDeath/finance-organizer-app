@@ -9,8 +9,10 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,6 +63,8 @@ import pe.moneyflow.core.model.QuickShortcut
 import pe.moneyflow.core.ui.component.CategoryAvatar
 import pe.moneyflow.core.ui.util.toMonthTitle
 import java.time.YearMonth
+import java.time.format.TextStyle
+import java.util.Locale
 
 /**
  * Month navigation for the dashboard.
@@ -79,6 +84,9 @@ fun MonthSelector(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
+    // Defaults suit a normal surface; the hero band passes its own on-brand pair.
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    mutedColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
     Row(
         modifier = modifier,
@@ -89,6 +97,7 @@ fun MonthSelector(
             Icon(
                 imageVector = Icons.Rounded.ChevronLeft,
                 contentDescription = "Mes anterior",
+                tint = contentColor,
             )
         }
         // Slides in the direction of travel, so the change reads as moving along a timeline.
@@ -110,7 +119,7 @@ fun MonthSelector(
             Text(
                 text = shown.toMonthTitle(),
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -119,6 +128,9 @@ fun MonthSelector(
             Icon(
                 imageVector = Icons.Rounded.ChevronRight,
                 contentDescription = "Mes siguiente",
+                // Explicit rather than IconButton's disabled default, which is alpha over the content
+                // color; the muted token carries "not available" without going translucent.
+                tint = if (canGoForward) contentColor else mutedColor,
             )
         }
     }
@@ -188,11 +200,16 @@ private fun BudgetMiniRow(progress: BudgetProgress) {
 }
 
 /**
- * "De un toque": the row that takes logging a habitual expense from five taps to one.
+ * "De un toque": the block that takes logging a habitual expense from five taps to one.
  *
- * Each chip carries its description and its usual amount, so the tap is a decision the user
- * already made — nothing to confirm. The save is automatic, so it always offers deshacer, and it
- * gets the FAB's haptic to feel like the same class of action.
+ * Each card carries its description and its usual amount, so the tap is a decision the user already
+ * made — nothing to confirm. The save is automatic, so it always offers deshacer, and it gets the
+ * FAB's haptic to feel like the same class of action.
+ *
+ * A two-column grid rather than a horizontal chip strip: the strip put anything past the second
+ * shortcut off-screen, so the one-tap path was only one tap for the two the heuristic happened to
+ * rank first. A grid shows all four at once, and the taller card fits the amount on its own line
+ * where it can be read at a glance instead of run together with the label.
  */
 @Composable
 fun ShortcutsRow(
@@ -209,22 +226,40 @@ fun ShortcutsRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = Spacing.xs),
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            items(items = shortcuts, key = { it.label + it.amountMinor }) { shortcut ->
-                val interaction = remember { MutableInteractionSource() }
-                AssistChip(
-                    onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onShortcut(shortcut)
-                    },
-                    interactionSource = interaction,
-                    label = {
-                        Text("${shortcut.label} · ${Money.format(shortcut.amountMinor, currencyCode)}")
-                    },
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .pressScale(interaction),
-                )
+        // Chunked into rows of two rather than a LazyVerticalGrid: this sits inside a LazyColumn,
+        // where a nested lazy grid in the same direction cannot measure.
+        shortcuts.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                pair.forEach { shortcut ->
+                    val interaction = remember { MutableInteractionSource() }
+                    MoneyCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 64.dp)
+                            .pressScale(interaction)
+                            .clickable(interactionSource = interaction, indication = null) {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onShortcut(shortcut)
+                            },
+                        shadowElevation = 0.dp,
+                        contentPadding = PaddingValues(Spacing.md),
+                    ) {
+                        Text(
+                            text = shortcut.label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = Money.format(shortcut.amountMinor, currencyCode),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+                // Keeps a lone trailing shortcut half-width instead of stretching it across the row.
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
@@ -237,43 +272,66 @@ fun ShortcutsRow(
  * decision, it sustains the habit of logging. If sessions show it reads as decoration, it goes.
  */
 @Composable
-fun StreakRow(days: List<StreakDay>, modifier: Modifier = Modifier) {
+fun StreakRow(
+    days: List<StreakDay>,
+    modifier: Modifier = Modifier,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    mutedColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
     val loggedCount = days.count { it.logged }
-    val outline = MaterialTheme.colorScheme.outlineVariant
-    val within = MaterialTheme.colorScheme.primary
-    val over = MaterialTheme.colorScheme.tertiary
+    val over = MaterialTheme.colorScheme.tertiaryContainer
 
-    MoneyCard(modifier = modifier, shadowElevation = 0.dp) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics {
-                    contentDescription = "Racha: $loggedCount de ${days.size} días registrados"
-                },
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "Racha",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                days.forEach { day ->
-                    val color = when {
-                        !day.logged -> Color.Transparent
-                        day.withinAllowance == false -> over
-                        else -> within
-                    }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = "Racha: $loggedCount de ${days.size} días registrados"
+            },
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Each dot is captioned with its weekday initial. Seven bare dots said "seven of something"
+        // and nothing more — you could not tell which day you had missed, which is the only thing a
+        // streak is for.
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            days.forEach { day ->
+                val filled = when {
+                    !day.logged -> Color.Transparent
+                    day.withinAllowance == false -> over
+                    else -> contentColor
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = day.date.dayOfWeek
+                            .getDisplayName(TextStyle.NARROW, Locale("es"))
+                            .uppercase(Locale("es")),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = mutedColor,
+                    )
+                    Spacer(Modifier.size(Spacing.xs))
                     Box(
                         modifier = Modifier
-                            .size(10.dp)
+                            .size(14.dp)
                             .clip(CircleShape)
-                            .background(color)
-                            .border(1.dp, if (day.logged) color else outline, CircleShape),
+                            .background(filled)
+                            .border(1.dp, if (day.logged) filled else mutedColor, CircleShape),
                     )
                 }
             }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Rounded.LocalFireDepartment,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.size(Spacing.xxs))
+            Text(
+                text = "$loggedCount/${days.size}",
+                style = MaterialTheme.typography.titleSmall,
+                color = contentColor,
+            )
         }
     }
 }

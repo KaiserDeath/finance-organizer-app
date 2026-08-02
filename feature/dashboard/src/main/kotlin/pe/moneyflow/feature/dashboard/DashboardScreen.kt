@@ -111,40 +111,35 @@ private fun DashboardContent(
     modifier: Modifier = Modifier,
 ) {
     val data = state.data
+    // No horizontal contentPadding: the hero band runs edge to edge, so the inset belongs to the
+    // items below it rather than to the list.
+    val sidePadding = Modifier.padding(horizontal = Spacing.lg)
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(
-            start = Spacing.lg,
-            end = Spacing.lg,
-            top = Spacing.md,
             bottom = 96.dp, // clear the docked FAB / bottom bar
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
-        // The month title moved into the shell's collapsing app bar, and "Hola 👋" is gone with it —
-        // it carried no information, had no name to personalize with, and rendered inconsistently
-        // across OEM emoji fonts, all while occupying the most valuable space on the screen.
+        // The hero band is the top of the screen: it owns the month selector and the streak, and the
+        // shell draws no app bar on this destination. "Hola 👋" is long gone — it carried no
+        // information, had no name to personalize with, and rendered inconsistently across OEM emoji
+        // fonts, all while occupying the most valuable space on the screen.
         item {
-            MonthSelector(
-                month = data.month,
+            HeroBalanceCard(
+                data = data,
+                pace = state.pace,
                 canGoForward = state.canGoForward,
-                onPrevious = onPreviousMonth,
-                onNext = onNextMonth,
+                onPreviousMonth = onPreviousMonth,
+                onNextMonth = onNextMonth,
+                streak = if (state.isLoading) emptyList() else state.streak,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
 
         if (state.isLoading) {
-            item { LoadingSkeleton() }
+            item { LoadingSkeleton(modifier = sidePadding) }
             return@LazyColumn
-        }
-
-        item {
-            HeroBalanceCard(
-                data = data,
-                pace = state.pace,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
 
         // Card order is deliberate: shortcuts (act), payments nudge (act), budgets at risk
@@ -155,17 +150,20 @@ private fun DashboardContent(
                     shortcuts = state.shortcuts,
                     currencyCode = data.currencyCode,
                     onShortcut = onShortcut,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = sidePadding.fillMaxWidth(),
                 )
             }
         }
 
-        if (state.streak.isNotEmpty()) {
-            item { StreakRow(days = state.streak, modifier = Modifier.fillMaxWidth()) }
-        }
-
         state.upcomingNudge?.let { nudge ->
-            item { UpcomingNudgeCard(nudge = nudge, currencyCode = data.currencyCode, onClick = onOpenUpcoming) }
+            item {
+                UpcomingNudgeCard(
+                    nudge = nudge,
+                    currencyCode = data.currencyCode,
+                    onClick = onOpenUpcoming,
+                    modifier = sidePadding,
+                )
+            }
         }
 
         // Budgets, promoted onto the dashboard. Previously the answer to "am I within budget?" — the
@@ -175,25 +173,25 @@ private fun DashboardContent(
                 BudgetSummaryCard(
                     budgets = state.topBudgets,
                     onOpenBudgets = onOpenBudgets,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = sidePadding.fillMaxWidth(),
                 )
             }
         }
 
-        item { StatRow(data) }
+        item { StatRow(data, modifier = sidePadding) }
 
         item {
             SectionHeader(
                 title = "Movimientos recientes",
                 actionLabel = if (data.recent.isNotEmpty()) "Ver todo" else null,
                 onActionClick = if (data.recent.isNotEmpty()) onSeeAllTransactions else null,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = sidePadding.fillMaxWidth(),
             )
         }
 
         if (data.recent.isEmpty()) {
             item {
-                MoneyCard(modifier = Modifier.fillMaxWidth(), shadowElevation = 0.dp) {
+                MoneyCard(modifier = sidePadding.fillMaxWidth(), shadowElevation = 0.dp) {
                     EmptyState(
                         icon = Icons.AutoMirrored.Rounded.ReceiptLong,
                         title = "Aún no hay gastos",
@@ -205,7 +203,7 @@ private fun DashboardContent(
         } else {
             item {
                 MoneyCard(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = sidePadding.fillMaxWidth(),
                     shadowElevation = 0.dp,
                     contentPadding = PaddingValues(vertical = Spacing.xs),
                 ) {
@@ -228,6 +226,7 @@ private fun UpcomingNudgeCard(
     nudge: UpcomingNudge,
     currencyCode: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val hasOverdue = nudge.overdueCount > 0
     val accent =
@@ -240,7 +239,7 @@ private fun UpcomingNudgeCard(
         else -> "${nudge.dueSoonCount} pago(s) por vencer"
     }
 
-    MoneyCard(modifier = Modifier.fillMaxWidth(), shadowElevation = 0.dp) {
+    MoneyCard(modifier = modifier.fillMaxWidth(), shadowElevation = 0.dp) {
         Row(
             modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
             verticalAlignment = Alignment.CenterVertically,
@@ -281,8 +280,8 @@ private fun UpcomingNudgeCard(
 }
 
 @Composable
-private fun StatRow(data: DashboardData) {
-    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+private fun StatRow(data: DashboardData, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         StatTile(
             label = "Hoy",
             value = Money.format(data.todaySpentMinor, data.currencyCode),
@@ -305,8 +304,8 @@ private fun StatRow(data: DashboardData) {
 }
 
 @Composable
-private fun LoadingSkeleton() {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+private fun LoadingSkeleton(modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         ShimmerBox(modifier = Modifier.fillMaxWidth().height(140.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
             ShimmerBox(modifier = Modifier.weight(1f).height(96.dp))

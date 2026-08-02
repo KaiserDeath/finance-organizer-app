@@ -12,125 +12,162 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowDownward
-import androidx.compose.material.icons.rounded.ArrowUpward
-import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import pe.moneyflow.core.common.Money
-import pe.moneyflow.core.designsystem.component.GlassCard
-import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Motion
 import pe.moneyflow.core.designsystem.theme.Spacing
-import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.domain.model.DashboardData
 import pe.moneyflow.core.domain.model.SpendingPace
+import pe.moneyflow.core.domain.model.StreakDay
 import pe.moneyflow.core.ui.component.AnimatedAmount
 import pe.moneyflow.core.ui.util.toMonthNameOnly
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * The dashboard hero.
+ * The dashboard hero — a full-bleed brand header rather than a card.
  *
- * The old version showed one number — "Gastado este mes" and an amount — which cannot answer the
- * question people actually open a spending app to ask: *am I OK?* A figure with no reference is data,
- * not insight. `S/ 1,240` is unreadable without knowing the budget, the usual, or the rate.
+ * It answers the question people open a spending app to ask: *am I OK?* A figure with no reference is
+ * data, not insight; `S/ 1,240` is unreadable without knowing the budget or the rate. So the headline
+ * carries a **denominator** ("de S/ 2,000" plus a bar, giving the number a scale) and a **projection**
+ * (where today's rate lands by month end — the only forward-looking number in the app, and the one
+ * that lets a user change course while it still matters).
  *
- * So the figure now carries three references, in one glance:
+ * There used to be a third reference: a signed delta against last month, "so 'a lot' has a baseline".
+ * The user sessions the Propuesta C handoff required before touching this file settled that against
+ * it — participants did not use the month-over-month figure and did not find it relevant. It was
+ * removed rather than moved: the same sessions rejected the "Cifras del cierre" block the prototype
+ * proposed on Análisis, so there was nowhere it earned a place. Don't reintroduce it from the
+ * prototype; its absence is a result, not an oversight.
  *
- *  - a **denominator** — "de S/ 2,000" plus a progress bar, so the number has a scale;
- *  - a **projection** — where today's rate lands by month end, which is the only forward-looking
- *    number in the app and the one that lets a user change course while it still matters;
- *  - a **comparison** — signed delta against last month, so "a lot" has a baseline.
+ * **Why a header and not a card.** The screen previously opened with an app bar printing the month,
+ * then a month selector repeating it, then an inset card — three stacked bands of chrome before any
+ * number. The prototype collapses all of that into one brand-colored block that owns the month
+ * selector, the figure, the pace and the streak, so the first thing on screen is the answer. The app
+ * bar is gone on this destination for the same reason; see `MoneyFlowApp.kt`.
+ *
+ * Colors resolve through the theme (`primary` happens to be the prototype's indigo). Secondary text
+ * on the band uses `primaryContainer` rather than alpha over `onPrimary`, per the handoff's one
+ * normative color rule.
  *
  * Expense-first is kept deliberately: for an expense tracker, "what have I spent" beats "what's my
  * balance". Income stays secondary.
- *
- * Every row below the amount is always rendered when its data exists, and the card's structure does
- * not change shape between users — the previous version hid income and balance behind
- * `if (monthIncome > 0)`, so the card silently changed height and no landmark below it was stable.
  */
 @Composable
 fun HeroBalanceCard(
     data: DashboardData,
     pace: SpendingPace?,
+    canGoForward: Boolean,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    streak: List<StreakDay>,
     modifier: Modifier = Modifier,
 ) {
-    GlassCard(modifier = modifier) {
-        Text(
-            text = if (pace == null) {
-                "Gastado en ${data.month.toMonthNameOnly()}"
-            } else {
-                "Gastado este mes"
-            },
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    val onBand = MaterialTheme.colorScheme.onPrimary
+    val onBandMuted = MaterialTheme.colorScheme.primaryContainer
 
-        // The headline. Counts to its value so logging an expense visibly moves it.
-        AnimatedAmount(
-            amountMinor = data.monthSpentMinor,
-            currencyCode = data.currencyCode,
-            style = MaterialTheme.typography.displayMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-
-        // ---- Denominator: the budget this spend is measured against -------------------------------
-        val budgetMinor = pace?.monthBudgetMinor
-        if (budgetMinor != null) {
-            Spacer(Modifier.height(Spacing.xs))
-            Text(
-                text = "de ${Money.format(budgetMinor, data.currencyCode)} presupuestado",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(Spacing.md))
-            HeroProgressBar(pace = pace, currencyCode = data.currencyCode)
-        }
-
-        // ---- Projection: where this month is heading ---------------------------------------------
-        if (pace != null && !pace.isComplete) {
-            Spacer(Modifier.height(Spacing.md))
-            HeroPaceRow(pace = pace, currencyCode = data.currencyCode)
-        }
-
-        // ---- Comparison + income ----------------------------------------------------------------
-        Spacer(Modifier.height(Spacing.lg))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xl),
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = onBand,
+        // Only the bottom corners round: the band runs to the top edge, under the status bar.
+        shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp),
+    ) {
+        // No statusBarsPadding here: the shell's Scaffold already consumes the top inset for this
+        // destination, and applying it again left a band of dead space above the month selector.
+        Column(
+            modifier = Modifier.padding(
+                start = Spacing.xl,
+                end = Spacing.xl,
+                top = Spacing.xs,
+                bottom = Spacing.xl,
+            ),
         ) {
-            HeroStat(
-                label = "vs mes pasado",
-                content = { MonthDeltaLabel(data) },
-                modifier = Modifier.weight(1f),
+            MonthSelector(
+                month = data.month,
+                canGoForward = canGoForward,
+                onPrevious = onPreviousMonth,
+                onNext = onNextMonth,
+                contentColor = onBand,
+                mutedColor = onBandMuted,
+                modifier = Modifier.fillMaxWidth(),
             )
-            HeroStat(
-                label = "Balance",
-                content = {
-                    Text(
-                        text = Money.format(data.balanceMinor, data.currencyCode),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (data.balanceMinor < 0) MaterialTheme.moneyColors.negative
-                        else MaterialTheme.colorScheme.onSurface,
-                    )
+
+            Text(
+                text = if (pace == null) {
+                    "Gastado en ${data.month.toMonthNameOnly()}"
+                } else {
+                    "Gastado este mes"
                 },
-                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.labelLarge,
+                color = onBandMuted,
             )
+
+            // The headline. Counts to its value so logging an expense visibly moves it.
+            AnimatedAmount(
+                amountMinor = data.monthSpentMinor,
+                currencyCode = data.currencyCode,
+                style = MaterialTheme.typography.displayMedium,
+                color = onBand,
+            )
+
+            // ---- Projection: where this month is heading ---------------------------------------
+            if (pace != null && !pace.isComplete) {
+                Spacer(Modifier.height(Spacing.sm))
+                HeroPaceRow(pace = pace, currencyCode = data.currencyCode, mutedColor = onBandMuted)
+            }
+
+            // ---- Denominator: the budget this spend is measured against -------------------------
+            val budgetMinor = pace?.monthBudgetMinor
+            if (budgetMinor != null) {
+                Spacer(Modifier.height(Spacing.md))
+                HeroProgressBar(
+                    pace = pace,
+                    currencyCode = data.currencyCode,
+                    onBand = onBand,
+                    mutedColor = onBandMuted,
+                )
+            }
+
+            // ---- Balance ------------------------------------------------------------------------
+            Spacer(Modifier.height(Spacing.md))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "Balance",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = onBandMuted,
+                )
+                Text(
+                    text = Money.format(data.balanceMinor, data.currencyCode),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = onBand,
+                )
+            }
+
+            // ---- Streak, inside the band ---------------------------------------------------------
+            if (streak.isNotEmpty()) {
+                Spacer(Modifier.height(Spacing.lg))
+                HorizontalDivider(color = onBandMuted)
+                Spacer(Modifier.height(Spacing.md))
+                StreakRow(days = streak, contentColor = onBand, mutedColor = onBandMuted)
+            }
         }
     }
 }
@@ -138,29 +175,40 @@ fun HeroBalanceCard(
 /**
  * Budget fill for the hero.
  *
- * Not the shared `MoneyProgressBar`: this one sits on the tinted hero surface rather than a card, and
- * it needs a **marker at the "on pace" point** so the bar shows two things at once — where you are, and
- * where you should be by today if the budget were spread evenly. A bar past the marker means you're
- * ahead of schedule even when still under the limit, which is the earliest possible warning.
+ * Not the shared `MoneyProgressBar`: this one sits on the brand band rather than a card, and it needs
+ * a **marker at the "on pace" point** so the bar shows two things at once — where you are, and where
+ * you should be by today if the budget were spread evenly. A bar past the marker means you're ahead
+ * of schedule even when still under the limit, which is the earliest possible warning.
  */
 @Composable
-private fun HeroProgressBar(pace: SpendingPace, currencyCode: String) {
+private fun HeroProgressBar(
+    pace: SpendingPace,
+    currencyCode: String,
+    onBand: Color,
+    mutedColor: Color,
+) {
     val fraction = (pace.budgetFraction ?: 0f).coerceIn(0f, 1f)
     val expectedFraction = (pace.elapsedDays.toFloat() / pace.daysInMonth).coerceIn(0f, 1f)
-    val barColor = when {
-        pace.isOverBudget -> MaterialTheme.moneyColors.negative
-        pace.isProjectedOverBudget -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.primary
-    }
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    // Red would not survive on the band; the over-budget signal is amber-on-indigo instead, which
+    // the light tertiary container gives at full opacity.
+    val alert = MaterialTheme.colorScheme.tertiaryContainer
+    val barColor = if (pace.isOverBudget || pace.isProjectedOverBudget) alert else onBand
 
     Column {
+        Text(
+            text = "de ${Money.format(pace.monthBudgetMinor ?: 0L, currencyCode)} presupuestado",
+            style = MaterialTheme.typography.bodyMedium,
+            color = mutedColor,
+        )
+        Spacer(Modifier.height(Spacing.sm))
         HeroBar(
             fraction = fraction,
             expectedFraction = expectedFraction,
             barColor = barColor,
-            trackColor = trackColor,
-            markerColor = MaterialTheme.colorScheme.outline,
+            // A decorative track, not text: the no-alpha rule governs secondary *text*, and there is
+            // no theme token for "slightly lighter than primary" that stays correct in both themes.
+            trackColor = onBand.copy(alpha = 0.26f),
+            markerColor = onBand,
         )
         Spacer(Modifier.height(Spacing.sm))
         Row(
@@ -181,98 +229,34 @@ private fun HeroProgressBar(pace: SpendingPace, currencyCode: String) {
                         "Excedido por ${Money.format(abs(remaining), currencyCode)}"
                     },
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (remaining >= 0) mutedColor else alert,
                 )
             }
         }
     }
 }
 
-@Composable
-private fun HeroStat(
-    label: String,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Column(modifier = modifier) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        content()
-    }
-}
-
-/** Signed month-over-month change. Up is bad here: this is spending, not income. */
-@Composable
-private fun MonthDeltaLabel(data: DashboardData) {
-    val delta = data.spendDeltaMinor
-    if (data.previousMonthSpentMinor == 0L) {
-        Text(
-            text = "Sin datos",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        return
-    }
-    if (delta == 0L) {
-        Text(
-            text = "Igual",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        return
-    }
-    val spentMore = delta > 0
-    val color = if (spentMore) MaterialTheme.moneyColors.negative
-    else MaterialTheme.moneyColors.positive
-    val percent = data.spendDeltaFraction?.let { "${abs(it * 100).roundToInt()}%" }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = if (spentMore) Icons.Rounded.ArrowUpward else Icons.Rounded.ArrowDownward,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(IconSize.sm),
-        )
-        Spacer(Modifier.size(Spacing.xxs))
-        Text(
-            text = percent ?: Money.format(abs(delta), data.currencyCode),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = color,
-        )
-    }
-}
-
 /**
- * "At this rate…" — the projection line.
+ * "A este ritmo…" — the projection line.
  *
- * Phrased as a rate rather than a verdict. With a budget it also gives the daily allowance, which turns
- * an abstract limit into a decision the user can actually make today.
+ * Phrased as a rate rather than a verdict. With a budget it also gives the daily allowance, which
+ * turns an abstract limit into a decision the user can actually make today.
  */
 @Composable
-private fun HeroPaceRow(pace: SpendingPace, currencyCode: String) {
+private fun HeroPaceRow(pace: SpendingPace, currencyCode: String, mutedColor: Color) {
     val allowance = pace.remainingDailyAllowanceMinor
-    val projectionColor = when {
-        pace.isOverBudget || pace.isProjectedOverBudget -> MaterialTheme.moneyColors.negative
-        else -> MaterialTheme.colorScheme.onSurface
-    }
     Column {
         Text(
             text = "A este ritmo: ${Money.format(pace.projectedMonthEndMinor, currencyCode)} " +
                 "al cierre del mes",
             style = MaterialTheme.typography.bodyMedium,
-            color = projectionColor,
         )
         if (allowance != null) {
             Text(
                 text = "Puedes gastar ${Money.format(allowance, currencyCode)} por día " +
                     "(${pace.daysRemaining} ${if (pace.daysRemaining == 1) "día" else "días"} restantes)",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = mutedColor,
             )
         }
         if (pace.committedRemainingMinor > 0) {
@@ -280,7 +264,7 @@ private fun HeroPaceRow(pace: SpendingPace, currencyCode: String) {
                 text = "Ya comprometido: " +
                     Money.format(pace.committedRemainingMinor, currencyCode),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = mutedColor,
             )
         }
     }

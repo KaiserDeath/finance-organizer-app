@@ -21,11 +21,9 @@ private fun previewData(
     month: YearMonth = july,
     spent: Long = 1_240_50,
     income: Long = 3_200_00,
-    previous: Long = 1_410_00,
 ) = DashboardData.empty(month).copy(
     monthSpentMinor = spent,
     monthIncomeMinor = income,
-    previousMonthSpentMinor = previous,
     monthTransactionCount = 24,
 )
 
@@ -49,12 +47,20 @@ private fun HeroBalanceCardStatesPreview() {
             HeroBalanceCard(
                 data = previewData(spent = 400_00),
                 pace = previewPace(spent = 400_00),
+                canGoForward = false,
+                onPreviousMonth = {},
+                onNextMonth = {},
+                streak = emptyList(),
                 modifier = Modifier.fillMaxWidth(),
             )
             // Heading for trouble: still under the limit, but the rate says otherwise (amber).
             HeroBalanceCard(
                 data = previewData(spent = 900_00),
                 pace = previewPace(spent = 900_00, committed = 300_00),
+                canGoForward = false,
+                onPreviousMonth = {},
+                onNextMonth = {},
+                streak = emptyList(),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -69,12 +75,16 @@ private fun HeroOverBudgetPreview() {
         HeroBalanceCard(
             data = previewData(spent = 2_310_00),
             pace = previewPace(spent = 2_310_00),
+            canGoForward = false,
+            onPreviousMonth = {},
+            onNextMonth = {},
+            streak = emptyList(),
             modifier = Modifier.fillMaxWidth(),
         )
     }
 }
 
-/** No budget configured: no denominator, no bar, no allowance — but still a projection and a delta. */
+/** No budget configured: no denominator, no bar, no allowance — but still a projection. */
 @Preview(name = "Hero · no budget", group = "dashboard")
 @Composable
 private fun HeroNoBudgetPreview() {
@@ -82,6 +92,10 @@ private fun HeroNoBudgetPreview() {
         HeroBalanceCard(
             data = previewData(),
             pace = previewPace(budget = null),
+            canGoForward = false,
+            onPreviousMonth = {},
+            onNextMonth = {},
+            streak = emptyList(),
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -97,21 +111,29 @@ private fun HeroNoBudgetPreview() {
 private fun HeroPastMonthPreview() {
     MoneyFlowPreviewTheme {
         HeroBalanceCard(
-            data = previewData(month = YearMonth.of(2026, 6), spent = 1_410_00, previous = 1_180_00),
+            data = previewData(month = YearMonth.of(2026, 6), spent = 1_410_00),
             pace = null,
+            canGoForward = false,
+            onPreviousMonth = {},
+            onNextMonth = {},
+            streak = emptyList(),
             modifier = Modifier.fillMaxWidth(),
         )
     }
 }
 
-/** First month of use: nothing to compare against, so the delta reads "Sin datos" rather than 100%. */
+/** First month of use: no income recorded yet, so the balance goes negative and takes its red. */
 @Preview(name = "Hero · no history", group = "dashboard")
 @Composable
 private fun HeroNoHistoryPreview() {
     MoneyFlowPreviewTheme {
         HeroBalanceCard(
-            data = previewData(spent = 120_00, income = 0, previous = 0),
+            data = previewData(spent = 120_00, income = 0),
             pace = previewPace(spent = 120_00, budget = null),
+            canGoForward = false,
+            onPreviousMonth = {},
+            onNextMonth = {},
+            streak = emptyList(),
             modifier = Modifier.fillMaxWidth(),
         )
     }

@@ -32,15 +32,13 @@ class GetDashboardUseCase @Inject constructor(
     operator fun invoke(month: YearMonth = YearMonth.now(clock)): Flow<DashboardData> {
         val monthStart = month.atDay(1)
         val monthEnd = month.atEndOfMonth()
-        val previous = month.minusMonths(1)
 
         return combine(
             transactionRepository.observeBetween(monthStart, monthEnd),
-            transactionRepository.observeBetween(previous.atDay(1), previous.atEndOfMonth()),
             transactionRepository.observeAll(),
             categoryRepository.observeAll(),
             settingsRepository.preferences,
-        ) { monthTx, previousTx, allTx, categories, prefs ->
+        ) { monthTx, allTx, categories, prefs ->
             val today = LocalDate.now(clock)
             // One definition of "total del mes": what was actually spent, pending excluded.
             // Pending rows already surface separately (committed/nudge); counting them here both
@@ -83,9 +81,6 @@ class GetDashboardUseCase @Inject constructor(
                 monthIncomeMinor = monthIncome,
                 monthTransactionCount = monthTx.size,
                 monthPendingMinor = monthPending,
-                previousMonthSpentMinor = previousTx
-                    .filter { it.type == TransactionType.EXPENSE && it.status == TransactionStatus.PAID }
-                    .sumOf { it.amountMinor },
                 largestExpense = expenses.maxByOrNull { it.amountMinor },
                 recent = allTx.sortedByDescending { it.createdAt }.take(6),
                 categoryBreakdown = breakdown,

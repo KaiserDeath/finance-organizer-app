@@ -15,8 +15,6 @@ data class DashboardData(
     val monthTransactionCount: Int = 0,
     /** Committed-but-unpaid expense total for [month] — kept out of [monthSpentMinor] on purpose. */
     val monthPendingMinor: Long = 0,
-    /** Expense total for the month before [month], so the hero can show a real comparison. */
-    val previousMonthSpentMinor: Long = 0,
     /** The single biggest expense in [month] — a high-signal, one-line fact. */
     val largestExpense: Transaction? = null,
     val recent: List<Transaction>,
@@ -25,17 +23,6 @@ data class DashboardData(
     val categoriesById: Map<String, Category>,
     val currencyCode: String,
 ) {
-    /** Signed change vs the previous month; positive means more was spent. */
-    val spendDeltaMinor: Long get() = monthSpentMinor - previousMonthSpentMinor
-
-    /** Change as a fraction of the previous month, or null when there's nothing to compare against. */
-    val spendDeltaFraction: Float?
-        get() = if (previousMonthSpentMinor > 0) {
-            spendDeltaMinor.toFloat() / previousMonthSpentMinor
-        } else {
-            null
-        }
-
     val balanceMinor: Long get() = monthIncomeMinor - monthSpentMinor
 
     companion object {
