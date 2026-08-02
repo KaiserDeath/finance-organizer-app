@@ -23,23 +23,29 @@ import androidx.compose.material.icons.rounded.CurrencyExchange
 import androidx.compose.material.icons.rounded.EventRepeat
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.theme.Spacing
+import pe.moneyflow.core.model.ThemeMode
 
 private data class SettingsItem(
     val icon: ImageVector,
@@ -58,13 +64,14 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenCategories: () -> Unit,
     onOpenCurrency: () -> Unit,
-    onOpenAppearance: () -> Unit,
     onOpenRecurring: () -> Unit,
     onOpenBackup: () -> Unit,
     onOpenSecurity: () -> Unit,
     onOpenLegal: () -> Unit,
     modifier: Modifier = Modifier,
+    appearanceViewModel: AppearanceViewModel = hiltViewModel(),
 ) {
+    val appearance by appearanceViewModel.uiState.collectAsStateWithLifecycle()
     val appItems = listOf(
         SettingsItem(
             Icons.Rounded.Category,
@@ -77,12 +84,6 @@ fun SettingsScreen(
             "Moneda",
             "Moneda base y tipos de cambio",
             onOpenCurrency,
-        ),
-        SettingsItem(
-            Icons.Rounded.Palette,
-            "Apariencia",
-            "Tema, modo oscuro y color dinámico",
-            onOpenAppearance,
         ),
     )
     val dataItems = listOf(
@@ -139,17 +140,28 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.xl),
         ) {
             item(key = "app") {
-                SettingsSection(label = "La app", items = appItems)
+                // The theme picker used to be a row leading to a screen that held nothing else.
+                // It is three mutually exclusive options, so it fits where it is decided.
+                SettingsGroup(label = "La app") {
+                    ThemeCard(
+                        selected = appearance.themeMode,
+                        onSelect = appearanceViewModel::setThemeMode,
+                    )
+                    SettingsCard(items = appItems)
+                }
             }
             item(key = "data") {
-                SettingsSection(label = "Tus datos", items = dataItems)
+                SettingsGroup(label = "Tus datos") {
+                    SettingsCard(items = dataItems)
+                }
             }
         }
     }
 }
 
+/** A labelled group. Holds one or more cards, so a control can sit beside the rows it belongs with. */
 @Composable
-private fun SettingsSection(label: String, items: List<SettingsItem>) {
+private fun SettingsGroup(label: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(
             text = label,
@@ -157,18 +169,56 @@ private fun SettingsSection(label: String, items: List<SettingsItem>) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = Spacing.xs),
         )
-        MoneyCard(
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(vertical = Spacing.xs),
-        ) {
-            items.forEachIndexed { index, item ->
-                SettingsRow(item)
-                if (index < items.lastIndex) {
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        modifier = Modifier.padding(start = 68.dp),
-                    )
-                }
+        content()
+    }
+}
+
+@Composable
+private fun SettingsCard(items: List<SettingsItem>) {
+    MoneyCard(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(vertical = Spacing.xs),
+    ) {
+        items.forEachIndexed { index, item ->
+            SettingsRow(item)
+            if (index < items.lastIndex) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(start = 68.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeCard(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
+    MoneyCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(Spacing.lg)) {
+        Text(
+            text = "Tema",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = "Elige claro, oscuro o seguir el sistema.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = Spacing.md),
+        )
+        // No dynamic-color switch: the brand palette is the app's identity, not a preference.
+        // See MoneyFlowTheme's KDoc for why it was removed.
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            val modes = listOf(
+                ThemeMode.SYSTEM to "Sistema",
+                ThemeMode.LIGHT to "Claro",
+                ThemeMode.DARK to "Oscuro",
+            )
+            modes.forEachIndexed { index, (mode, label) ->
+                SegmentedButton(
+                    selected = selected == mode,
+                    onClick = { onSelect(mode) },
+                    shape = SegmentedButtonDefaults.itemShape(index, modes.size),
+                ) { Text(label) }
             }
         }
     }

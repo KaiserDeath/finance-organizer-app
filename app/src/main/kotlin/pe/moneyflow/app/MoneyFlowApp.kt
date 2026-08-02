@@ -60,7 +60,6 @@ import pe.moneyflow.app.backup.BackupScreen
 import pe.moneyflow.app.money.MoneyScreen
 import pe.moneyflow.app.security.SecurityScreen
 import pe.moneyflow.app.legal.LegalScreen
-import pe.moneyflow.app.settings.AppearanceScreen
 import pe.moneyflow.app.settings.SettingsScreen
 import pe.moneyflow.feature.accounts.AccountsRoute
 import pe.moneyflow.feature.accounts.accountsScreen
@@ -104,9 +103,6 @@ data object BackupRoute
 data object SecurityRoute
 
 @Serializable
-data object AppearanceRoute
-
-@Serializable
 data object LegalRoute
 
 internal enum class TopLevelDestination(
@@ -123,7 +119,9 @@ internal enum class TopLevelDestination(
         Icons.AutoMirrored.Rounded.ReceiptLong,
         "Movimientos",
     ),
-    ANALYTICS(AnalyticsRoute, "Análisis", Icons.Rounded.BarChart, "Análisis y reportes"),
+    // Title is not "Análisis y reportes": the monthly report left this screen for its own
+    // destination, so the bar would be promising something the screen no longer holds.
+    ANALYTICS(AnalyticsRoute, "Análisis", Icons.Rounded.BarChart, "Análisis"),
     // Budgets left the bar: its headline number now shows on the "Tu dinero" row without entering,
     // which was the argument that promoted it in the first place — and four tabs keep the bar
     // legible on 5-inch screens. It stacks under Tu dinero (and under Inicio's "Ver todo") instead.
@@ -332,6 +330,7 @@ fun MoneyFlowApp(
             upcomingScreen(
                 onPaymentClick = { id -> navController.navigateToMovementDetail(id) },
                 onOpenRecurring = { navController.navigate(RecurringRoute) },
+                onBack = { navController.popBackStack() },
             )
             composable<MoneyRoute> {
                 MoneyScreen(
@@ -348,7 +347,6 @@ fun MoneyFlowApp(
                     onBack = { navController.popBackStack() },
                     onOpenCategories = { navController.navigate(CategoriesRoute) },
                     onOpenCurrency = { navController.navigate(CurrencyRoute) },
-                    onOpenAppearance = { navController.navigate(AppearanceRoute) },
                     onOpenRecurring = { navController.navigate(RecurringRoute) },
                     onOpenBackup = { navController.navigate(BackupRoute) },
                     onOpenSecurity = { navController.navigate(SecurityRoute) },
@@ -369,7 +367,6 @@ fun MoneyFlowApp(
             )
             monthlyReportScreen(onBack = { navController.popBackStack() })
             currencyScreen(onBack = { navController.popBackStack() })
-            composable<AppearanceRoute> { AppearanceScreen(onBack = { navController.popBackStack() }) }
             composable<BackupRoute> { BackupScreen(onBack = { navController.popBackStack() }) }
             composable<SecurityRoute> { SecurityScreen(onBack = { navController.popBackStack() }) }
             composable<LegalRoute> { LegalScreen(onBack = { navController.popBackStack() }) }

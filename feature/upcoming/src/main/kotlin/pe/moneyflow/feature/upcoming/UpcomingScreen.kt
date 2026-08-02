@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.EventAvailable
+import androidx.compose.material.icons.rounded.EventRepeat
+import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -30,7 +32,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -71,6 +73,7 @@ import pe.moneyflow.core.ui.util.toShortLabel
 fun UpcomingScreen(
     onPaymentClick: (String) -> Unit,
     onOpenRecurring: () -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: UpcomingViewModel = hiltViewModel(),
 ) {
@@ -127,6 +130,23 @@ fun UpcomingScreen(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        // A stacked destination gets no bar from the shell, so it owns one — which is also where
+        // the link to the schedule belongs. Análisis reaches its report the same way.
+        topBar = {
+            TopAppBar(
+                title = { Text("Próximos") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onOpenRecurring) {
+                        Icon(Icons.Rounded.EventRepeat, contentDescription = "Pagos recurrentes")
+                    }
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -158,18 +178,6 @@ fun UpcomingScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(Spacing.lg),
                 ) {
-                    item {
-                        // Title moved to the shell's app bar; the link to the schedule behind this
-                        // timeline stays here, right-aligned where it was.
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            TextButton(onClick = onOpenRecurring) { Text("Recurrentes") }
-                        }
-                    }
-
                     uiState.sections.forEach { section ->
                         item(key = "header-${section.bucket}") {
                             SectionHeaderRow(
@@ -372,7 +380,8 @@ private fun UpcomingRow(
             color = titleColor,
         )
         // Pagar opens the pay sheet for every pending row — the sheet itself explains when the
-        // method has no app to launch, instead of the affordance silently disappearing.
+        // method has no app to launch, instead of the affordance silently disappearing. The glyph
+        // is Payments, not OpenInNew: a cash row leaves this app for nothing.
         FilledTonalIconButton(
             onClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -380,7 +389,7 @@ private fun UpcomingRow(
             },
             modifier = Modifier.padding(start = Spacing.sm),
         ) {
-            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = "Pagar")
+            Icon(Icons.Rounded.Payments, contentDescription = "Pagar")
         }
         // Only real rows can be marked paid — there is no id to settle on a projection, and the
         // deep-link path above is the one place a forecast turns into ledger data.
