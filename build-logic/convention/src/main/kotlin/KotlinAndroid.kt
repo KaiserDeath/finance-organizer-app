@@ -18,6 +18,11 @@ internal fun Project.configureKotlinAndroid(
 
         defaultConfig {
             minSdk = 26
+            // Without this, library instrumented tests compile, package, and run *nothing* —
+            // `connectedAndroidTest` reports BUILD SUCCESSFUL with tests="0". Only :app declared a
+            // runner, so core:ui's accessibility suite had never executed despite being written as
+            // a regression guard.
+            testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         }
 
         compileOptions {

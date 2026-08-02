@@ -23,6 +23,8 @@ dependencies {
     // Instrumented UI tests: these exist specifically to hold the accessibility fixes in place
     // (48dp touch targets, amount reflow at large font scale, real clickable affordances).
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.espresso.core)
+    androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

@@ -43,6 +43,24 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
                 // Every feature ViewModel test needs MainDispatcherRule; wiring it here keeps that
                 // from being re-declared (or forgotten) in each feature's build file.
                 add("testImplementation", project(":core:testing"))
+
+                // Compose UI tests. Feature modules are where composition-level defects live —
+                // a section rendering when it should not, an action offered twice — and those are
+                // invisible to a ViewModel test, which never composes anything.
+                add("androidTestImplementation", libs.findLibrary("androidx-junit").get())
+                add(
+                    "androidTestImplementation",
+                    libs.findLibrary("androidx-test-espresso-core").get(),
+                )
+                add("androidTestImplementation", libs.findLibrary("androidx-test-runner").get())
+                add(
+                    "androidTestImplementation",
+                    libs.findLibrary("androidx-compose-ui-test-junit4").get(),
+                )
+                add(
+                    "debugImplementation",
+                    libs.findLibrary("androidx-compose-ui-test-manifest").get(),
+                )
             }
         }
     }
