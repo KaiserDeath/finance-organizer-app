@@ -22,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -30,8 +29,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import pe.moneyflow.core.designsystem.theme.HeroTintDark
-import pe.moneyflow.core.designsystem.theme.HeroTintLight
 import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Spacing
 
@@ -70,27 +67,6 @@ fun MoneyCard(
         shadowElevation = shadowElevation,
     ) {
         Column(modifier = Modifier.padding(contentPadding), content = content)
-    }
-}
-
-/** A translucent, frosted-looking card for hero/summary surfaces (glassmorphism-lite). */
-@Composable
-fun GlassCard(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    // Resolve light/dark by the actual surface luminance so this stays correct under both a
-    // forced theme and Material You dynamic color — but the tint itself is a fixed brand color.
-    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-    Surface(
-        modifier = modifier,
-        shape = MaterialTheme.shapes.extraLarge,
-        color = if (isDark) HeroTintDark else HeroTintLight,
-        tonalElevation = 0.dp,
-        shadowElevation = 6.dp,
-    ) {
-        // Spacing.xxl against the 28dp extraLarge radius, for the same reason as MoneyCard.
-        Column(modifier = Modifier.padding(Spacing.xxl), content = content)
     }
 }
 

@@ -32,7 +32,6 @@ import pe.moneyflow.core.designsystem.component.DonutChart
 import pe.moneyflow.core.designsystem.component.DonutSlice
 import pe.moneyflow.core.designsystem.component.EmptyState
 import pe.moneyflow.core.designsystem.component.ErrorState
-import pe.moneyflow.core.designsystem.component.GlassCard
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.component.SectionHeader
 import pe.moneyflow.core.designsystem.component.ShimmerBox
@@ -226,14 +225,6 @@ private fun StatTilePreview() {
 private fun CardsPreview() {
     MoneyFlowPreviewTheme {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-            GlassCard(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    "Gastado este mes",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text("S/ 1,240.50", style = MaterialTheme.typography.displayMedium)
-            }
             MoneyCard(modifier = Modifier.fillMaxWidth(), shadowElevation = 0.dp) {
                 Text("MoneyCard", style = MaterialTheme.typography.titleMedium)
                 Text(

@@ -217,14 +217,6 @@ val MaterialTheme.brandSurface: BrandSurfaceColors
     get() = LocalBrandSurface.current
 
 /**
- * Fixed brand tint for the dashboard hero ([pe.moneyflow.core.designsystem.component.GlassCard]).
- * Deliberately *not* sourced from the color scheme so Material You / dynamic color can't repaint
- * the hero with a saturated wallpaper color — it only adapts light↔dark for legibility.
- */
-val HeroTintLight = Color(0xFFE7E6FB) // calm pale indigo
-val HeroTintDark = Color(0xFF262450)  // muted deep indigo
-
-/**
  * Fallback palette used to color category slices/chips when a stored hex is missing, cycled as
  * `CategoryPalette[index % size]`.
  *
