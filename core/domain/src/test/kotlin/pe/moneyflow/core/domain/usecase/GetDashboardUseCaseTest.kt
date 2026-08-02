@@ -106,4 +106,5 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setMonthlyBudget(minor: Long?) = Unit
     override suspend fun setActiveMethodIds(ids: Set<String>?) = Unit
     override suspend fun setShortcuts(shortcuts: List<pe.moneyflow.core.model.QuickShortcut>) = Unit
+    override suspend fun setAmountsHidden(hidden: Boolean) = Unit
 }
