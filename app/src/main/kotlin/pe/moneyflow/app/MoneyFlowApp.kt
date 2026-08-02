@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Assessment
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
@@ -15,6 +16,7 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
@@ -49,8 +51,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlinx.serialization.Serializable
 import pe.moneyflow.core.designsystem.component.pressScale
-import pe.moneyflow.core.ui.util.toMonthTitle
-import java.time.LocalDate
 import pe.moneyflow.app.backup.BackupScreen
 import pe.moneyflow.app.money.MoneyScreen
 import pe.moneyflow.app.security.SecurityScreen
@@ -64,7 +64,9 @@ import pe.moneyflow.feature.addedit.movementDetailScreen
 import pe.moneyflow.feature.addedit.navigateToAddEdit
 import pe.moneyflow.feature.addedit.navigateToMovementDetail
 import pe.moneyflow.feature.analytics.AnalyticsRoute
+import pe.moneyflow.feature.analytics.MonthlyReportRoute
 import pe.moneyflow.feature.analytics.analyticsScreen
+import pe.moneyflow.feature.analytics.monthlyReportScreen
 import pe.moneyflow.feature.currency.CurrencyRoute
 import pe.moneyflow.feature.currency.currencyScreen
 import pe.moneyflow.feature.budgets.BudgetsRoute
@@ -212,18 +214,25 @@ fun MoneyFlowApp(
         modifier = if (isTopLevel) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
         else Modifier,
         topBar = {
-            if (topLevel != null) {
-                // The dashboard's bar carries the *month*, not "Inicio". The bottom nav already says
-                // "Inicio" and highlights it, so repeating it in the app bar spends the most prominent
-                // text on the screen restating what's directly below it. The month is the context the
-                // user actually needs, and it's where a month selector belongs later.
-                val barTitle = if (topLevel == TopLevelDestination.DASHBOARD) {
-                    LocalDate.now().toMonthTitle()
-                } else {
-                    topLevel.title
-                }
+            // The dashboard has no app bar: its hero header *is* the top of the screen, and it owns
+            // the month selector. The bar used to print the month too, which both duplicated the
+            // selector right below it and lied — it read `LocalDate.now()`, so stepping back a month
+            // left the title on the current one.
+            if (topLevel != null && topLevel != TopLevelDestination.DASHBOARD) {
                 MediumTopAppBar(
-                    title = { Text(barTitle) },
+                    title = { Text(topLevel.title) },
+                    actions = {
+                        // Análisis leads with the overrun card; the monthly report is a place you go
+                        // on purpose, so it lives here rather than in a tab competing with it.
+                        if (topLevel == TopLevelDestination.ANALYTICS) {
+                            IconButton(onClick = { navController.navigate(MonthlyReportRoute) }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Assessment,
+                                    contentDescription = "Reporte mensual",
+                                )
+                            }
+                        }
+                    },
                     scrollBehavior = scrollBehavior,
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent,
@@ -339,6 +348,7 @@ fun MoneyFlowApp(
                 onAdjustBudget = { id -> navController.navigate(BudgetsRoute(editBudgetId = id)) },
                 onSeeExpenses = { id -> navController.navigate(TransactionsRoute(categoryId = id)) },
             )
+            monthlyReportScreen(onBack = { navController.popBackStack() })
             currencyScreen(onBack = { navController.popBackStack() })
             composable<AppearanceRoute> { AppearanceScreen(onBack = { navController.popBackStack() }) }
             composable<BackupRoute> { BackupScreen(onBack = { navController.popBackStack() }) }
