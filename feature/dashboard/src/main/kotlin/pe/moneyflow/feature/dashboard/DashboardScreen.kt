@@ -67,6 +67,8 @@ fun DashboardScreen(
     onTransactionClick: (String) -> Unit,
     onOpenUpcoming: () -> Unit,
     onOpenBudgets: () -> Unit,
+    onAddExpense: () -> Unit,
+    onOpenShortcuts: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
@@ -99,6 +101,8 @@ fun DashboardScreen(
             onTransactionClick = onTransactionClick,
             onOpenUpcoming = onOpenUpcoming,
             onOpenBudgets = onOpenBudgets,
+            onAddExpense = onAddExpense,
+            onOpenShortcuts = onOpenShortcuts,
             onPreviousMonth = viewModel::showPreviousMonth,
             onNextMonth = viewModel::showNextMonth,
             onShortcut = onShortcut,
@@ -114,6 +118,8 @@ private fun DashboardContent(
     onTransactionClick: (String) -> Unit,
     onOpenUpcoming: () -> Unit,
     onOpenBudgets: () -> Unit,
+    onAddExpense: () -> Unit,
+    onOpenShortcuts: () -> Unit,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onShortcut: (QuickShortcut) -> Unit,
@@ -148,12 +154,32 @@ private fun DashboardContent(
                 onNextMonth = onNextMonth,
                 streak = if (state.isLoading) emptyList() else state.streak,
                 onOpenBudgets = onOpenBudgets,
+                isFirstRun = state.isFirstRun,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
 
         if (state.isLoading) {
             item { LoadingSkeleton(modifier = sidePadding) }
+            return@LazyColumn
+        }
+
+        // A ledger with nothing in it has one useful screen: the one that asks for the first entry.
+        // Everything below is a variation on "empty", and three of them stacked read as a broken
+        // app rather than a new one.
+        if (state.isFirstRun) {
+            item {
+                FirstRunCard(
+                    onAddExpense = onAddExpense,
+                    modifier = sidePadding.fillMaxWidth(),
+                )
+            }
+            item {
+                ShortcutsPendingLine(
+                    onOpenShortcuts = onOpenShortcuts,
+                    modifier = sidePadding.fillMaxWidth(),
+                )
+            }
             return@LazyColumn
         }
 
@@ -174,7 +200,12 @@ private fun DashboardContent(
             // headline feature that is simply absent, with no trace, is indistinguishable from one
             // that was never built. Past months are excluded: shortcuts are deliberately empty there
             // and log to *today*, so the explanation would be nonsense.
-            item { ShortcutsEmptyCard(modifier = sidePadding.fillMaxWidth()) }
+            item {
+                ShortcutsEmptyCard(
+                    onOpenShortcuts = onOpenShortcuts,
+                    modifier = sidePadding.fillMaxWidth(),
+                )
+            }
         }
 
         state.upcomingNudge?.let { nudge ->

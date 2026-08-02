@@ -61,6 +61,7 @@ import pe.moneyflow.app.money.MoneyScreen
 import pe.moneyflow.app.security.SecurityScreen
 import pe.moneyflow.app.legal.LegalScreen
 import pe.moneyflow.app.settings.SettingsScreen
+import pe.moneyflow.app.settings.ShortcutsScreen
 import pe.moneyflow.feature.accounts.AccountsRoute
 import pe.moneyflow.feature.accounts.accountsScreen
 import pe.moneyflow.feature.addedit.addEditScreen
@@ -101,6 +102,9 @@ data object BackupRoute
 
 @Serializable
 data object SecurityRoute
+
+@Serializable
+data object ShortcutsRoute
 
 @Serializable
 data object LegalRoute
@@ -322,6 +326,8 @@ fun MoneyFlowApp(
                 onOpenUpcoming = { navController.navigate(UpcomingRoute) },
                 // Plain navigate(): budgets is a stacked destination now, so it gets a back arrow.
                 onOpenBudgets = { navController.navigate(BudgetsRoute()) },
+                onAddExpense = { navController.navigateToAddEdit() },
+                onOpenShortcuts = { navController.navigate(ShortcutsRoute) },
             )
             transactionsScreen(
                 onTransactionClick = { id -> navController.navigateToMovementDetail(id) },
@@ -347,6 +353,7 @@ fun MoneyFlowApp(
                     onBack = { navController.popBackStack() },
                     onOpenCategories = { navController.navigate(CategoriesRoute) },
                     onOpenCurrency = { navController.navigate(CurrencyRoute) },
+                    onOpenShortcuts = { navController.navigate(ShortcutsRoute) },
                     onOpenRecurring = { navController.navigate(RecurringRoute) },
                     onOpenBackup = { navController.navigate(BackupRoute) },
                     onOpenSecurity = { navController.navigate(SecurityRoute) },
@@ -367,6 +374,7 @@ fun MoneyFlowApp(
             )
             monthlyReportScreen(onBack = { navController.popBackStack() })
             currencyScreen(onBack = { navController.popBackStack() })
+            composable<ShortcutsRoute> { ShortcutsScreen(onBack = { navController.popBackStack() }) }
             composable<BackupRoute> { BackupScreen(onBack = { navController.popBackStack() }) }
             composable<SecurityRoute> { SecurityScreen(onBack = { navController.popBackStack() }) }
             composable<LegalRoute> { LegalScreen(onBack = { navController.popBackStack() }) }

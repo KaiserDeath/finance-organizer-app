@@ -72,6 +72,23 @@ data class DashboardUiState(
 ) {
     val isCurrentMonth: Boolean get() = data.month == YearMonth.now()
 
+    /**
+     * Nothing has ever been logged, and we are looking at the month where that can be fixed.
+     *
+     * Inicio otherwise greets a new user with four zeros and two separate explanations of the same
+     * emptiness — the band's projection and budget bar collapse, the shortcuts card explains a
+     * 30-day rule, and the movements card says there are no movements — while the one thing to do
+     * (the FAB) is the smallest element on screen. This collapses all of that into one ask.
+     *
+     * `monthSpentMinor` is checked alongside `recent` because the recent list is capped: a month
+     * with spend but nothing in the window is not a first run.
+     */
+    val isFirstRun: Boolean
+        get() = !isLoading &&
+            isCurrentMonth &&
+            data.recent.isEmpty() &&
+            data.monthSpentMinor == 0L
+
     /** Whether an earlier month can be reached; the app has no data before its first transaction. */
     val canGoBack: Boolean get() = true
 

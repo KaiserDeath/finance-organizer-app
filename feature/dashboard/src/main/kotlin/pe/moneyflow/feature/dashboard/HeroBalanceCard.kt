@@ -83,6 +83,7 @@ fun HeroBalanceCard(
     onNextMonth: () -> Unit,
     streak: List<StreakDay>,
     onOpenBudgets: () -> Unit,
+    isFirstRun: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val brand = MaterialTheme.brandSurface
@@ -155,22 +156,34 @@ fun HeroBalanceCard(
             }
 
             // ---- Balance ------------------------------------------------------------------------
+            // On a first run the balance is a third zero under two others, and "Balance S/ 0.00"
+            // is not the answer to a screen the user has not fed yet. One line saying what the
+            // first entry unlocks takes its place.
             Spacer(Modifier.height(Spacing.md))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
+            if (isFirstRun) {
                 Text(
-                    text = "Balance",
-                    style = MaterialTheme.typography.labelLarge,
+                    text = "Tu primer gasto pone en marcha el resto: el ritmo, el presupuesto " +
+                        "y la racha.",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = onBandMuted,
                 )
-                Text(
-                    text = Money.format(data.balanceMinor, data.currencyCode),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = onBand,
-                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "Balance",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = onBandMuted,
+                    )
+                    Text(
+                        text = Money.format(data.balanceMinor, data.currencyCode),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = onBand,
+                    )
+                }
             }
 
             // ---- Streak, inside the band ---------------------------------------------------------

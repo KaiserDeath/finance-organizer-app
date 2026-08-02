@@ -183,6 +183,41 @@ class DashboardViewModelTest {
         assertTrue(state.topBudgets.isEmpty())
     }
 
+    /**
+     * The first-run collapse replaces three cards with one ask, so it has to be exactly right about
+     * when it applies: too eager and it hides a real ledger.
+     */
+    @Test
+    fun `an empty current month is a first run`() = runTest {
+        val state = viewModel().uiState.first { !it.isLoading }
+
+        assertTrue(state.isFirstRun)
+    }
+
+    @Test
+    fun `one movement ends the first run`() = runTest {
+        val repo = FakeTransactionRepository(listOf(expense("a", 5_000, today)))
+
+        val state = viewModel(repo).uiState.first { !it.isLoading }
+
+        assertEquals(false, state.isFirstRun)
+    }
+
+    /**
+     * An empty *past* month is just an empty past month — the card asks for a first expense and the
+     * FAB it points at would date that expense today, on a different month than the one on screen.
+     */
+    @Test
+    fun `an empty past month is not a first run`() = runTest {
+        val repo = FakeTransactionRepository(listOf(expense("a", 5_000, today)))
+        val vm = viewModel(repo)
+
+        vm.showPreviousMonth()
+        val state = vm.uiState.first { !it.isLoading && !it.isCurrentMonth }
+
+        assertEquals(false, state.isFirstRun)
+    }
+
     @Test
     fun `forward navigation stops at the current month`() = runTest {
         val vm = viewModel()

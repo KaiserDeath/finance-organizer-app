@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CurrencyExchange
@@ -64,6 +65,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenCategories: () -> Unit,
     onOpenCurrency: () -> Unit,
+    onOpenShortcuts: () -> Unit,
     onOpenRecurring: () -> Unit,
     onOpenBackup: () -> Unit,
     onOpenSecurity: () -> Unit,
@@ -84,6 +86,12 @@ fun SettingsScreen(
             "Moneda",
             "Moneda base y tipos de cambio",
             onOpenCurrency,
+        ),
+        SettingsItem(
+            Icons.Rounded.Bolt,
+            "Atajos de un toque",
+            "Elige tus gastos más frecuentes",
+            onOpenShortcuts,
         ),
     )
     val dataItems = listOf(
