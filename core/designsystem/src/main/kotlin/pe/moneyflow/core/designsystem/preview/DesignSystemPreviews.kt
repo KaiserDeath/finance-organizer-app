@@ -27,7 +27,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import pe.moneyflow.core.designsystem.component.BarChart
-import pe.moneyflow.core.designsystem.component.CumulativeLineChart
 import pe.moneyflow.core.designsystem.component.BarChartEntry
 import pe.moneyflow.core.designsystem.component.DonutChart
 import pe.moneyflow.core.designsystem.component.DonutSlice
@@ -374,23 +373,6 @@ private fun IllustrationsPreview() {
                 }
             }
         }
-    }
-}
-
-/** The cash-flow curve: solid current month, dashed previous, shared y-ceiling. */
-@ThemePreviews
-@Composable
-private fun CumulativeLineChartPreview() {
-    MoneyFlowPreviewTheme {
-        // 18 days in, running ahead of a full 30-day previous month.
-        val previous = (1..30).runningFold(0L) { acc, d -> acc + 40_00 + (d % 5) * 9_00 }.drop(1)
-        val current = (1..18).runningFold(0L) { acc, d -> acc + 55_00 + (d % 4) * 11_00 }.drop(1)
-        CumulativeLineChart(
-            current = current,
-            previous = previous,
-            peakMinor = maxOf(current.max(), previous.max()),
-            contentDescription = "Ritmo de gasto acumulado.",
-        )
     }
 }
 

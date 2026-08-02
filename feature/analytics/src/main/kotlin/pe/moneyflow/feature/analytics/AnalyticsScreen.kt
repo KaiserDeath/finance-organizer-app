@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarMonth
@@ -33,22 +35,18 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,11 +72,11 @@ import pe.moneyflow.core.designsystem.component.ShimmerBox
 import pe.moneyflow.core.designsystem.component.StatTile
 import pe.moneyflow.core.designsystem.theme.CategoryPalette
 import pe.moneyflow.core.designsystem.theme.moneyColors
+import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.AnalyticsData
 import pe.moneyflow.core.domain.model.BudgetProgress
-import pe.moneyflow.core.domain.model.CumulativeSpend
 import pe.moneyflow.core.domain.model.CategoryDelta
 import pe.moneyflow.core.domain.model.Insight
 import pe.moneyflow.core.domain.model.MonthlyReport
@@ -95,49 +93,16 @@ fun AnalyticsScreen(
     viewModel: AnalyticsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Remembering which export the user asked for is what lets a failure offer a real "Reintentar"
-    // instead of just reporting itself. Errors used to surface as a Toast, which is both a legacy
-    // look and a dead end — there was nothing to act on.
-    var lastExport by remember { mutableStateOf<(() -> Unit)?>(null) }
-
-    LaunchedEffect(viewModel) {
-        viewModel.eventFlow.collectLatest { event ->
-            when (event) {
-                is AnalyticsEvent.ShareCsv -> runShare(snackbarHostState, lastExport) {
-                    CsvExporter.share(context, event.csv, event.fileName)
-                }
-
-                is AnalyticsEvent.SharePdf -> runShare(snackbarHostState, lastExport) {
-                    PdfReportExporter.share(context, event.report, event.fileName)
-                }
-
-                is AnalyticsEvent.ExportFailed ->
-                    snackbarHostState.showRetryable(event.message, lastExport)
-
-                // Retrying an empty month would fail identically, so this one is informational only.
-                AnalyticsEvent.NothingToExport ->
-                    snackbarHostState.showSnackbar("No hay movimientos para exportar este mes")
-            }
-        }
-    }
-
+    // No export handling here: exporting moved to MonthlyReportScreen along with the report itself,
+    // and this screen has no action that can raise an AnalyticsEvent.
     AnalyticsContent(
         state = uiState,
         onBack = onBack,
         onAdjustBudget = onAdjustBudget,
         onSeeExpenses = onSeeExpenses,
         snackbarHostState = snackbarHostState,
-        onExportCsv = {
-            lastExport = viewModel::exportCurrentMonth
-            viewModel.exportCurrentMonth()
-        },
-        onExportPdf = {
-            lastExport = viewModel::exportPdfReport
-            viewModel.exportPdfReport()
-        },
         modifier = modifier,
     )
 }
@@ -176,12 +141,8 @@ private fun AnalyticsContent(
     onAdjustBudget: (String) -> Unit,
     onSeeExpenses: (String) -> Unit,
     snackbarHostState: SnackbarHostState,
-    onExportCsv: () -> Unit,
-    onExportPdf: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-
     Scaffold(
         modifier = modifier,
         containerColor = Color.Transparent,
@@ -215,30 +176,20 @@ private fun AnalyticsContent(
         // The screen opens with where you overspent and what to do about it, not with a chart:
         // a number that doesn't lead anywhere is noise formatted as data.
         val worst = state.worstOverrun
-        if (!state.isLoading && worst != null) {
+        if (!state.isLoading) {
             item(key = "worst-overrun") {
-                WorstOverrunCard(
-                    progress = worst,
-                    onAdjustBudget = { onAdjustBudget(worst.budget.id) },
-                    onSeeExpenses = worst.budget.categoryId?.let { id -> { onSeeExpenses(id) } },
-                )
-            }
-        }
-
-        item {
-            // PrimaryTabRow supersedes TabRow in M3: it carries the current full-width indicator
-            // treatment and animates between tabs, which plain TabRow no longer does.
-            PrimaryTabRow(selectedTabIndex = selectedTab, containerColor = Color.Transparent) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text("Tendencias") },
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text("Reporte") },
-                )
+                if (worst != null) {
+                    WorstOverrunCard(
+                        progress = worst,
+                        onAdjustBudget = { onAdjustBudget(worst.budget.id) },
+                        onSeeExpenses = worst.budget.categoryId?.let { id -> { onSeeExpenses(id) } },
+                    )
+                } else {
+                    // Says so rather than collapsing. When this slot rendered nothing, the screen
+                    // opened on summary tiles and read as though the actionable card had never been
+                    // built — the absence of bad news is itself the answer this screen owes you.
+                    NoOverrunCard()
+                }
             }
         }
 
@@ -247,17 +198,94 @@ private fun AnalyticsContent(
             return@LazyColumn
         }
 
-        if (selectedTab == 0) {
-            trendsTab(state.analytics, state.cumulative, state.insights)
-        } else {
-            reportTab(
-                report = state.report,
-                isExporting = state.isExporting,
-                onExportCsv = onExportCsv,
-                onExportPdf = onExportPdf,
-            )
+        // The monthly report used to be the second half of a `Tendencias | Reporte` tab pair. The
+        // tabs were removed: they put a navigation layer above the one card on this screen that is
+        // meant to lead, and the prototype has no tab row here. The report is now a stacked
+        // destination behind the app bar's action — a place you deliberately go, not a mode this
+        // screen sits in half the time.
+        trendsTab(state.analytics, state.insights)
+    }
+    }
+}
+
+/**
+ * The monthly report, as a destination rather than a tab.
+ *
+ * Reuses [AnalyticsViewModel] — the report, the export state and the share events all already live
+ * there, and a second ViewModel would duplicate the export pipeline to save recomputing figures this
+ * screen ignores. The cost is that opening the report also spins up the trends/budgets/insights
+ * flows; worth splitting if this screen ever gets heavier.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MonthlyReportScreen(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: AnalyticsViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    var lastExport by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    LaunchedEffect(viewModel) {
+        viewModel.eventFlow.collectLatest { event ->
+            when (event) {
+                is AnalyticsEvent.ShareCsv -> runShare(snackbarHostState, lastExport) {
+                    CsvExporter.share(context, event.csv, event.fileName)
+                }
+
+                is AnalyticsEvent.SharePdf -> runShare(snackbarHostState, lastExport) {
+                    PdfReportExporter.share(context, event.report, event.fileName)
+                }
+
+                is AnalyticsEvent.ExportFailed ->
+                    snackbarHostState.showRetryable(event.message, lastExport)
+
+                AnalyticsEvent.NothingToExport ->
+                    snackbarHostState.showSnackbar("No hay movimientos para exportar este mes")
+            }
         }
     }
+
+    Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Reporte mensual") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentPadding = PaddingValues(
+                start = Spacing.lg,
+                end = Spacing.lg,
+                top = Spacing.md,
+                bottom = 96.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            reportTab(
+                report = uiState.report,
+                isExporting = uiState.isExporting,
+                onExportCsv = {
+                    lastExport = viewModel::exportCurrentMonth
+                    viewModel.exportCurrentMonth()
+                },
+                onExportPdf = {
+                    lastExport = viewModel::exportPdfReport
+                    viewModel.exportPdfReport()
+                },
+            )
+        }
     }
 }
 
@@ -322,13 +350,40 @@ private fun WorstOverrunCard(
     }
 }
 
+/** The "nothing is over its limit" counterpart to [WorstOverrunCard]. */
+@Composable
+private fun NoOverrunCard() {
+    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Rounded.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.moneyColors.positive,
+                modifier = Modifier.size(IconSize.md),
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Column {
+                Text(
+                    text = "Ningún límite excedido",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Todas tus categorías están dentro de su presupuesto este mes.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Trends tab
 // ---------------------------------------------------------------------------------------------
 
 private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(
     data: AnalyticsData,
-    cumulative: CumulativeSpend,
     insights: List<Insight>,
 ) {
     val hasData = data.totalExpenseMinor > 0 || data.totalIncomeMinor > 0
@@ -347,15 +402,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(
     }
 
     item { SummaryStatRow(data) }
-    // Leads the tab: direction of travel is the most actionable thing here, and it's the only chart
-    // that answers "am I ahead of last month right now?" while the month can still be changed.
-    if (cumulative.hasData) {
-        item { CashFlowCard(cumulative = cumulative, modifier = Modifier.fillMaxWidth()) }
-    }
-    item { MonthlyTrendCard(data) }
+    // Breakdown before the historical charts: the prototype's Análisis leads with the month total and
+    // where it went, because that is what a category limit gets adjusted against. The month-over-month
+    // cash-flow curve that used to lead here was removed — the user sessions found the comparison
+    // against last month irrelevant, the same finding that took the delta out of the hero.
     if (data.categoryBreakdown.isNotEmpty()) {
         item { CategoryBreakdownCard(data) }
     }
+    item { MonthlyTrendCard(data) }
     item { WeekdayCard(data) }
     // Sugerencias landed here from the old Más drawer: an insight is a number with an action
     // behind it, which is this screen's whole premise.

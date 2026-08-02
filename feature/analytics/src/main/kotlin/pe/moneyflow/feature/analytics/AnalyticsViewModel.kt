@@ -13,13 +13,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import pe.moneyflow.core.domain.model.AnalyticsData
 import pe.moneyflow.core.domain.model.BudgetProgress
-import pe.moneyflow.core.domain.model.CumulativeSpend
 import pe.moneyflow.core.domain.model.Insight
 import pe.moneyflow.core.domain.model.MonthlyReport
 import pe.moneyflow.core.domain.usecase.ExportTransactionsCsvUseCase
 import pe.moneyflow.core.domain.usecase.GetAnalyticsUseCase
 import pe.moneyflow.core.domain.usecase.GetBudgetsProgressUseCase
-import pe.moneyflow.core.domain.usecase.GetCumulativeSpendUseCase
 import pe.moneyflow.core.domain.usecase.GetInsightsUseCase
 import pe.moneyflow.core.domain.usecase.GetMonthlyReportUseCase
 import java.time.YearMonth
@@ -29,8 +27,6 @@ data class AnalyticsUiState(
     val isLoading: Boolean = true,
     val analytics: AnalyticsData = AnalyticsData.Empty,
     val report: MonthlyReport = MonthlyReport.empty(YearMonth.now()),
-    /** Day-by-day running totals for the cash-flow curve, this month against last. */
-    val cumulative: CumulativeSpend = CumulativeSpend.empty(YearMonth.now()),
     /** The budget the user overran the most — what the screen opens with, when there is one. */
     val worstOverrun: BudgetProgress? = null,
     val insights: List<Insight> = emptyList(),
@@ -50,7 +46,6 @@ sealed interface AnalyticsEvent {
 class AnalyticsViewModel @Inject constructor(
     getAnalytics: GetAnalyticsUseCase,
     getMonthlyReport: GetMonthlyReportUseCase,
-    getCumulativeSpend: GetCumulativeSpendUseCase,
     getBudgetsProgress: GetBudgetsProgressUseCase,
     getInsights: GetInsightsUseCase,
     private val exportCsv: ExportTransactionsCsvUseCase,
@@ -64,18 +59,15 @@ class AnalyticsViewModel @Inject constructor(
     // Analytics absorbed Sugerencias: an insight is a number with an action behind it, which is
     // exactly what this screen is for — two separate places to look was one too many.
     val uiState: StateFlow<AnalyticsUiState> = combine(
-        combine(getAnalytics(), getMonthlyReport(), getCumulativeSpend()) { a, r, c ->
-            Triple(a, r, c)
-        },
+        combine(getAnalytics(), getMonthlyReport()) { a, r -> a to r },
         getBudgetsProgress(),
         getInsights(),
         exporting,
-    ) { (analytics, report, cumulative), budgets, insights, isExporting ->
+    ) { (analytics, report), budgets, insights, isExporting ->
         AnalyticsUiState(
             isLoading = false,
             analytics = analytics,
             report = report,
-            cumulative = cumulative,
             worstOverrun = budgets
                 .filter { it.isOverBudget }
                 .maxByOrNull { it.spentMinor - it.budget.amountMinor },
