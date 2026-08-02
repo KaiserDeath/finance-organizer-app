@@ -105,13 +105,57 @@ class AnalyticsViewModelTest {
     }
 
     @Test
-    fun `no budget over its limit leaves the actionable slot empty`() = runTest {
+    fun `no budget over its limit means no overrun, but still something to watch`() = runTest {
         val state = viewModel(
             transactions = listOf(expense("lunch", "comida", 5_000)),
             budgets = listOf(budget("b1", "comida", 50_000)),
         ).uiState.first { !it.isLoading }
 
         assertNull(state.worstOverrun)
+        assertEquals("b1", state.closestToLimit?.budget?.id)
+    }
+
+    /**
+     * "Closest" is the highest *fraction* of its limit, not the biggest spend: a budget at 90% of
+     * S/ 1,000 is closer to trouble than one at 10% of S/ 500, despite spending nine times more.
+     */
+    @Test
+    fun `closest to the limit is the highest fraction, not the biggest spend`() = runTest {
+        val state = viewModel(
+            transactions = listOf(
+                expense("rent", "alquiler", 90_000),
+                expense("lunch", "comida", 5_000),
+            ),
+            budgets = listOf(budget("b1", "comida", 50_000), budget("b2", "alquiler", 100_000)),
+        ).uiState.first { !it.isLoading }
+
+        assertEquals("b2", state.closestToLimit?.budget?.id)
+    }
+
+    /** An overrun is the other card's job — it must not also show up as the thing to watch. */
+    @Test
+    fun `a budget already over its limit is not the closest to it`() = runTest {
+        val state = viewModel(
+            transactions = listOf(
+                expense("rent", "alquiler", 110_000),
+                expense("lunch", "comida", 5_000),
+            ),
+            budgets = listOf(budget("b1", "comida", 50_000), budget("b2", "alquiler", 100_000)),
+        ).uiState.first { !it.isLoading }
+
+        assertEquals("b2", state.worstOverrun?.budget?.id)
+        assertEquals("b1", state.closestToLimit?.budget?.id)
+    }
+
+    /** No budgets at all is a third state: nothing to watch, so the card keeps plain reassurance. */
+    @Test
+    fun `no budgets at all leaves nothing to watch`() = runTest {
+        val state = viewModel(
+            transactions = listOf(expense("lunch", "comida", 5_000)),
+        ).uiState.first { !it.isLoading }
+
+        assertNull(state.worstOverrun)
+        assertNull(state.closestToLimit)
     }
 
     @Test

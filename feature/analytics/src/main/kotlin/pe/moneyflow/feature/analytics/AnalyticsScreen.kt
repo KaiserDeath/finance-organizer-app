@@ -67,6 +67,7 @@ import pe.moneyflow.core.designsystem.component.DonutSlice
 import pe.moneyflow.core.designsystem.component.EmptyState
 import pe.moneyflow.core.designsystem.illustration.Illustration
 import pe.moneyflow.core.designsystem.component.MoneyCard
+import pe.moneyflow.core.designsystem.component.MoneyProgressBar
 import pe.moneyflow.core.designsystem.component.SectionHeader
 import pe.moneyflow.core.designsystem.component.ShimmerBox
 import pe.moneyflow.core.designsystem.component.StatTile
@@ -188,7 +189,19 @@ private fun AnalyticsContent(
                     // Says so rather than collapsing. When this slot rendered nothing, the screen
                     // opened on summary tiles and read as though the actionable card had never been
                     // built — the absence of bad news is itself the answer this screen owes you.
-                    NoOverrunCard()
+                    //
+                    // But "nothing is over" alone occupied the most privileged slot on the screen
+                    // while offering nothing to do, which is the charge that demoted the card
+                    // before it. It leads with whatever is closest to its limit, so the "two taps
+                    // to act" rule holds in both states.
+                    val closest = state.closestToLimit
+                    NoOverrunCard(
+                        closest = closest,
+                        onAdjustBudget = closest?.let { p -> { onAdjustBudget(p.budget.id) } },
+                        onSeeExpenses = closest?.budget?.categoryId?.let { id ->
+                            { onSeeExpenses(id) }
+                        },
+                    )
                 }
             }
         }
@@ -350,29 +363,100 @@ private fun WorstOverrunCard(
     }
 }
 
-/** The "nothing is over its limit" counterpart to [WorstOverrunCard]. */
+/**
+ * The "nothing is over its limit" counterpart to [WorstOverrunCard].
+ *
+ * Leads with the good news, then hands over the budget closest to its limit and the same two exits
+ * [WorstOverrunCard] offers. With no budgets at all there is nothing to watch, so it keeps the
+ * plain reassurance.
+ */
 @Composable
-private fun NoOverrunCard() {
+private fun NoOverrunCard(
+    closest: BudgetProgress?,
+    onAdjustBudget: (() -> Unit)?,
+    onSeeExpenses: (() -> Unit)?,
+) {
+    // Same thresholds as BudgetMiniRow — one bar meaning one thing across the app.
+    val barColor = when {
+        closest == null -> MaterialTheme.colorScheme.primary
+        closest.isNearLimit -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.primary
+    }
+
     MoneyCard(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = Icons.Rounded.CheckCircle,
                 contentDescription = null,
                 tint = MaterialTheme.moneyColors.positive,
-                modifier = Modifier.size(IconSize.md),
+                modifier = Modifier.size(IconSize.sm),
             )
-            Spacer(Modifier.width(Spacing.md))
-            Column {
-                Text(
-                    text = "Ningún límite excedido",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "Todas tus categorías están dentro de su presupuesto este mes.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Spacer(Modifier.width(Spacing.sm))
+            Text(
+                text = "Ningún límite excedido",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.moneyColors.positive,
+            )
+        }
+
+        if (closest == null) {
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                text = "Todas tus categorías están dentro de su presupuesto este mes.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@MoneyCard
+        }
+
+        Spacer(Modifier.height(Spacing.lg))
+        Text(
+            text = "Lo más cerca del límite",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(
+                text = closest.category?.name ?: closest.budget.name,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "${closest.percentUsed}%",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = barColor,
+            )
+        }
+        Spacer(Modifier.height(Spacing.xs))
+        val daysLeft = LocalDate.now().let { it.lengthOfMonth() - it.dayOfMonth }
+        Text(
+            text = "${Money.format(closest.spentMinor, closest.currencyCode)} de " +
+                "${Money.format(closest.budget.amountMinor, closest.currencyCode)} · " +
+                "quedan $daysLeft día(s) de este mes.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        MoneyProgressBar(fraction = closest.fraction, color = barColor, height = 6.dp)
+        Spacer(Modifier.height(Spacing.lg))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            if (onAdjustBudget != null) {
+                Button(
+                    onClick = onAdjustBudget,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) { Text("Ajustar el límite") }
+            }
+            if (onSeeExpenses != null) {
+                OutlinedButton(
+                    onClick = onSeeExpenses,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) { Text("Ver esos gastos") }
             }
         }
     }

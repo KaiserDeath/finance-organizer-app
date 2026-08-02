@@ -147,6 +147,7 @@ private fun DashboardContent(
                 onPreviousMonth = onPreviousMonth,
                 onNextMonth = onNextMonth,
                 streak = if (state.isLoading) emptyList() else state.streak,
+                onOpenBudgets = onOpenBudgets,
                 modifier = Modifier.fillMaxWidth(),
             )
         }

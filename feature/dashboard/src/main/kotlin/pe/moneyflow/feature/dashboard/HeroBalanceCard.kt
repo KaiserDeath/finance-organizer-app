@@ -2,6 +2,7 @@ package pe.moneyflow.feature.dashboard
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -25,6 +27,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import pe.moneyflow.core.common.Money
@@ -77,6 +82,7 @@ fun HeroBalanceCard(
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     streak: List<StreakDay>,
+    onOpenBudgets: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val brand = MaterialTheme.brandSurface
@@ -141,7 +147,11 @@ fun HeroBalanceCard(
             val budgetMinor = pace?.monthBudgetMinor
             if (budgetMinor != null) {
                 Spacer(Modifier.height(Spacing.md))
-                HeroProgressBar(pace = pace, currencyCode = data.currencyCode)
+                HeroProgressBar(
+                    pace = pace,
+                    currencyCode = data.currencyCode,
+                    onOpenBudgets = onOpenBudgets,
+                )
             }
 
             // ---- Balance ------------------------------------------------------------------------
@@ -181,9 +191,14 @@ fun HeroBalanceCard(
  * a **marker at the "on pace" point** so the bar shows two things at once — where you are, and where
  * you should be by today if the budget were spread evenly. A bar past the marker means you're ahead
  * of schedule even when still under the limit, which is the earliest possible warning.
+ *
+ * The whole block opens Presupuestos. These are the most consequential numbers on Inicio and they
+ * were the only ones with no exit — the budget they measure against was editable everywhere except
+ * from the bar drawing it. No new destination: `BudgetsRoute` is already stacked and already
+ * reachable from the Presupuestos card further down.
  */
 @Composable
-private fun HeroProgressBar(pace: SpendingPace, currencyCode: String) {
+private fun HeroProgressBar(pace: SpendingPace, currencyCode: String, onOpenBudgets: () -> Unit) {
     val brand = MaterialTheme.brandSurface
     val onBand = brand.content
     val mutedColor = brand.mutedContent
@@ -191,8 +206,31 @@ private fun HeroProgressBar(pace: SpendingPace, currencyCode: String) {
     val expectedFraction = (pace.elapsedDays.toFloat() / pace.daysInMonth).coerceIn(0f, 1f)
     val alert = brand.alert
     val barColor = if (pace.isOverBudget || pace.isProjectedOverBudget) alert else onBand
+    val percentUsed = ((pace.budgetFraction ?: 0f) * 100).roundToInt()
+    val remaining = pace.remainingBudgetMinor
+    // One label for the block: a reader using TalkBack gets the verdict, not four orphan fragments.
+    val label = buildString {
+        append("$percentUsed% del presupuesto usado")
+        if (remaining != null) {
+            append(
+                if (remaining >= 0) {
+                    ", quedan ${Money.format(remaining, currencyCode)}"
+                } else {
+                    ", excedido por ${Money.format(abs(remaining), currencyCode)}"
+                },
+            )
+        }
+        append(". Abrir presupuestos.")
+    }
 
-    Column {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Spacing.md))
+            .clickable(onClick = onOpenBudgets, role = Role.Button)
+            .heightIn(min = 48.dp)
+            .semantics(mergeDescendants = true) { contentDescription = label },
+    ) {
         Text(
             text = "de ${Money.format(pace.monthBudgetMinor ?: 0L, currencyCode)} presupuestado",
             style = MaterialTheme.typography.bodyMedium,
@@ -212,11 +250,10 @@ private fun HeroProgressBar(pace: SpendingPace, currencyCode: String) {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = "${((pace.budgetFraction ?: 0f) * 100).roundToInt()}% usado",
+                text = "$percentUsed% usado",
                 style = MaterialTheme.typography.labelMedium,
                 color = barColor,
             )
-            val remaining = pace.remainingBudgetMinor
             if (remaining != null) {
                 Text(
                     text = if (remaining >= 0) {
