@@ -77,8 +77,14 @@ class BudgetsViewModel @Inject constructor(
     /** The budget as it was before the last edit, for the snackbar's deshacer. */
     private var editedPrevious: Budget? = null
 
-    /** Same idea for the month budget, whose "clear" is destructive enough to need a way back. */
-    private var previousMonthlyBudget: Long? = null
+    /**
+     * Same idea for the month budget, whose "clear" is destructive enough to need a way back.
+     *
+     * Boxed rather than a bare `Long?` because null is a *legitimate stashed value* — undoing a
+     * first-ever set means going back to having none. A bare nullable cannot tell "nothing to undo"
+     * from "undo to nothing", and a second undo then cleared the budget instead of doing nothing.
+     */
+    private var previousMonthlyBudget: MonthBudgetUndo? = null
 
     val uiState: StateFlow<BudgetsUiState> =
         combine(
@@ -160,13 +166,16 @@ class BudgetsViewModel @Inject constructor(
      * screen's roll-up. All three simply never appeared, with nothing explaining why.
      */
     fun setMonthlyBudget(minor: Long?) {
-        previousMonthlyBudget = uiState.value.monthlyBudgetMinor
+        previousMonthlyBudget = MonthBudgetUndo(uiState.value.monthlyBudgetMinor)
         viewModelScope.launch { settingsRepository.setMonthlyBudget(minor) }
     }
 
     fun undoMonthlyBudget() {
-        val previous = previousMonthlyBudget
+        val previous = previousMonthlyBudget ?: return
         previousMonthlyBudget = null
-        viewModelScope.launch { settingsRepository.setMonthlyBudget(previous) }
+        viewModelScope.launch { settingsRepository.setMonthlyBudget(previous.minor) }
     }
+
+    /** Box so "nothing stashed" stays distinguishable from "stashed a null". */
+    private data class MonthBudgetUndo(val minor: Long?)
 }

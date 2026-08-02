@@ -2,9 +2,11 @@ package pe.moneyflow.feature.budgets
 
 import androidx.lifecycle.SavedStateHandle
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -31,12 +33,13 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 
 /**
- * The month-allocation roll-up: how much of the month's budget has been handed to categories, how
- * much is still unassigned, and how much spending no budget is watching.
+ * The month-allocation roll-up — how much of the month's budget has been handed to categories, how
+ * much is still unassigned, how much spending no budget is watching — and the editing of the month
+ * budget itself.
  *
- * Tested here rather than on screen because the roll-up only renders when a month budget exists, and
- * that value can currently only be set during onboarding — an installed app that skipped the step
- * has no way to produce the state at all.
+ * The roll-up arithmetic is tested rather than eyeballed because it is derived from three sources at
+ * once. The editing is tested because its undo has no symptom beyond a snackbar: nothing on screen
+ * distinguishes "undo restored the old amount" from "undo quietly did the wrong thing".
  */
 class BudgetsViewModelTest {
 
@@ -82,11 +85,13 @@ class BudgetsViewModelTest {
         budgets: List<Budget> = emptyList(),
         transactions: List<Transaction> = emptyList(),
         monthlyBudgetMinor: Long? = 200_000,
+        settings: FakeSettingsRepository = FakeSettingsRepository(
+            monthlyBudgetMinor = monthlyBudgetMinor,
+        ),
     ): BudgetsViewModel {
         val txRepo = FakeTransactionRepository(transactions)
         val catRepo = FakeCategoryRepository(listOf(comida, transporte, ocio))
         val budgetRepo = FakeBudgetRepository(budgets)
-        val settings = FakeSettingsRepository(monthlyBudgetMinor = monthlyBudgetMinor)
         return BudgetsViewModel(
             savedStateHandle = SavedStateHandle(),
             getBudgetsProgress = GetBudgetsProgressUseCase(
@@ -199,5 +204,107 @@ class BudgetsViewModelTest {
         assertTrue("this is exactly when 'you have assigned none of it' is worth saying", state.hasRollup)
         assertTrue(state.isEmpty)
         assertEquals(200_000L, state.unassignedMinor)
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // Editing the month budget. Until this existed the value could only be written by onboarding,
+    // so these cover the path that made it recoverable — and its undo, which has no UI symptom
+    // beyond the snackbar and so cannot be confirmed by looking.
+    // -----------------------------------------------------------------------------------------
+
+    @Test
+    fun `setting the month budget persists it`() = runTest {
+        val settings = FakeSettingsRepository(monthlyBudgetMinor = null)
+        val vm = viewModel(settings = settings)
+
+        vm.setMonthlyBudget(200_000)
+        advanceUntilIdle()
+
+        assertEquals(200_000L, settings.current.monthlyBudgetMinor)
+    }
+
+    @Test
+    fun `undo restores the previous amount after a change`() = runTest {
+        val settings = FakeSettingsRepository(monthlyBudgetMinor = 200_000)
+        val vm = viewModel(settings = settings)
+        vm.uiState.first { !it.isLoading }
+
+        vm.setMonthlyBudget(350_000)
+        advanceUntilIdle()
+        assertEquals(350_000L, settings.current.monthlyBudgetMinor)
+
+        vm.undoMonthlyBudget()
+        advanceUntilIdle()
+
+        assertEquals(200_000L, settings.current.monthlyBudgetMinor)
+    }
+
+    /** Clearing is the destructive path, so putting the amount back is the whole point of the undo. */
+    @Test
+    fun `undo restores the amount after clearing`() = runTest {
+        val settings = FakeSettingsRepository(monthlyBudgetMinor = 200_000)
+        val vm = viewModel(settings = settings)
+        vm.uiState.first { !it.isLoading }
+
+        vm.setMonthlyBudget(null)
+        advanceUntilIdle()
+        assertNull(settings.current.monthlyBudgetMinor)
+
+        vm.undoMonthlyBudget()
+        advanceUntilIdle()
+
+        assertEquals(200_000L, settings.current.monthlyBudgetMinor)
+    }
+
+    /**
+     * Undoing a *first* set returns to having none — the state really was null before, and the UI
+     * correspondingly does not offer undo on that path.
+     */
+    @Test
+    fun `undo after the first ever set clears it again`() = runTest {
+        val settings = FakeSettingsRepository(monthlyBudgetMinor = null)
+        val vm = viewModel(settings = settings)
+        vm.uiState.first { !it.isLoading }
+
+        vm.setMonthlyBudget(200_000)
+        advanceUntilIdle()
+        vm.undoMonthlyBudget()
+        advanceUntilIdle()
+
+        assertNull(settings.current.monthlyBudgetMinor)
+    }
+
+    @Test
+    fun `undo is a one-shot — a second call cannot re-apply it`() = runTest {
+        val settings = FakeSettingsRepository(monthlyBudgetMinor = 200_000)
+        val vm = viewModel(settings = settings)
+        vm.uiState.first { !it.isLoading }
+
+        vm.setMonthlyBudget(350_000)
+        advanceUntilIdle()
+        vm.undoMonthlyBudget()
+        advanceUntilIdle()
+        vm.undoMonthlyBudget()
+        advanceUntilIdle()
+
+        assertEquals(
+            "a second undo must not re-apply the value the first one reverted",
+            200_000L,
+            settings.current.monthlyBudgetMinor,
+        )
+    }
+
+    @Test
+    fun `the new amount reaches the roll-up`() = runTest {
+        val settings = FakeSettingsRepository(monthlyBudgetMinor = null)
+        val vm = viewModel(budgets = listOf(budget("b1", "comida", 60_000)), settings = settings)
+        assertFalse(vm.uiState.first { !it.isLoading }.hasRollup)
+
+        vm.setMonthlyBudget(200_000)
+        advanceUntilIdle()
+
+        val state = vm.uiState.first { !it.isLoading }
+        assertTrue(state.hasRollup)
+        assertEquals(140_000L, state.unassignedMinor)
     }
 }

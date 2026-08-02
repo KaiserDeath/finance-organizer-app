@@ -100,8 +100,16 @@ class FakeSmartInsights(private val items: List<Insight> = emptyList()) : SmartI
 }
 
 /**
- * Preferences are a *value* here, not a store: what a test needs is "given a monthly budget of X" or
- * "given these shortcuts", and the setters are never the thing under test.
+ * Preferences as a store, seeded from the constructor.
+ *
+ * The constructor arguments are still how a test says "given a monthly budget of X" — that is what
+ * most callers need and none of them changed. But the setters are real, because they stopped being
+ * incidental: the monthly budget can now be edited from Presupuestos, so "did the ViewModel actually
+ * persist it, and does undo put the old value back" is the behaviour under test. A no-op setter
+ * would have let both pass while doing nothing.
+ *
+ * [current] is the direct read, matching how [FakeTransactionRepository] exposes its rows — asserting
+ * on the store is steadier than re-collecting a `WhileSubscribed` state flow to observe a write.
  */
 class FakeSettingsRepository(
     monthlyBudgetMinor: Long? = null,
@@ -109,7 +117,7 @@ class FakeSettingsRepository(
     currencyCode: String = "PEN",
     activeMethodIds: Set<String>? = null,
 ) : SettingsRepository {
-    override val preferences: Flow<UserPreferences> = flowOf(
+    private val store = MutableStateFlow(
         UserPreferences(
             currencyCode = currencyCode,
             monthlyBudgetMinor = monthlyBudgetMinor,
@@ -118,14 +126,36 @@ class FakeSettingsRepository(
         ),
     )
 
-    override suspend fun setThemeMode(mode: ThemeMode) = Unit
-    override suspend fun setCurrency(code: String) = Unit
-    override suspend fun setOnboardingComplete(complete: Boolean) = Unit
+    val current: UserPreferences get() = store.value
+
+    override val preferences: Flow<UserPreferences> = store
+
+    override suspend fun setThemeMode(mode: ThemeMode) {
+        store.value = store.value.copy(themeMode = mode)
+    }
+
+    override suspend fun setCurrency(code: String) {
+        store.value = store.value.copy(currencyCode = code)
+    }
+
+    override suspend fun setOnboardingComplete(complete: Boolean) {
+        store.value = store.value.copy(onboardingComplete = complete)
+    }
+
     override suspend fun setPinHash(hash: String?) = Unit
     override suspend fun setBiometricEnabled(enabled: Boolean) = Unit
-    override suspend fun setMonthlyBudget(minor: Long?) = Unit
-    override suspend fun setActiveMethodIds(ids: Set<String>?) = Unit
-    override suspend fun setShortcuts(shortcuts: List<QuickShortcut>) = Unit
+
+    override suspend fun setMonthlyBudget(minor: Long?) {
+        store.value = store.value.copy(monthlyBudgetMinor = minor)
+    }
+
+    override suspend fun setActiveMethodIds(ids: Set<String>?) {
+        store.value = store.value.copy(activeMethodIds = ids)
+    }
+
+    override suspend fun setShortcuts(shortcuts: List<QuickShortcut>) {
+        store.value = store.value.copy(shortcuts = shortcuts)
+    }
 }
 
 class FakeAccountRepository(private val items: List<Account> = emptyList()) : AccountRepository {
