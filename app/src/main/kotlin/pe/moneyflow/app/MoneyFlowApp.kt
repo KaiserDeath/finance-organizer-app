@@ -215,9 +215,15 @@ fun MoneyFlowApp(
     ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        // Only the top-level bar participates in scroll; nested screens manage themselves.
-        modifier = if (isTopLevel) Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
-        else Modifier,
+        // Only destinations that actually have a collapsing bar participate in scroll. Inicio must
+        // be excluded now that it draws none: exitUntilCollapsed consumes the scroll delta to
+        // collapse a bar, and with no bar to collapse it swallowed the gesture outright, leaving
+        // the dashboard unable to scroll at all.
+        modifier = if (isTopLevel && topLevel != TopLevelDestination.DASHBOARD) {
+            Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        } else {
+            Modifier
+        },
         // Inicio draws its brand band under the status bar, so it must not be inset from the top —
         // it applies `statusBarsPadding()` to the band's *content* instead, which is what puts the
         // colour behind the clock. Every other destination keeps the default.
