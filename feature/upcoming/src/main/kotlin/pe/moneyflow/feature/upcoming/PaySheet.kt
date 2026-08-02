@@ -42,6 +42,7 @@ import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.domain.model.UpcomingPayment
 import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.ui.util.toShortLabel
+import pe.moneyflow.core.ui.util.money
 
 /**
  * The pay flow: amount, due date, and the method — then the user actually pays, instead of the
@@ -97,7 +98,7 @@ internal fun PaySheet(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = Money.format(tx.amountMinor, tx.currencyCode),
+                    text = money(tx.amountMinor, tx.currencyCode),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -132,36 +133,13 @@ internal fun PaySheet(
                 }
             }
 
-            if (methods.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Text(
-                        text = "Método de pago",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        methods.forEach { method ->
-                            val hasApp = !method.deepLinkPackage.isNullOrBlank()
-                            FilterChip(
-                                selected = method.id == selectedId,
-                                onClick = { selectedId = method.id },
-                                label = { Text(method.name) },
-                                leadingIcon = if (hasApp) {
-                                    {
-                                        Icon(
-                                            Icons.Rounded.Smartphone,
-                                            contentDescription = "Tiene app",
-                                            modifier = Modifier.padding(0.dp),
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                            )
-                        }
-                    }
-                }
-            }
+            MethodPicker(
+                methods = methods,
+                selectedId = selectedId,
+                onSelect = { selectedId = it },
+                suggestionNote = methods.firstOrNull { it.id == suggestedMethodId }
+                    ?.let { "Usaste ${it.name} la última vez." },
+            )
 
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 if (selected != null && selectedHasApp) {
@@ -211,6 +189,132 @@ internal fun PaySheet(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Settle several overdue payments at once, with one method and one undo.
+ *
+ * Deliberately has no "abrir la app" path. Launching a bank app once cannot pay N bills, and the
+ * return-from-app handler settles exactly what it was waiting on — offering it here would claim the
+ * batch was paid because one app was opened. This records payments the user has already made.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun PayBatchSheet(
+    payments: List<UpcomingPayment>,
+    methods: List<PaymentMethod>,
+    suggestedMethodId: String?,
+    currencyCode: String,
+    onSettleAll: (PaymentMethod?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selectedId by remember { mutableStateOf(suggestedMethodId ?: methods.firstOrNull()?.id) }
+    val selected = methods.firstOrNull { it.id == selectedId }
+    val totalMinor = payments.sumOf { it.transaction.amountMinor }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Column {
+                Text(
+                    text = "${payments.size} pagos vencidos",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = money(totalMinor, currencyCode),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                // Names them: "3 pagos" is a number, and the user is about to write all three to
+                // the ledger under one undo.
+                Text(
+                    text = payments.joinToString(" · ") { it.transaction.title },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            MethodPicker(
+                methods = methods,
+                selectedId = selectedId,
+                onSelect = { selectedId = it },
+                suggestionNote = "Se registra el mismo método en los ${payments.size}.",
+            )
+
+            Button(
+                onClick = { onSettleAll(selected) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(IconSize.sm),
+                )
+                Spacer(Modifier.size(Spacing.sm))
+                Text("Registrar ${payments.size} pagos")
+            }
+        }
+    }
+}
+
+/** The method chips, shared by [PaySheet] and [PayBatchSheet] so both explain the choice the same way. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MethodPicker(
+    methods: List<PaymentMethod>,
+    selectedId: String?,
+    onSelect: (String) -> Unit,
+    suggestionNote: String?,
+) {
+    if (methods.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(
+            text = "Método de pago",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            methods.forEach { method ->
+                val hasApp = !method.deepLinkPackage.isNullOrBlank()
+                FilterChip(
+                    selected = method.id == selectedId,
+                    onClick = { onSelect(method.id) },
+                    label = { Text(method.name) },
+                    leadingIcon = if (hasApp) {
+                        {
+                            Icon(
+                                Icons.Rounded.Smartphone,
+                                contentDescription = "Tiene app",
+                                modifier = Modifier.padding(0.dp),
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                )
+            }
+        }
+        // The preselection is not arbitrary and not a default: settling records the method, so the
+        // suggestion is the user's own last answer for this payment. It was improving with use
+        // entirely invisibly, which reads as the app guessing.
+        if (suggestionNote != null) {
+            Text(
+                text = suggestionNote,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

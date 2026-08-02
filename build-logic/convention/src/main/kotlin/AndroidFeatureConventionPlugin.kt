@@ -47,12 +47,10 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
                 // Compose UI tests. Feature modules are where composition-level defects live —
                 // a section rendering when it should not, an action offered twice — and those are
                 // invisible to a ViewModel test, which never composes anything.
-                add("androidTestImplementation", libs.findLibrary("androidx-junit").get())
-                add(
-                    "androidTestImplementation",
-                    libs.findLibrary("androidx-test-espresso-core").get(),
-                )
-                add("androidTestImplementation", libs.findLibrary("androidx-test-runner").get())
+                //
+                // Only the Compose-specific half lives here; the runner, espresso and androidx
+                // junit come from `moneyflow.android.library`, which is where the runner is
+                // declared.
                 add(
                     "androidTestImplementation",
                     libs.findLibrary("androidx-compose-ui-test-junit4").get(),

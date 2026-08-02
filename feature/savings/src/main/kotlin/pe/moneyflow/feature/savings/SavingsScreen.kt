@@ -74,6 +74,7 @@ import pe.moneyflow.core.designsystem.component.SkeletonBlocks
 import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.model.SavingsGoal
+import pe.moneyflow.core.ui.util.money
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -198,7 +199,7 @@ private fun OverallCard(savedMinor: Long, targetMinor: Long, currencyCode: Strin
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = "${Money.format(savedMinor, currencyCode)} / ${Money.format(targetMinor, currencyCode)}",
+            text = "${money(savedMinor, currencyCode)} / ${money(targetMinor, currencyCode)}",
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -279,7 +280,7 @@ private fun GoalCard(
                         text = if (goal.isComplete) {
                             "¡Meta alcanzada!"
                         } else {
-                            "Faltan ${Money.format(goal.remainingMinor, currencyCode)}"
+                            "Faltan ${money(goal.remainingMinor, currencyCode)}"
                         },
                         style = MaterialTheme.typography.labelMedium,
                         color = if (goal.isComplete) MaterialTheme.moneyColors.positive else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -303,7 +304,7 @@ private fun GoalCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "${Money.format(goal.currentAmountMinor, currencyCode)} de ${Money.format(goal.targetAmountMinor, currencyCode)}",
+                    text = "${money(goal.currentAmountMinor, currencyCode)} de ${money(goal.targetAmountMinor, currencyCode)}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

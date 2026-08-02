@@ -3,6 +3,7 @@ package pe.moneyflow.app.widget
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import pe.moneyflow.core.domain.repository.SettingsRepository
 import pe.moneyflow.core.domain.usecase.GetDashboardUseCase
 
 /**
@@ -13,4 +14,7 @@ import pe.moneyflow.core.domain.usecase.GetDashboardUseCase
 @InstallIn(SingletonComponent::class)
 interface WidgetEntryPoint {
     fun getDashboardUseCase(): GetDashboardUseCase
+
+    /** Discreet mode has to reach the widget too — a home screen is the most public surface here. */
+    fun settingsRepository(): SettingsRepository
 }

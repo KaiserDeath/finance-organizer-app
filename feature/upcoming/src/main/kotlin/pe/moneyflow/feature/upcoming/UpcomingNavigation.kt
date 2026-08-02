@@ -10,8 +10,13 @@ data object UpcomingRoute
 fun NavGraphBuilder.upcomingScreen(
     onPaymentClick: (String) -> Unit,
     onOpenRecurring: () -> Unit,
+    onBack: () -> Unit,
 ) {
     composable<UpcomingRoute> {
-        UpcomingScreen(onPaymentClick = onPaymentClick, onOpenRecurring = onOpenRecurring)
+        UpcomingScreen(
+            onPaymentClick = onPaymentClick,
+            onOpenRecurring = onOpenRecurring,
+            onBack = onBack,
+        )
     }
 }

@@ -33,6 +33,8 @@ import androidx.core.view.WindowCompat
 @Composable
 fun MoneyFlowTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    /** Discreet mode. Lives here so every amount inherits it; see [LocalAmountsHidden]. */
+    amountsHidden: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = if (darkTheme) DarkColors else LightColors
@@ -54,6 +56,7 @@ fun MoneyFlowTheme(
     CompositionLocalProvider(
         LocalMoneyColors provides moneyColors,
         LocalBrandSurface provides brandSurface,
+        LocalAmountsHidden provides amountsHidden,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

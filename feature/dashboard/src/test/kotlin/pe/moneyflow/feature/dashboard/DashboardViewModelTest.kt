@@ -80,12 +80,12 @@ class DashboardViewModelTest {
         repo: FakeTransactionRepository = FakeTransactionRepository(),
         shortcuts: List<QuickShortcut> = emptyList(),
         monthlyBudgetMinor: Long? = null,
-    ): DashboardViewModel {
-        val catRepo = FakeCategoryRepository(listOf(comida))
-        val settings = FakeSettingsRepository(
+        settings: FakeSettingsRepository = FakeSettingsRepository(
             monthlyBudgetMinor = monthlyBudgetMinor,
             shortcuts = shortcuts,
-        )
+        ),
+    ): DashboardViewModel {
+        val catRepo = FakeCategoryRepository(listOf(comida))
         return DashboardViewModel(
             getDashboard = GetDashboardUseCase(repo, catRepo, settings, clock),
             getUpcoming = GetUpcomingPaymentsUseCase(
@@ -181,6 +181,59 @@ class DashboardViewModelTest {
         assertTrue(state.streak.isEmpty())
         assertTrue("logging a shortcut would date it today, not to the month on screen", state.shortcuts.isEmpty())
         assertTrue(state.topBudgets.isEmpty())
+    }
+
+    /**
+     * The first-run collapse replaces three cards with one ask, so it has to be exactly right about
+     * when it applies: too eager and it hides a real ledger.
+     */
+    @Test
+    fun `an empty current month is a first run`() = runTest {
+        val state = viewModel().uiState.first { !it.isLoading }
+
+        assertTrue(state.isFirstRun)
+    }
+
+    @Test
+    fun `one movement ends the first run`() = runTest {
+        val repo = FakeTransactionRepository(listOf(expense("a", 5_000, today)))
+
+        val state = viewModel(repo).uiState.first { !it.isLoading }
+
+        assertEquals(false, state.isFirstRun)
+    }
+
+    /**
+     * An empty *past* month is just an empty past month — the card asks for a first expense and the
+     * FAB it points at would date that expense today, on a different month than the one on screen.
+     */
+    @Test
+    fun `an empty past month is not a first run`() = runTest {
+        val repo = FakeTransactionRepository(listOf(expense("a", 5_000, today)))
+        val vm = viewModel(repo)
+
+        vm.showPreviousMonth()
+        val state = vm.uiState.first { !it.isLoading && !it.isCurrentMonth }
+
+        assertEquals(false, state.isFirstRun)
+    }
+
+    /**
+     * Discreet mode is persisted, not held in the ViewModel, so the toggle has to reach the store —
+     * a flag kept in memory would look identical until the app restarted.
+     */
+    @Test
+    fun `toggling discreet mode writes through to settings`() = runTest {
+        val settings = FakeSettingsRepository()
+        val vm = viewModel(settings = settings)
+
+        vm.toggleAmountsHidden()
+        advanceUntilIdle()
+        assertEquals(true, settings.current.amountsHidden)
+
+        vm.toggleAmountsHidden()
+        advanceUntilIdle()
+        assertEquals(false, settings.current.amountsHidden)
     }
 
     @Test

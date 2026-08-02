@@ -51,6 +51,9 @@ private fun HeroBalanceCardStatesPreview() {
                 onPreviousMonth = {},
                 onNextMonth = {},
                 streak = emptyList(),
+                onOpenBudgets = {},
+                isFirstRun = false,
+                onToggleAmountsHidden = {},
                 modifier = Modifier.fillMaxWidth(),
             )
             // Heading for trouble: still under the limit, but the rate says otherwise (amber).
@@ -61,6 +64,9 @@ private fun HeroBalanceCardStatesPreview() {
                 onPreviousMonth = {},
                 onNextMonth = {},
                 streak = emptyList(),
+                onOpenBudgets = {},
+                isFirstRun = false,
+                onToggleAmountsHidden = {},
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -79,6 +85,9 @@ private fun HeroOverBudgetPreview() {
             onPreviousMonth = {},
             onNextMonth = {},
             streak = emptyList(),
+            onOpenBudgets = {},
+            isFirstRun = false,
+            onToggleAmountsHidden = {},
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -96,6 +105,9 @@ private fun HeroNoBudgetPreview() {
             onPreviousMonth = {},
             onNextMonth = {},
             streak = emptyList(),
+            onOpenBudgets = {},
+            isFirstRun = false,
+            onToggleAmountsHidden = {},
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -117,6 +129,9 @@ private fun HeroPastMonthPreview() {
             onPreviousMonth = {},
             onNextMonth = {},
             streak = emptyList(),
+            onOpenBudgets = {},
+            isFirstRun = false,
+            onToggleAmountsHidden = {},
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -134,6 +149,9 @@ private fun HeroNoHistoryPreview() {
             onPreviousMonth = {},
             onNextMonth = {},
             streak = emptyList(),
+            onOpenBudgets = {},
+            isFirstRun = false,
+            onToggleAmountsHidden = {},
             modifier = Modifier.fillMaxWidth(),
         )
     }

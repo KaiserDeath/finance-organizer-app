@@ -60,6 +60,7 @@ import pe.moneyflow.core.domain.model.DashboardData
 import pe.moneyflow.core.domain.model.SpendingPace
 import pe.moneyflow.core.model.QuickShortcut
 import pe.moneyflow.core.ui.component.TransactionRow
+import pe.moneyflow.core.ui.util.money
 
 @Composable
 fun DashboardScreen(
@@ -67,6 +68,8 @@ fun DashboardScreen(
     onTransactionClick: (String) -> Unit,
     onOpenUpcoming: () -> Unit,
     onOpenBudgets: () -> Unit,
+    onAddExpense: () -> Unit,
+    onOpenShortcuts: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
@@ -99,9 +102,12 @@ fun DashboardScreen(
             onTransactionClick = onTransactionClick,
             onOpenUpcoming = onOpenUpcoming,
             onOpenBudgets = onOpenBudgets,
+            onAddExpense = onAddExpense,
+            onOpenShortcuts = onOpenShortcuts,
             onPreviousMonth = viewModel::showPreviousMonth,
             onNextMonth = viewModel::showNextMonth,
             onShortcut = onShortcut,
+            onToggleAmountsHidden = viewModel::toggleAmountsHidden,
             modifier = Modifier.padding(innerPadding),
         )
     }
@@ -114,9 +120,12 @@ private fun DashboardContent(
     onTransactionClick: (String) -> Unit,
     onOpenUpcoming: () -> Unit,
     onOpenBudgets: () -> Unit,
+    onAddExpense: () -> Unit,
+    onOpenShortcuts: () -> Unit,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onShortcut: (QuickShortcut) -> Unit,
+    onToggleAmountsHidden: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val data = state.data
@@ -147,12 +156,34 @@ private fun DashboardContent(
                 onPreviousMonth = onPreviousMonth,
                 onNextMonth = onNextMonth,
                 streak = if (state.isLoading) emptyList() else state.streak,
+                onOpenBudgets = onOpenBudgets,
+                isFirstRun = state.isFirstRun,
+                onToggleAmountsHidden = onToggleAmountsHidden,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
 
         if (state.isLoading) {
             item { LoadingSkeleton(modifier = sidePadding) }
+            return@LazyColumn
+        }
+
+        // A ledger with nothing in it has one useful screen: the one that asks for the first entry.
+        // Everything below is a variation on "empty", and three of them stacked read as a broken
+        // app rather than a new one.
+        if (state.isFirstRun) {
+            item {
+                FirstRunCard(
+                    onAddExpense = onAddExpense,
+                    modifier = sidePadding.fillMaxWidth(),
+                )
+            }
+            item {
+                ShortcutsPendingLine(
+                    onOpenShortcuts = onOpenShortcuts,
+                    modifier = sidePadding.fillMaxWidth(),
+                )
+            }
             return@LazyColumn
         }
 
@@ -173,7 +204,12 @@ private fun DashboardContent(
             // headline feature that is simply absent, with no trace, is indistinguishable from one
             // that was never built. Past months are excluded: shortcuts are deliberately empty there
             // and log to *today*, so the explanation would be nonsense.
-            item { ShortcutsEmptyCard(modifier = sidePadding.fillMaxWidth()) }
+            item {
+                ShortcutsEmptyCard(
+                    onOpenShortcuts = onOpenShortcuts,
+                    modifier = sidePadding.fillMaxWidth(),
+                )
+            }
         }
 
         state.upcomingNudge?.let { nudge ->
@@ -325,7 +361,7 @@ private fun UpcomingNudgeCard(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Total ${Money.format(nudge.totalAmountMinor, currencyCode)}",
+                    text = "Total ${money(nudge.totalAmountMinor, currencyCode)}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -344,14 +380,15 @@ private fun StatRow(data: DashboardData, pace: SpendingPace?, modifier: Modifier
     // What the month still owes. Takes the *committed* figure rather than `monthPendingMinor`,
     // which counts only pending rows that exist in the ledger and so ignores occurrences still
     // projected from recurring templates. That made the tile read "S/ 0.00" on a month where the
-    // hero said "Ya comprometido: S/ 10,279" and Próximos listed the same S/ 10,279 — three
-    // numbers about one month, with this one disagreeing. Past months have no pace, and nothing
-    // is "still owed" in a month already gone, so they fall back to the materialized total.
+    // band and Próximos both said S/ 10,279 — three numbers about one month, with this one
+    // disagreeing. The band no longer prints it at all (this tile is the one place it lives now).
+    // Past months have no pace, and nothing is "still owed" in a month already gone, so they fall
+    // back to the materialized total.
     val pendingMinor = pace?.committedRemainingMinor ?: data.monthPendingMinor
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         StatTile(
             label = "Hoy",
-            value = Money.format(data.todaySpentMinor, data.currencyCode),
+            value = money(data.todaySpentMinor, data.currencyCode),
             icon = Icons.Rounded.CalendarToday,
             accent = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f),
@@ -361,7 +398,7 @@ private fun StatRow(data: DashboardData, pace: SpendingPace?, modifier: Modifier
         // month still owes — in amber, and deliberately outside the spent total.
         StatTile(
             label = "Por pagar",
-            value = Money.format(pendingMinor, data.currencyCode),
+            value = money(pendingMinor, data.currencyCode),
             icon = Icons.Rounded.Schedule,
             accent = MaterialTheme.colorScheme.tertiary,
             modifier = Modifier.weight(1f),

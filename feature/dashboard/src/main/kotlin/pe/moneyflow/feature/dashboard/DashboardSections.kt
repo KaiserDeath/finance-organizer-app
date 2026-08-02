@@ -26,14 +26,18 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -42,16 +46,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import pe.moneyflow.core.common.Money
+import pe.moneyflow.core.designsystem.component.EmptyState
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.component.MoneyProgressBar
 import pe.moneyflow.core.designsystem.component.SectionHeader
 import pe.moneyflow.core.designsystem.component.pressScale
 import pe.moneyflow.core.designsystem.icon.iconForKey
+import pe.moneyflow.core.designsystem.illustration.Illustration
 import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Motion
 import pe.moneyflow.core.designsystem.theme.Spacing
@@ -65,6 +72,7 @@ import pe.moneyflow.core.ui.util.toMonthTitle
 import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
+import pe.moneyflow.core.ui.util.money
 
 /**
  * Month navigation for the dashboard.
@@ -252,7 +260,7 @@ fun ShortcutsRow(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            text = Money.format(shortcut.amountMinor, currencyCode),
+                            text = money(shortcut.amountMinor, currencyCode),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
@@ -266,16 +274,86 @@ fun ShortcutsRow(
 }
 
 /**
+ * The whole of Inicio on a ledger with nothing in it: one ask, with the button it names.
+ *
+ * Replaces the movements empty state *and* the shortcuts card in this state. The FAB can do the
+ * same thing, but it is the smallest element on screen and carries no words — a first-time user is
+ * being asked to trust an icon. This says what to do and why it is worth doing.
+ */
+@Composable
+fun FirstRunCard(onAddExpense: () -> Unit, modifier: Modifier = Modifier) {
+    MoneyCard(modifier = modifier, shadowElevation = 0.dp) {
+        EmptyState(
+            illustration = Illustration.NoTransactions,
+            title = "Empieza por un gasto de hoy",
+            subtitle = "Un almuerzo, un pasaje, lo que tengas a mano. Toma unos segundos.",
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(Spacing.lg))
+        Button(
+            onClick = onAddExpense,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = null,
+                modifier = Modifier.size(IconSize.chip),
+            )
+            Text(
+                text = "Registrar un gasto",
+                modifier = Modifier.padding(start = Spacing.sm),
+            )
+        }
+    }
+}
+
+/**
+ * The 30-day shortcuts rule as one line, not a card.
+ *
+ * On a first run [ShortcutsEmptyCard] is a full card explaining an absence, stacked under another
+ * card explaining the same absence. Here it is context — and, unlike before, a way in: the picker
+ * that onboarding offered once is now a destination, so skipping that step is recoverable.
+ */
+@Composable
+fun ShortcutsPendingLine(onOpenShortcuts: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.small)
+            .clickable(onClick = onOpenShortcuts, role = Role.Button)
+            .heightIn(min = 48.dp)
+            .padding(horizontal = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Bolt,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(IconSize.sm),
+        )
+        Text(
+            text = "Tus atajos de un toque se activan a los 30 días de historial.",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
  * The "no shortcuts yet" counterpart to [ShortcutsRow].
  *
  * States the actual rule rather than a placeholder, because the rule is the whole answer to "why is
  * this empty?" — `GetFrequentShortcutsUseCase` returns nothing until the oldest movement in the
  * ledger is 30 days old, so a two-week-old install has no shortcuts no matter how repetitive its
- * spending is. There is no action to offer: shortcuts are only chosen during onboarding, and the
- * prototype defines no screen for editing them afterwards.
+ * spending is.
+ *
+ * The wait is no longer the only option: picking them explicitly is a destination now, so a user
+ * who skipped onboarding's step 4 does not have to serve the 30 days to get the feature back.
  */
 @Composable
-fun ShortcutsEmptyCard(modifier: Modifier = Modifier) {
+fun ShortcutsEmptyCard(onOpenShortcuts: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(
             text = "De un toque",
@@ -294,6 +372,13 @@ fun ShortcutsEmptyCard(modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            TextButton(
+                onClick = onOpenShortcuts,
+                modifier = Modifier
+                    .padding(top = Spacing.sm)
+                    .heightIn(min = 48.dp),
+                contentPadding = PaddingValues(horizontal = Spacing.sm),
+            ) { Text("Elegirlos ahora") }
         }
     }
 }

@@ -26,4 +26,7 @@ interface SettingsRepository {
     suspend fun setActiveMethodIds(ids: Set<String>?)
 
     suspend fun setShortcuts(shortcuts: List<QuickShortcut>)
+
+    /** Discreet mode. Persists, so a masked screen stays masked across launches. */
+    suspend fun setAmountsHidden(hidden: Boolean)
 }

@@ -156,6 +156,12 @@ class FakeSettingsRepository(
     override suspend fun setShortcuts(shortcuts: List<QuickShortcut>) {
         store.value = store.value.copy(shortcuts = shortcuts)
     }
+
+    // Backed by the store rather than a no-op: the dashboard's toggle reads the current value
+    // before flipping it, so a fake that swallowed the write would make that look like it worked.
+    override suspend fun setAmountsHidden(hidden: Boolean) {
+        store.value = store.value.copy(amountsHidden = hidden)
+    }
 }
 
 class FakeAccountRepository(private val items: List<Account> = emptyList()) : AccountRepository {

@@ -29,6 +29,12 @@ data class AnalyticsUiState(
     val report: MonthlyReport = MonthlyReport.empty(YearMonth.now()),
     /** The budget the user overran the most — what the screen opens with, when there is one. */
     val worstOverrun: BudgetProgress? = null,
+    /**
+     * The budget closest to its limit without crossing it. Only read when [worstOverrun] is null:
+     * "nothing is over" is true but not useful on its own, and this is the thing worth watching.
+     * Null when no budgets exist at all, which is a different message.
+     */
+    val closestToLimit: BudgetProgress? = null,
     val insights: List<Insight> = emptyList(),
     val isExporting: Boolean = false,
 )
@@ -71,6 +77,9 @@ class AnalyticsViewModel @Inject constructor(
             worstOverrun = budgets
                 .filter { it.isOverBudget }
                 .maxByOrNull { it.spentMinor - it.budget.amountMinor },
+            closestToLimit = budgets
+                .filterNot { it.isOverBudget }
+                .maxByOrNull { it.fraction },
             insights = insights,
             isExporting = isExporting,
         )

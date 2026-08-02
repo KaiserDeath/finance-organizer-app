@@ -71,6 +71,7 @@ import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.Transaction
 import pe.moneyflow.core.model.TransactionType
 import pe.moneyflow.core.ui.component.TransactionRow
+import pe.moneyflow.core.ui.util.money
 
 @Composable
 fun TransactionsScreen(
@@ -212,7 +213,7 @@ private fun TransactionsList(
             item(key = "header-${section.dateLabel}") {
                 SectionHeaderRow(
                     label = section.dateLabel,
-                    total = Money.format(section.expenseTotalMinor, state.currencyCode),
+                    total = money(section.expenseTotalMinor, state.currencyCode),
                 )
             }
             items(items = section.items, key = { it.id }) { tx ->

@@ -12,6 +12,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.theme.Motion
 import pe.moneyflow.core.designsystem.theme.TabularFigures
+import pe.moneyflow.core.ui.util.amountsHidden
 
 /**
  * A currency figure that counts to its value instead of snapping to it.
@@ -36,6 +37,19 @@ fun AnimatedAmount(
     color: Color = Color.Unspecified,
     maxLines: Int = 2,
 ) {
+    // Discreet mode short-circuits the count entirely: there is nothing to watch a masked figure
+    // count towards, and animating towards it would still recompose on every frame.
+    if (amountsHidden()) {
+        Text(
+            text = Money.mask(currencyCode),
+            style = style.copy(fontFeatureSettings = TabularFigures),
+            color = color,
+            maxLines = maxLines,
+            modifier = modifier,
+        )
+        return
+    }
+
     // Animate in major units: minor units would need Long interpolation and the extra precision is
     // invisible at these speeds anyway.
     val animated by animateFloatAsState(

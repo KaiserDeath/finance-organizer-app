@@ -42,6 +42,7 @@ import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.theme.moneyColors
+import pe.moneyflow.core.ui.util.money
 
 /**
  * "Tu dinero": the money destinations, each row carrying its live figure — not a mute chevron.
@@ -96,11 +97,11 @@ fun MoneyScreen(
                 MoneyRow(
                     icon = Icons.Rounded.CalendarMonth,
                     title = "Próximos pagos",
-                    figure = Money.format(state.upcomingTotalMinor, state.currencyCode),
+                    figure = money(state.upcomingTotalMinor, state.currencyCode),
                     caption = if (state.overdueCount > 0) "${state.overdueCount} vencido(s)" else null,
                     captionColor = MaterialTheme.moneyColors.negative,
                     figureDescription = buildString {
-                        append("Pendiente ${Money.format(state.upcomingTotalMinor, state.currencyCode)}")
+                        append("Pendiente ${money(state.upcomingTotalMinor, state.currencyCode)}")
                         if (state.overdueCount > 0) append(", ${state.overdueCount} pago(s) vencido(s)")
                     },
                     isLoading = state.isLoading,
@@ -110,9 +111,9 @@ fun MoneyScreen(
                 MoneyRow(
                     icon = Icons.Rounded.AccountBalanceWallet,
                     title = "Cuentas",
-                    figure = Money.format(state.accountsBalanceMinor, state.currencyCode),
+                    figure = money(state.accountsBalanceMinor, state.currencyCode),
                     figureDescription =
-                        "Saldo total ${Money.format(state.accountsBalanceMinor, state.currencyCode)}",
+                        "Saldo total ${money(state.accountsBalanceMinor, state.currencyCode)}",
                     isLoading = state.isLoading,
                     onClick = onOpenAccounts,
                 )
@@ -120,9 +121,9 @@ fun MoneyScreen(
                 MoneyRow(
                     icon = Icons.Rounded.Savings,
                     title = "Ahorros",
-                    figure = Money.format(state.savingsBalanceMinor, state.currencyCode),
+                    figure = money(state.savingsBalanceMinor, state.currencyCode),
                     figureDescription =
-                        "Ahorrado ${Money.format(state.savingsBalanceMinor, state.currencyCode)}",
+                        "Ahorrado ${money(state.savingsBalanceMinor, state.currencyCode)}",
                     isLoading = state.isLoading,
                     onClick = onOpenSavings,
                 )

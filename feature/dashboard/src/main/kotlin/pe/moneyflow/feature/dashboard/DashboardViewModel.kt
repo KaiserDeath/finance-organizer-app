@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -72,6 +73,23 @@ data class DashboardUiState(
 ) {
     val isCurrentMonth: Boolean get() = data.month == YearMonth.now()
 
+    /**
+     * Nothing has ever been logged, and we are looking at the month where that can be fixed.
+     *
+     * Inicio otherwise greets a new user with four zeros and two separate explanations of the same
+     * emptiness — the band's projection and budget bar collapse, the shortcuts card explains a
+     * 30-day rule, and the movements card says there are no movements — while the one thing to do
+     * (the FAB) is the smallest element on screen. This collapses all of that into one ask.
+     *
+     * `monthSpentMinor` is checked alongside `recent` because the recent list is capped: a month
+     * with spend but nothing in the window is not a first run.
+     */
+    val isFirstRun: Boolean
+        get() = !isLoading &&
+            isCurrentMonth &&
+            data.recent.isEmpty() &&
+            data.monthSpentMinor == 0L
+
     /** Whether an earlier month can be reached; the app has no data before its first transaction. */
     val canGoBack: Boolean get() = true
 
@@ -88,7 +106,7 @@ class DashboardViewModel @Inject constructor(
     getBudgetsProgress: GetBudgetsProgressUseCase,
     getFrequentShortcuts: GetFrequentShortcutsUseCase,
     observeTransactions: ObserveTransactionsUseCase,
-    settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository,
     private val saveTransaction: SaveTransactionUseCase,
     private val deleteTransaction: DeleteTransactionUseCase,
     private val clock: Clock,
@@ -107,6 +125,20 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun showCurrentMonth() = selectedMonth.update { YearMonth.now(clock) }
+
+    /**
+     * Flips discreet mode and persists it, so a masked screen stays masked across launches.
+     *
+     * Reads the current value from the store rather than from [uiState] so the write is against
+     * what is actually saved, not against a frame that may have been composed before the last one
+     * landed. Presentation only — nothing here touches what is stored or computed.
+     */
+    fun toggleAmountsHidden() {
+        viewModelScope.launch {
+            val current = settingsRepository.preferences.first().amountsHidden
+            settingsRepository.setAmountsHidden(!current)
+        }
+    }
 
     val uiState: StateFlow<DashboardUiState> = selectedMonth
         .flatMapLatest { month ->

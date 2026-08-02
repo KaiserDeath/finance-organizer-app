@@ -88,6 +88,7 @@ import pe.moneyflow.core.domain.model.BudgetProgress
 import pe.moneyflow.core.model.BudgetPeriod
 import pe.moneyflow.core.ui.component.CategoryAvatar
 import java.time.YearMonth
+import pe.moneyflow.core.ui.util.money
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -281,7 +282,7 @@ private fun MonthAllocationCard(state: BudgetsUiState, onEdit: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = Money.format(monthly, currency),
+                    text = money(monthly, currency),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -301,13 +302,13 @@ private fun MonthAllocationCard(state: BudgetsUiState, onEdit: () -> Unit) {
                 1 -> "Repartido en 1 categoría"
                 else -> "Repartido en ${state.items.size} categorías"
             },
-            amount = Money.format(state.totalLimitMinor, currency),
+            amount = money(state.totalLimitMinor, currency),
             accent = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.height(Spacing.sm))
         AllocationRow(
             label = "Sin asignar a ninguna categoría",
-            amount = Money.format(state.unassignedMinor ?: 0L, currency),
+            amount = money(state.unassignedMinor ?: 0L, currency),
             accent = MaterialTheme.colorScheme.outline,
         )
 
@@ -315,7 +316,7 @@ private fun MonthAllocationCard(state: BudgetsUiState, onEdit: () -> Unit) {
             Spacer(Modifier.height(Spacing.lg))
             Text(
                 text = "De lo gastado este mes, " +
-                    "${Money.format(state.unbudgetedSpentMinor, currency)} cayó fuera de todo " +
+                    "${money(state.unbudgetedSpentMinor, currency)} cayó fuera de todo " +
                     "presupuesto. El total del mes sigue siendo uno solo.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -390,7 +391,7 @@ private fun OverallCard(spentMinor: Long, limitMinor: Long, currencyCode: String
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = "${Money.format(spentMinor, currencyCode)} / ${Money.format(limitMinor, currencyCode)}",
+            text = "${money(spentMinor, currencyCode)} / ${money(limitMinor, currencyCode)}",
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -453,7 +454,7 @@ private fun BudgetCard(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = "${Money.format(progress.spentMinor, progress.currencyCode)} de ${Money.format(progress.budget.amountMinor, progress.currencyCode)}",
+                text = "${money(progress.spentMinor, progress.currencyCode)} de ${money(progress.budget.amountMinor, progress.currencyCode)}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -476,9 +477,9 @@ private fun BudgetCard(
                 Spacer(Modifier.padding(horizontal = Spacing.xxs))
                 Text(
                     text = if (progress.isOverBudget) {
-                        "Superaste el límite por ${Money.format(-progress.remainingMinor, progress.currencyCode)}"
+                        "Superaste el límite por ${money(-progress.remainingMinor, progress.currencyCode)}"
                     } else {
-                        "Te quedan ${Money.format(progress.remainingMinor, progress.currencyCode)}"
+                        "Te quedan ${money(progress.remainingMinor, progress.currencyCode)}"
                     },
                     style = MaterialTheme.typography.labelMedium,
                     color = barColor,

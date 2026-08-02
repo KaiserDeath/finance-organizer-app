@@ -94,6 +94,7 @@ import pe.moneyflow.core.ui.recurrence.recurrenceSummary
 import pe.moneyflow.core.ui.util.toShortLabel
 import java.time.LocalDate
 import java.util.UUID
+import pe.moneyflow.core.ui.util.money
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -303,7 +304,7 @@ private fun RecurringCard(
                     )
                 }
                 Text(
-                    text = Money.format(template.amountMinor, template.currencyCode),
+                    text = money(template.amountMinor, template.currencyCode),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )

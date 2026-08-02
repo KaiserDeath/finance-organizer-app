@@ -45,6 +45,15 @@ data class UpcomingUiState(
     val nextMonthTotalMinor: Long
         get() = sections.firstOrNull { it.bucket == UpcomingBucket.NEXT_MONTH }?.totalMinor ?: 0L
 
+    /**
+     * Overdue payments that can actually be settled, in the order they are shown.
+     *
+     * Projections are excluded: settling one materializes ledger data, and doing that in bulk on
+     * rows the user never saw as real is a decision the batch button has no right to make.
+     */
+    val settleableOverdue: List<UpcomingPayment>
+        get() = sections.flatMap { it.items }.filter { it.isOverdue && !it.isProjected }
+
     /** The method behind a payment, or null when unset/unknown. */
     fun methodFor(payment: UpcomingPayment): PaymentMethod? =
         payment.transaction.paymentMethodId?.let { methodsById[it] }
@@ -96,13 +105,47 @@ class UpcomingViewModel @Inject constructor(
      * turns into ledger data.
      */
     fun settle(payment: UpcomingPayment, methodId: String? = null) {
+        val (apply, undo) = settleActionFor(payment, methodId)
+        lastSettleUndo = undo
+        viewModelScope.launch { apply() }
+    }
+
+    /**
+     * Settles several payments with one method, under a single undo.
+     *
+     * Three overdue bills otherwise mean three sheet round-trips, each with its own 4s undo window —
+     * and the undos expire in the order they opened, so the first is gone before the third is made.
+     * One undo covering the batch is the only version of this that is safe to offer.
+     *
+     * Touches settle behaviour only: no change to the recurring model or to
+     * [GetUpcomingPaymentsUseCase].
+     */
+    fun settleAll(payments: List<UpcomingPayment>, methodId: String? = null) {
+        if (payments.isEmpty()) return
+        val actions = payments.map { settleActionFor(it, methodId) }
+        // Undone in reverse, so a projection's materialized row is removed before anything that
+        // followed it — the same order a user would expect from stepping back.
+        lastSettleUndo = { actions.reversed().forEach { (_, undo) -> undo() } }
+        viewModelScope.launch { actions.forEach { (apply, _) -> apply() } }
+    }
+
+    /**
+     * The settle as a pair of suspend functions: do it, and put it back.
+     *
+     * Held as data rather than executed inline so one settle and a batch of them can share the
+     * same two behaviours — a real pending row is marked paid in place, while a projected
+     * occurrence has no row yet and materializes as already paid.
+     */
+    private fun settleActionFor(
+        payment: UpcomingPayment,
+        methodId: String?,
+    ): Pair<suspend () -> Unit, suspend () -> Unit> {
         val tx = payment.transaction
-        if (payment.isProjected) {
+        return if (payment.isProjected) {
             val today = LocalDate.now(clock)
             val now = Instant.now(clock)
             val newId = UUID.randomUUID().toString()
-            lastSettleUndo = { deleteTransaction(newId) }
-            viewModelScope.launch {
+            val apply: suspend () -> Unit = {
                 saveTransaction(
                     tx.copy(
                         id = newId,
@@ -114,11 +157,12 @@ class UpcomingViewModel @Inject constructor(
                     ),
                 )
             }
+            apply to { deleteTransaction(newId) }
         } else {
             // `tx` is the row as it was before settling, so restoring it undoes both the status
             // flip and any method change in one step.
-            lastSettleUndo = { saveTransaction(tx) }
-            viewModelScope.launch { markTransactionPaid(tx.id, methodId) }
+            val apply: suspend () -> Unit = { markTransactionPaid(tx.id, methodId) }
+            apply to { saveTransaction(tx) }
         }
     }
 
