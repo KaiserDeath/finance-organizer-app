@@ -171,6 +171,55 @@ class UpcomingViewModelTest {
         assertEquals(TransactionStatus.PENDING, repo["gym"]!!.status)
     }
 
+    /**
+     * The batch is only safe to offer because its undo covers the whole thing. Settling three bills
+     * and being able to revert one of them would be worse than three separate sheets.
+     */
+    @Test
+    fun `settling a batch records the method on every row`() = runTest {
+        val rent = gym.copy(id = "rent", title = "Alquiler", amountMinor = 90_000)
+        val repo = FakeTransactionRepository(listOf(gym, rent))
+
+        viewModel(repo).settleAll(listOf(payment(gym), payment(rent)), methodId = "yape")
+        advanceUntilIdle()
+
+        assertEquals(TransactionStatus.PAID, repo["gym"]!!.status)
+        assertEquals(TransactionStatus.PAID, repo["rent"]!!.status)
+        assertEquals("yape", repo["gym"]!!.paymentMethodId)
+        assertEquals("yape", repo["rent"]!!.paymentMethodId)
+    }
+
+    @Test
+    fun `one undo reverts the whole batch, not just the last row`() = runTest {
+        val rent = gym.copy(id = "rent", title = "Alquiler", amountMinor = 90_000)
+        val repo = FakeTransactionRepository(listOf(gym, rent))
+        val vm = viewModel(repo)
+
+        vm.settleAll(listOf(payment(gym), payment(rent)), methodId = "yape")
+        advanceUntilIdle()
+
+        vm.undoSettle()
+        advanceUntilIdle()
+
+        assertEquals(TransactionStatus.PENDING, repo["gym"]!!.status)
+        assertEquals(TransactionStatus.PENDING, repo["rent"]!!.status)
+        assertNull(repo["gym"]!!.paymentMethodId)
+    }
+
+    @Test
+    fun `settling an empty batch does nothing and leaves no undo behind`() = runTest {
+        val repo = FakeTransactionRepository(listOf(gym))
+        val vm = viewModel(repo)
+
+        vm.settleAll(emptyList(), methodId = "yape")
+        advanceUntilIdle()
+        // The previous undo must not fire for a batch that never happened.
+        vm.undoSettle()
+        advanceUntilIdle()
+
+        assertEquals(TransactionStatus.PENDING, repo["gym"]!!.status)
+    }
+
     @Test
     fun `deleting stashes the row so undo can restore it verbatim`() = runTest {
         val repo = FakeTransactionRepository(listOf(gym))

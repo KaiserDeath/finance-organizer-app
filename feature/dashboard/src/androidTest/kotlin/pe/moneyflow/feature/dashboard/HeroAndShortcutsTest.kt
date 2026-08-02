@@ -47,6 +47,8 @@ class HeroAndShortcutsTest {
         data: DashboardData = data(),
         pace: SpendingPace? = pace(),
         streak: List<StreakDay> = emptyList(),
+        isFirstRun: Boolean = false,
+        onOpenBudgets: () -> Unit = {},
     ) = rule.setContent {
         MoneyFlowTheme(darkTheme = false) {
             HeroBalanceCard(
@@ -56,6 +58,8 @@ class HeroAndShortcutsTest {
                 onPreviousMonth = {},
                 onNextMonth = {},
                 streak = streak,
+                onOpenBudgets = onOpenBudgets,
+                isFirstRun = isFirstRun,
             )
         }
     }
@@ -178,7 +182,7 @@ class HeroAndShortcutsTest {
     @Test
     fun withNoShortcuts_theEmptyStateExplainsWhen() {
         rule.setContent {
-            MoneyFlowTheme(darkTheme = false) { ShortcutsEmptyCard() }
+            MoneyFlowTheme(darkTheme = false) { ShortcutsEmptyCard(onOpenShortcuts = {}) }
         }
 
         rule.onNodeWithText("De un toque").assertIsDisplayed()
