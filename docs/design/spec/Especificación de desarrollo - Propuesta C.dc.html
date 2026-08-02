@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  doc-page:not(:defined){visibility:hidden}
+  body{margin:0}
+  a{color:#4F46E5}
+  a:hover{color:#3730A3}
+</style>
+<script src="./doc-page.js"></script>
+</helmet>
+
+<doc-page margin="0.8in">
+
+  <div slot="footer" style="display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px solid #E2E2EA; font-family:Roboto,sans-serif; font-size:9.5px; color:#8A8A96; letter-spacing:.04em">
+    <span>MoneyFlow · Propuesta C · especificación de desarrollo</span>
+    <span>Julio 2026 · borrador para revisión</span>
+  </div>
+
+  <div style="font-family:Roboto,sans-serif; color:#1A1A22; font-size:10.5pt; line-height:1.6">
+
+    <h1 style="margin:0 0 10px; font-size:26pt; font-weight:700; letter-spacing:-.6px; line-height:1.15">Propuesta C — especificación de desarrollo</h1>
+    <p style="margin:0 0 22px; font-size:12pt; line-height:1.5; color:#4A4A54">Qué construir, en qué archivo, y por qué. Pantalla por pantalla, contra el código que ya existe.</p>
+
+    <div style="break-inside:avoid; background:#F4F4F9; border-radius:10px; padding:16px 18px; margin:0 0 26px">
+      <p style="margin:0 0 8px; font-size:10pt; line-height:1.55; color:#1A1A22"><strong style="font-weight:700">Cómo leer esto.</strong> Cada sección describe una pantalla del prototipo, nombra los archivos Kotlin que toca y da la razón de la decisión. La razón importa tanto como el cambio: si al implementar aparece una restricción que la invalida, la decisión se vuelve a abrir, no se implementa a medias.</p>
+      <p style="margin:0; font-size:10pt; line-height:1.55; color:#4A4A54">Referencia viva: <em>MoneyFlow Prototipo C (standalone).html</em>. Donde el texto y el prototipo difieran, manda el prototipo.</p>
+    </div>
+
+    <div style="break-inside:avoid; border-left:3px solid #B45309; background:#FDF6E7; padding:14px 18px; margin:0 0 30px">
+      <div style="font-size:9pt; font-weight:700; color:#B45309; letter-spacing:.08em; text-transform:uppercase; margin-bottom:6px">Bloqueante · decidir antes de empezar el dashboard</div>
+      <p style="margin:0; font-size:10pt; line-height:1.55; color:#4A2E00">La sección 3 (héroe de dos números) está <strong style="font-weight:700">pendiente de validación con usuarios</strong>. Todo lo demás en este documento es implementable hoy. No arranques el héroe hasta tener las 3–5 sesiones; el resto del dashboard no depende de esa decisión.</p>
+    </div>
+
+    <h2 style="margin:0 0 12px; font-size:16pt; font-weight:700; letter-spacing:-.2px">1 · Alcance</h2>
+    <p style="margin:0 0 12px">Nueve hallazgos salieron de la auditoría de julio. Seis ya están tocados en código —total o parcialmente— y uno divergió a propósito. Este documento cubre los tres que seguían abiertos, las partes parciales que quedaron a medias, y dos piezas nuevas que el prototipo introdujo: el flujo de pago y el onboarding.</p>
+
+    <table style="width:100%; border-collapse:collapse; font-size:9.5pt; margin:0 0 14px">
+      <thead>
+        <tr>
+          <th style="text-align:left; padding:8px 10px 8px 0; border-bottom:1.5px solid #1A1A22; font-weight:700; width:34px">#</th>
+          <th style="text-align:left; padding:8px 10px 8px 0; border-bottom:1.5px solid #1A1A22; font-weight:700">Hallazgo</th>
+          <th style="text-align:left; padding:8px 10px 8px 0; border-bottom:1.5px solid #1A1A22; font-weight:700; width:92px">Estado</th>
+          <th style="text-align:left; padding:8px 0; border-bottom:1.5px solid #1A1A22; font-weight:700; width:86px">Sección</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">1</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Mes duplicado en barra y selector</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#15803D; font-weight:500">Resuelto</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">—</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">2</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Demasiadas cifras en el héroe</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#B45309; font-weight:500">Diverge</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA">3</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">3</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Ocho tarjetas de igual peso</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#4A4A54; font-weight:500">Parcial</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA">3</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">4</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Registrar un gasto cuesta 5 toques</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#4A4A54; font-weight:500">Parcial</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA">4</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">5</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Dos totales del mismo mes</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#4A4A54; font-weight:500">Parcial</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA">6</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">6</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Pendiente mezclado con pagado</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#4A4A54; font-weight:500">Parcial</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA">8</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">7</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Buscador dentro del scroll</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#DC2626; font-weight:500">Abierto</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA">5</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">8</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Datos que no habilitan decisiones</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#DC2626; font-weight:500">Abierto</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA">6</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; color:#8A8A96">9</td><td style="padding:7px 10px 7px 0">Cajón «Más» de doce destinos</td><td style="padding:7px 10px 7px 0; color:#DC2626; font-weight:500">Abierto</td><td style="padding:7px 0">2, 7</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin:0 0 26px; font-size:9.5pt; color:#4A4A54">Cuentas y Ahorros aparecen en el prototipo para probar el mapa de navegación, no su contenido. Sus pantallas actuales (<span style="font-family:'Roboto Mono',monospace; font-size:9pt">AccountsScreen.kt</span>, <span style="font-family:'Roboto Mono',monospace; font-size:9pt">SavingsScreen.kt</span>) se conservan tal cual.</p>
+
+    <h2 style="margin:0 0 12px; font-size:16pt; font-weight:700; letter-spacing:-.2px">2 · Navegación — de doce destinos a seis</h2>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Qué cambia.</strong> La barra inferior pasa de cinco pestañas a cuatro: <em>Inicio</em>, <em>Movimientos</em>, <em>Análisis</em>, <em>Tu dinero</em>. <em>Presupuestos</em> deja de ser pestaña y pasa a ser la primera fila de Tu dinero, con su cifra viva. El cajón <em>Más</em>, con sus doce entradas planas, desaparece.</p>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Por qué.</strong> El cajón plano mezclaba dos preguntas distintas: «¿dónde está mi plata?» y «¿cómo configuro la app?». Separarlas es lo que reduce doce entradas a seis sin esconder nada: cuatro destinos de plata más métodos de pago en Tu dinero, y siete pantallas de configuración detrás de una sola puerta llamada Ajustes. Presupuestos baja de la barra porque ahora tiene un lugar donde su cifra se ve sin entrar —el argumento que en su momento la subió a la barra— y porque cuatro pestañas dejan la barra legible en pantallas de 5 pulgadas.</p>
+
+    <table style="width:100%; border-collapse:collapse; font-size:9.5pt; margin:0 0 14px">
+      <thead>
+        <tr>
+          <th style="text-align:left; padding:8px 10px 8px 0; border-bottom:1.5px solid #1A1A22; font-weight:700; width:45%">Antes</th>
+          <th style="text-align:left; padding:8px 0; border-bottom:1.5px solid #1A1A22; font-weight:700">Después</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Barra: Inicio · Movimientos · Presupuestos · Análisis · Más</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA">Barra: Inicio · Movimientos · Análisis · Tu dinero</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Más → 12 entradas planas</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA">Tu dinero → 5 destinos con cifra · Ajustes → 7 en dos grupos</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Sugerencias como destino propio</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA">Absorbido por Análisis (sección 6)</td></tr>
+        <tr><td style="padding:7px 10px 7px 0">Próximos pagos: nudge en dashboard + entrada en Más</td><td style="padding:7px 0">Igual, pero la entrada vive en Tu dinero con su total</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin:0 0 8px; font-size:10pt"><strong style="font-weight:700">Archivos.</strong></p>
+    <ul style="margin:0 0 12px; padding-left:20px; font-size:10pt; line-height:1.6">
+      <li style="margin-bottom:5px"><span style="font-family:'Roboto Mono',monospace; font-size:9pt">app/MoneyFlowApp.kt</span> — quitar <span style="font-family:'Roboto Mono',monospace; font-size:9pt">BUDGETS</span> del enum <span style="font-family:'Roboto Mono',monospace; font-size:9pt">TopLevelDestination</span>, renombrar <span style="font-family:'Roboto Mono',monospace; font-size:9pt">MORE</span> a <span style="font-family:'Roboto Mono',monospace; font-size:9pt">MONEY</span> (ruta nueva <span style="font-family:'Roboto Mono',monospace; font-size:9pt">MoneyRoute</span>, etiqueta «Tu dinero», ícono <span style="font-family:'Roboto Mono',monospace; font-size:9pt">Icons.Rounded.AccountBalanceWallet</span>). El badge de vencidos sigue en Inicio.</li>
+      <li style="margin-bottom:5px"><span style="font-family:'Roboto Mono',monospace; font-size:9pt">app/MoreScreen.kt</span> → se parte en <span style="font-family:'Roboto Mono',monospace; font-size:9pt">app/money/MoneyScreen.kt</span> (+ ViewModel, ver sección 7) y <span style="font-family:'Roboto Mono',monospace; font-size:9pt">app/settings/SettingsScreen.kt</span>.</li>
+      <li><span style="font-family:'Roboto Mono',monospace; font-size:9pt">feature/budgets/BudgetsNavigation.kt</span> — <span style="font-family:'Roboto Mono',monospace; font-size:9pt">BudgetsRoute</span> deja de ser top-level y pasa a destino apilado con <span style="font-family:'Roboto Mono',monospace; font-size:9pt">onBack</span> obligatorio; hoy es nullable.</li>
+    </ul>
+    <p style="margin:0 0 12px; font-size:9.5pt; color:#4A4A54">Efecto colateral a cuidar: con Presupuestos fuera de la barra, <span style="font-family:'Roboto Mono',monospace; font-size:9pt">navigateToTopLevel</span> ya no aplica a esa ruta. El enlace desde el dashboard (<span style="font-family:'Roboto Mono',monospace; font-size:9pt">onOpenBudgets</span>) pasa a <span style="font-family:'Roboto Mono',monospace; font-size:9pt">navigate()</span> normal, y con ello gana su flecha de retorno.</p>
+    <p style="margin:0 0 26px; font-size:9.5pt; color:#4A4A54">Contraste: ningún texto secundario queda en opacidad. El gris secundario es <span style="font-family:'Roboto Mono',monospace; font-size:9pt">#4A4A54</span> sobre blanco — 7.4:1. Aplica a todas las pantallas de este documento, no solo a las nuevas.</p>
+
+    <h2 style="margin:0 0 12px; font-size:16pt; font-weight:700; letter-spacing:-.2px">3 · Inicio — el héroe y lo que va debajo</h2>
+
+    <div style="break-inside:avoid; border-left:3px solid #B45309; background:#FDF6E7; padding:14px 18px; margin:0 0 16px">
+      <div style="font-size:9pt; font-weight:700; color:#B45309; letter-spacing:.08em; text-transform:uppercase; margin-bottom:6px">Pendiente de validación</div>
+      <p style="margin:0 0 8px; font-size:10pt; line-height:1.55; color:#4A2E00">El handoff pide un héroe de dos números: <em>lo que te queda</em> y <em>de cuánto</em>. <span style="font-family:'Roboto Mono',monospace; font-size:9pt">HeroBalanceCard.kt</span> hizo lo contrario y dejó escrito por qué: «una cifra sin referencia es dato, no información». Hoy el héroe carga denominador, barra, porcentaje usado, restante, proyección, variación y balance.</p>
+      <p style="margin:0; font-size:10pt; line-height:1.55; color:#4A2E00">Ninguna de las dos posturas es obviamente correcta y no se resuelve discutiéndola. El prototipo implementa la de dos números y manda proyección y variación a Análisis. <strong style="font-weight:700">Las 3–5 sesiones deciden.</strong> Hasta entonces, no toques <span style="font-family:'Roboto Mono',monospace; font-size:9pt">HeroBalanceCard.kt</span>.</p>
+    </div>
+
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Qué probar en sesión.</strong> Tarea: «averigua cuánto te queda para el resto del mes». Mide el tiempo hasta la respuesta correcta y si el usuario menciona espontáneamente la proyección. Si nadie la usa para decidir, sobra en el héroe; si la buscan al no encontrarla, el código actual tenía razón.</p>
+
+    <p style="margin:0 0 10px"><strong style="font-weight:700">Lo demás del dashboard, que sí se puede implementar ya:</strong></p>
+    <ul style="margin:0 0 14px; padding-left:20px; line-height:1.6">
+      <li style="margin-bottom:6px"><strong style="font-weight:500">Fuera el <span style="font-family:'Roboto Mono',monospace; font-size:9pt">StatTile</span> «Movimientos».</strong> Saber que van 47 no cambia ninguna decisión. Es el caso más limpio del hallazgo 8. En <span style="font-family:'Roboto Mono',monospace; font-size:9pt">DashboardSections.kt</span>.</li>
+      <li style="margin-bottom:6px"><strong style="font-weight:500">Atajos «De un toque».</strong> Fila de chips con descripción y monto habitual: un toque guarda el gasto y muestra un toast con deshacer. Es lo que baja el registro de cinco toques a uno. La lista sale del onboarding (sección 9) y, si el usuario lo saltó, de las cuatro combinaciones descripción+categoría+método más frecuentes de los últimos 30 días.</li>
+      <li style="margin-bottom:6px"><strong style="font-weight:500">Jerarquía de tarjetas.</strong> <span style="font-family:'Roboto Mono',monospace; font-size:9pt">GlassCard</span> ya separa el héroe, pero debajo quedan seis tarjetas de igual peso. Orden propuesto: atajos, nudge de pagos, presupuestos en riesgo, movimientos de hoy. Todo lo demás baja a Análisis o a Tu dinero.</li>
+      <li><strong style="font-weight:500">Racha.</strong> Siete puntos, uno por día de la última semana, contra el permitido diario variable. Es el único elemento no accionable que se queda: no informa una decisión, sostiene el hábito de registrar. Si en sesión resulta decorativo, se cae.</li>
+    </ul>
+    <p style="margin:0 0 26px; font-size:9.5pt; color:#4A4A54"><strong style="font-weight:700">Archivos:</strong> <span style="font-family:'Roboto Mono',monospace; font-size:9pt">feature/dashboard/DashboardScreen.kt</span>, <span style="font-family:'Roboto Mono',monospace; font-size:9pt">DashboardSections.kt</span>, <span style="font-family:'Roboto Mono',monospace; font-size:9pt">DashboardViewModel.kt</span> (añadir <span style="font-family:'Roboto Mono',monospace; font-size:9pt">shortcuts</span> y <span style="font-family:'Roboto Mono',monospace; font-size:9pt">streak</span> al <span style="font-family:'Roboto Mono',monospace; font-size:9pt">UiState</span>). <span style="font-family:'Roboto Mono',monospace; font-size:9pt">pace</span> y <span style="font-family:'Roboto Mono',monospace; font-size:9pt">topBudgets</span> ya existen y se conservan.</p>
+
+    <h2 style="margin:0 0 12px; font-size:16pt; font-weight:700; letter-spacing:-.2px">4 · Registrar un gasto</h2>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Qué cambia.</strong> El auto-focus en el monto y los detalles plegados ya están en código. Faltan tres cosas: el teclado numérico propio abierto de entrada, la sugerencia de categoría a partir de la descripción, y que el selector de método muestre solo los métodos que el usuario declaró tener.</p>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Por qué.</strong> El objetivo del handoff es bajar de cinco toques a dos. Dos se ganan con los atajos (sección 3); esta pantalla cubre el caso en que el gasto no es habitual. Ahí el costo no está en los campos sino en las decisiones: elegir categoría y método. La sugerencia por descripción resuelve la primera —«almuerzo» ya implica Comida— y el método por defecto resuelve la segunda.</p>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Reglas del selector de método</strong> (los tres defectos que aparecieron probando el prototipo):</p>
+    <ul style="margin:0 0 14px; padding-left:20px; line-height:1.6">
+      <li style="margin-bottom:5px">Si el método por defecto ya no existe o quedó fuera de la selección del usuario, cae al primer método válido. Nunca a <span style="font-family:'Roboto Mono',monospace; font-size:9pt">null</span> ni a un id huérfano.</li>
+      <li style="margin-bottom:5px">Solo se listan métodos activos del usuario. Nada de chips fantasma que se pintan y no seleccionan.</li>
+      <li>Un botón deshabilitado no se ve tocable: sin sombra, sin ripple, opacidad del contenedor y no del texto.</li>
+    </ul>
+    <p style="margin:0 0 26px; font-size:9.5pt; color:#4A4A54"><strong style="font-weight:700">Archivos:</strong> <span style="font-family:'Roboto Mono',monospace; font-size:9pt">feature/addedit/AddEditScreen.kt</span>, <span style="font-family:'Roboto Mono',monospace; font-size:9pt">AddEditViewModel.kt</span>, <span style="font-family:'Roboto Mono',monospace; font-size:9pt">core/ui/paymentmethod/PaymentMethodSelector.kt</span>.</p>
+
+    <h2 style="margin:0 0 12px; font-size:16pt; font-weight:700; letter-spacing:-.2px">5 · Movimientos — hallazgo 7</h2>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Qué cambia.</strong> Buscador y chips de categoría salen del scroll y se fijan arriba, bajo el título. El filtro activo se ve siempre; el resultado ya no se pierde al bajar. El chip activo es el único relleno; los demás son contorno.</p>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Por qué.</strong> Hoy el buscador es un elemento más de la lista y los filtros viven en un badge. La consecuencia es que después de tres pantallazos de scroll el usuario no puede saber qué está viendo sin volver arriba —y no hay nada que le indique que debería. Un filtro cuyo estado no es visible es un filtro que el usuario cree que no aplicó.</p>
+    <p style="margin:0 0 26px; font-size:9.5pt; color:#4A4A54"><strong style="font-weight:700">Archivos:</strong> <span style="font-family:'Roboto Mono',monospace; font-size:9pt">feature/transactions/TransactionsScreen.kt</span> — sacar el campo de búsqueda del <span style="font-family:'Roboto Mono',monospace; font-size:9pt">LazyColumn</span> y ponerlo en una cabecera fija sobre él. <span style="font-family:'Roboto Mono',monospace; font-size:9pt">TransactionsViewModel.kt</span> no cambia: la query y el filtro ya viven ahí.</p>
+
+    <h2 style="margin:0 0 12px; font-size:16pt; font-weight:700; letter-spacing:-.2px">6 · Análisis — hallazgos 8 y 5</h2>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Qué cambia.</strong> Análisis deja de abrir con una dona y abre con la categoría en la que te pasaste, cuánto te pasaste, y dos salidas concretas:</p>
+    <ul style="margin:0 0 14px; padding-left:20px; line-height:1.6">
+      <li style="margin-bottom:5px"><strong style="font-weight:500">Ajustar el límite</strong> — abre el editor de ese presupuesto, con el monto cargado, en un toque.</li>
+      <li><strong style="font-weight:500">Ver esos gastos</strong> — abre Movimientos ya filtrado por esa categoría.</li>
+    </ul>
+    <p style="margin:0 0 12px">Si el peor sobregiro es de un gasto <em>fijo</em>, la tarjeta cambia de tono. Un alquiler que se pasó del límite no se recorta: el mensaje es «tu límite está corto», la salida es corregirlo, y desaparece la presión de los días que faltan. Esta distinción es la que evita que la pantalla dé consejos imposibles.</p>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Por qué.</strong> El hallazgo 8 no era «hay muchos números», era «los números no llevan a ninguna parte». Un dato que no habilita una acción es ruido con formato de dato. La prueba de si esta pantalla funciona es simple: la tarea 4 del guion —«averigua si te pasaste en alguna categoría y sube ese límite»— debería resolverse en dos toques desde Análisis.</p>
+    <p style="margin:0 0 12px">Aquí también aterriza <em>Sugerencias</em> (<span style="font-family:'Roboto Mono',monospace; font-size:9pt">InsightsScreen.kt</span>), que hoy es un destino propio en el cajón Más. Un insight es exactamente esto —un número con una acción detrás— así que tener las dos cosas separadas duplicaba el lugar donde el usuario debe buscar.</p>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Hallazgo 5, de paso.</strong> El centro de la dona y el héroe siguen dando totales distintos del mismo mes. Un solo caso de uso define cuál es el correcto: el total del mes es <em>lo gastado</em>, sin pendientes. Si la dona necesita incluir comprometidos, lo dice explícitamente en su etiqueta. Dos cifras iguales con nombre distinto es un bug; dos cifras distintas con nombre distinto es información.</p>
+    <p style="margin:0 0 26px; font-size:9.5pt; color:#4A4A54"><strong style="font-weight:700">Archivos:</strong> <span style="font-family:'Roboto Mono',monospace; font-size:9pt">feature/analytics/AnalyticsScreen.kt</span> y <span style="font-family:'Roboto Mono',monospace; font-size:9pt">AnalyticsViewModel.kt</span> (absorbe <span style="font-family:'Roboto Mono',monospace; font-size:9pt">GetInsightsUseCase</span> y <span style="font-family:'Roboto Mono',monospace; font-size:9pt">GetBudgetsProgressUseCase</span>); <span style="font-family:'Roboto Mono',monospace; font-size:9pt">feature/insights/</span> se retira como destino y su tarjeta se reutiliza; <span style="font-family:'Roboto Mono',monospace; font-size:9pt">core/domain/model/BudgetProgress</span> necesita saber si la categoría es de gasto fijo.</p>
+
+    <h2 style="margin:0 0 12px; font-size:16pt; font-weight:700; letter-spacing:-.2px">7 · Tu dinero y Ajustes — hallazgo 9</h2>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Tu dinero</strong> lista cinco destinos, y cada uno trae su cifra viva en la fila —no un chevron mudo. Presupuestos: cuántos están en riesgo. Próximos pagos: total pendiente y cuántos vencidos. Cuentas y Ahorros: su saldo. Métodos de pago: cuántos configurados.</p>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Por qué la cifra en la fila.</strong> La mitad de las visitas a estas pantallas son para mirar un número, no para operar. Ponerlo en la fila resuelve esa mitad sin entrar, y convierte una lista de navegación en un resumen.</p>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Ajustes</strong> agrupa las siete pantallas de configuración en dos bloques: <em>La app</em> (Categorías, Moneda, Apariencia) y <em>Tus datos</em> (Recurrentes, Copia de seguridad, Seguridad, Legal). La tarea 5 del guion —encontrar dónde se activa el bloqueo con PIN— mide si el agrupamiento funciona.</p>
+    <p style="margin:0 0 26px; font-size:9.5pt; color:#4A4A54"><strong style="font-weight:700">Archivos:</strong> nuevos <span style="font-family:'Roboto Mono',monospace; font-size:9pt">app/money/MoneyScreen.kt</span> + <span style="font-family:'Roboto Mono',monospace; font-size:9pt">MoneyViewModel.kt</span> (combina presupuestos, próximos, cuentas, ahorros y métodos para las cifras de fila) y <span style="font-family:'Roboto Mono',monospace; font-size:9pt">app/settings/SettingsScreen.kt</span>; se elimina <span style="font-family:'Roboto Mono',monospace; font-size:9pt">app/MoreScreen.kt</span>. Las rutas destino no cambian.</p>
+
+    <h2 style="margin:0 0 12px; font-size:16pt; font-weight:700; letter-spacing:-.2px">8 · Pagar — flujo nuevo</h2>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Qué cambia.</strong> Hoy «Pagar» marca la transacción como pagada y nada más. Pasa a abrir un sheet con el monto, la fecha de vencimiento y el método sugerido, y desde ahí el usuario paga de verdad.</p>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Por qué.</strong> El usuario no quiere marcar que pagó, quiere pagar. La app sabía el monto, el método y la fecha, y aun así lo dejaba salir a buscar Yape por su cuenta y volver a registrar. <span style="font-family:'Roboto Mono',monospace; font-size:9pt">launchPaymentApp()</span> ya existe en <span style="font-family:'Roboto Mono',monospace; font-size:9pt">core/ui/util/AppLauncher.kt</span> con su fallback a Play Store y a web banking; solo faltaba llamarla desde aquí.</p>
+
+    <p style="margin:0 0 8px; font-size:10pt"><strong style="font-weight:700">Contrato del sheet.</strong> Tres estados, según el método seleccionado:</p>
+    <table style="width:100%; border-collapse:collapse; font-size:9.5pt; margin:0 0 14px">
+      <thead>
+        <tr>
+          <th style="text-align:left; padding:8px 10px 8px 0; border-bottom:1.5px solid #1A1A22; font-weight:700; width:26%">Método</th>
+          <th style="text-align:left; padding:8px 10px 8px 0; border-bottom:1.5px solid #1A1A22; font-weight:700">Acción principal</th>
+          <th style="text-align:left; padding:8px 0; border-bottom:1.5px solid #1A1A22; font-weight:700; width:34%">Qué ve el usuario</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:8px 10px 8px 0; border-bottom:1px solid #E2E2EA; vertical-align:top">Con app<br><span style="color:#8A8A96; font-size:9pt">Yape, BCP</span></td>
+          <td style="padding:8px 10px 8px 0; border-bottom:1px solid #E2E2EA; vertical-align:top">Abre la app; al volver, marca pagado y ofrece deshacer</td>
+          <td style="padding:8px 0; border-bottom:1px solid #E2E2EA; vertical-align:top">Ícono de teléfono en el chip; toast de confirmación al volver</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 10px 8px 0; border-bottom:1px solid #E2E2EA; vertical-align:top">Sin app<br><span style="color:#8A8A96; font-size:9pt">Efectivo, tarjetas, Plin</span></td>
+          <td style="padding:8px 10px 8px 0; border-bottom:1px solid #E2E2EA; vertical-align:top">Marca pagado directamente</td>
+          <td style="padding:8px 0; border-bottom:1px solid #E2E2EA; vertical-align:top">Una línea que explica por qué no hay app que abrir — no un botón muerto</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 10px 8px 0; vertical-align:top">Ya pagado por fuera</td>
+          <td style="padding:8px 10px 8px 0; vertical-align:top">Marca pagado con el método elegido y lo recuerda</td>
+          <td style="padding:8px 0; vertical-align:top">Acción secundaria, siempre disponible</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin:0 0 12px; font-size:9.5pt; color:#4A4A54">Que «ya pagué por fuera» recuerde el método no es un detalle: es la única fuente de verdad sobre con qué paga realmente el usuario cada cosa, y es lo que hace que el método sugerido mejore con el uso.</p>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Hallazgo 6, de paso.</strong> Pendiente y pagado siguen sumándose en el mismo total. Con el sheet ya construido, la separación es barata: el total del mes muestra lo gastado, y los comprometidos van en su propia línea. <span style="font-family:'Roboto Mono',monospace; font-size:9pt">UpcomingViewModel</span> ya distingue proyectados de reales; el dashboard todavía no.</p>
+    <p style="margin:0 0 26px; font-size:9.5pt; color:#4A4A54"><strong style="font-weight:700">Archivos:</strong> nuevo <span style="font-family:'Roboto Mono',monospace; font-size:9pt">feature/upcoming/PaySheet.kt</span>; <span style="font-family:'Roboto Mono',monospace; font-size:9pt">UpcomingScreen.kt</span> y <span style="font-family:'Roboto Mono',monospace; font-size:9pt">UpcomingViewModel.kt</span> (<span style="font-family:'Roboto Mono',monospace; font-size:9pt">methodsById</span> y <span style="font-family:'Roboto Mono',monospace; font-size:9pt">methodFor()</span> ya están; falta persistir el método al marcar pagado); <span style="font-family:'Roboto Mono',monospace; font-size:9pt">core/ui/util/AppLauncher.kt</span> sin cambios; <span style="font-family:'Roboto Mono',monospace; font-size:9pt">core/ui/preset/FinancePresets.kt</span> aporta el <span style="font-family:'Roboto Mono',monospace; font-size:9pt">deepLinkPackage</span>.</p>
+
+    <h2 style="margin:0 0 12px; font-size:16pt; font-weight:700; letter-spacing:-.2px">9 · Onboarding</h2>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Qué cambia.</strong> Cinco pasos, una decisión por paso: la promesa, cuánto quieres gastar al mes, con qué pagas, qué compras a diario, y el resumen. Los pasos 2, 3 y 4 se pueden saltar.</p>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Por qué.</strong> No es una bienvenida: es la configuración mínima sin la cual las demás pantallas no tienen nada que decir. El presupuesto es el denominador del héroe; sin él no hay «cuánto te queda». Los métodos elegidos son los únicos que aparecen después al registrar y al pagar; sin ellos el selector muestra seis opciones genéricas. Los atajos llenan «De un toque»; sin ellos el registro vuelve a costar cinco toques. Cada paso paga una pantalla concreta, y por eso son cinco y no diez.</p>
+    <p style="margin:0 0 12px"><strong style="font-weight:700">Qué hacen los saltos.</strong> Saltar el presupuesto deja el héroe sin denominador y debe degradar con gracia, no romperse. Saltar métodos activa los seis por defecto. Saltar atajos deja la fila vacía hasta que haya 30 días de historial. Cuántos usuarios saltan cada paso, y cuáles, es de los datos más útiles de las sesiones.</p>
+    <p style="margin:0 0 26px; font-size:9.5pt; color:#4A4A54"><strong style="font-weight:700">Archivos:</strong> <span style="font-family:'Roboto Mono',monospace; font-size:9pt">app/OnboardingScreen.kt</span> (existe, se reescribe el contenido de los pasos); persistencia en <span style="font-family:'Roboto Mono',monospace; font-size:9pt">core/datastore</span>; el salto al primer gasto ya está resuelto por <span style="font-family:'Roboto Mono',monospace; font-size:9pt">startInAddTransaction</span> en <span style="font-family:'Roboto Mono',monospace; font-size:9pt">MoneyFlowApp.kt</span>.</p>
+
+    <h2 style="margin:0 0 12px; font-size:16pt; font-weight:700; letter-spacing:-.2px">10 · Orden de implementación</h2>
+    <p style="margin:0 0 12px">El orden no es por tamaño sino por dependencia: la navegación primero porque todo lo demás cuelga de ella, y el héroe último porque espera un dato que aún no existe.</p>
+    <table style="width:100%; border-collapse:collapse; font-size:9.5pt; margin:0 0 14px">
+      <thead>
+        <tr>
+          <th style="text-align:left; padding:8px 10px 8px 0; border-bottom:1.5px solid #1A1A22; font-weight:700; width:34px">#</th>
+          <th style="text-align:left; padding:8px 10px 8px 0; border-bottom:1.5px solid #1A1A22; font-weight:700">Bloque</th>
+          <th style="text-align:left; padding:8px 0; border-bottom:1.5px solid #1A1A22; font-weight:700; width:44%">Por qué aquí</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">1</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Navegación: 6 destinos, Tu dinero, Ajustes</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA; color:#4A4A54">Cambia dónde vive todo lo demás</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">2</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Buscador fijo en Movimientos</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA; color:#4A4A54">Aislado, sin dependencias, cierra el hallazgo 7</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">3</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Análisis accionable + absorber Sugerencias</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA; color:#4A4A54">Necesita las rutas nuevas del bloque 1</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">4</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Sheet de pago</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA; color:#4A4A54">Autocontenido; el launcher ya existe</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA; color:#8A8A96">5</td><td style="padding:7px 10px 7px 0; border-bottom:1px solid #E2E2EA">Onboarding + atajos de un toque</td><td style="padding:7px 0; border-bottom:1px solid #E2E2EA; color:#4A4A54">Los atajos dependen de lo que el onboarding recoge</td></tr>
+        <tr><td style="padding:7px 10px 7px 0; color:#8A8A96">6</td><td style="padding:7px 10px 7px 0">Héroe</td><td style="padding:7px 0; color:#4A4A54">Bloqueado hasta las sesiones con usuarios</td></tr>
+      </tbody>
+    </table>
+
+    <h2 style="margin:0 0 12px; font-size:16pt; font-weight:700; letter-spacing:-.2px">11 · Qué queda fuera</h2>
+    <p style="margin:0 0 8px">Deliberadamente no cubierto, para que no se cuele por omisión:</p>
+    <ul style="margin:0 0 14px; padding-left:20px; line-height:1.6">
+      <li style="margin-bottom:5px">Contenido de Cuentas y Ahorros. Aparecen en el mapa; sus pantallas no se tocan.</li>
+      <li style="margin-bottom:5px">Selector de mes en la barra superior. El sitio está reservado en <span style="font-family:'Roboto Mono',monospace; font-size:9pt">MoneyFlowApp.kt</span>, la interacción no está diseñada.</li>
+      <li style="margin-bottom:5px">Multi-moneda, widget y notificaciones. Sin cambios respecto al código actual.</li>
+      <li>Tablet y foldable. <span style="font-family:'Roboto Mono',monospace; font-size:9pt">NavigationSuiteScaffold</span> ya adapta la barra a rail, pero el contenido de las pantallas nuevas está diseñado a una columna.</li>
+    </ul>
+
+  </div>
+</doc-page>
+
+</x-dc>
+</body>
+</html>
