@@ -58,17 +58,54 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The emulator costs ~13 minutes, which is worth skipping for a PR that cannot
+      # possibly change app behaviour. Note what this does NOT do: filter on
+      # `src/androidTest/**`. These tests exercise the *main* sources — the 48dp touch
+      # target they caught on 2026-08-02 was a defect in UpcomingScreen.kt, not in a
+      # test — so keying off test files would skip the run precisely when it matters.
+      # The rule is inverted instead: run unless nothing but prose changed.
+      #
+      # The job itself always runs, and this is deliberate. It is a required check, so
+      # a `paths:` filter that skipped the job entirely would leave the status never
+      # reported and the pull request unmergeable for ever.
+      - name: Does this change need the emulator?
+        id: scope
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "not a pull request — running"
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base='${{ github.event.pull_request.base.sha }}'
+          changed=$(git diff --name-only "$base"...HEAD)
+          echo "changed files:"; echo "$changed" | sed 's/^/  /'
+          # Anything that is not documentation forces a run. Unknown paths count as
+          # code: a new top-level directory should not silently opt out of testing.
+          if echo "$changed" | grep -qvE '^(docs/|README\.md$|.*\.md$)'; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "-> code touched, running the emulator"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "-> documentation only, skipping the emulator"
+          fi
 
       - uses: actions/setup-java@v4
+        if: steps.scope.outputs.needed == 'true'
         with:
           distribution: temurin
           java-version: '17'
 
       - uses: gradle/actions/setup-gradle@v4
+        if: steps.scope.outputs.needed == 'true'
 
       # The emulator needs hardware acceleration; without this it falls back to a
       # software renderer and the Compose tests time out rather than fail cleanly.
       - name: Enable KVM
+        if: steps.scope.outputs.needed == 'true'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -76,6 +113,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Instrumented tests
+        if: steps.scope.outputs.needed == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -91,11 +129,11 @@ jobs:
       # exactly how core/ui's accessibility suite sat dead for months. Counting the
       # result XMLs is the only way to tell a passing suite from an absent one.
       - name: Assert instrumented tests actually ran
-        if: always()
+        if: always() && steps.scope.outputs.needed == 'true'
         run: python3 .github/scripts/check_test_counts.py instrumented
 
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: failure() && steps.scope.outputs.needed == 'true'
         with:
           name: instrumented-test-reports
           path: |
