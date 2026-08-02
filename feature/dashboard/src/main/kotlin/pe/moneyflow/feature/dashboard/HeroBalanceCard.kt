@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.theme.Motion
+import pe.moneyflow.core.designsystem.theme.brandSurface
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.domain.model.DashboardData
 import pe.moneyflow.core.domain.model.SpendingPace
@@ -60,9 +61,10 @@ import kotlin.math.roundToInt
  * selector, the figure, the pace and the streak, so the first thing on screen is the answer. The app
  * bar is gone on this destination for the same reason; see `MoneyFlowApp.kt`.
  *
- * Colors resolve through the theme (`primary` happens to be the prototype's indigo). Secondary text
- * on the band uses `primaryContainer` rather than alpha over `onPrimary`, per the handoff's one
- * normative color rule.
+ * Colors come from `MaterialTheme.brandSurface`, not from `colorScheme` directly. Picking them here
+ * is what got dark mode wrong: Material's `primary` is a *light* lavender in dark theme, so the band
+ * rendered as a bright block with dark text. Those roles now live in the design system, where the
+ * next brand surface inherits the answer instead of re-deriving it.
  *
  * Expense-first is kept deliberately: for an expense tracker, "what have I spent" beats "what's my
  * balance". Income stays secondary.
@@ -77,12 +79,13 @@ fun HeroBalanceCard(
     streak: List<StreakDay>,
     modifier: Modifier = Modifier,
 ) {
-    val onBand = MaterialTheme.colorScheme.onPrimary
-    val onBandMuted = MaterialTheme.colorScheme.primaryContainer
+    val brand = MaterialTheme.brandSurface
+    val onBand = brand.content
+    val onBandMuted = brand.mutedContent
 
     Surface(
         modifier = modifier,
-        color = MaterialTheme.colorScheme.primary,
+        color = brand.container,
         contentColor = onBand,
         // Only the bottom corners round: the band runs to the top edge, under the status bar.
         shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp),
@@ -138,12 +141,7 @@ fun HeroBalanceCard(
             val budgetMinor = pace?.monthBudgetMinor
             if (budgetMinor != null) {
                 Spacer(Modifier.height(Spacing.md))
-                HeroProgressBar(
-                    pace = pace,
-                    currencyCode = data.currencyCode,
-                    onBand = onBand,
-                    mutedColor = onBandMuted,
-                )
+                HeroProgressBar(pace = pace, currencyCode = data.currencyCode)
             }
 
             // ---- Balance ------------------------------------------------------------------------
@@ -185,17 +183,13 @@ fun HeroBalanceCard(
  * of schedule even when still under the limit, which is the earliest possible warning.
  */
 @Composable
-private fun HeroProgressBar(
-    pace: SpendingPace,
-    currencyCode: String,
-    onBand: Color,
-    mutedColor: Color,
-) {
+private fun HeroProgressBar(pace: SpendingPace, currencyCode: String) {
+    val brand = MaterialTheme.brandSurface
+    val onBand = brand.content
+    val mutedColor = brand.mutedContent
     val fraction = (pace.budgetFraction ?: 0f).coerceIn(0f, 1f)
     val expectedFraction = (pace.elapsedDays.toFloat() / pace.daysInMonth).coerceIn(0f, 1f)
-    // Red would not survive on the band; the over-budget signal is amber-on-indigo instead, which
-    // the light tertiary container gives at full opacity.
-    val alert = MaterialTheme.colorScheme.tertiaryContainer
+    val alert = brand.alert
     val barColor = if (pace.isOverBudget || pace.isProjectedOverBudget) alert else onBand
 
     Column {
@@ -209,9 +203,7 @@ private fun HeroProgressBar(
             fraction = fraction,
             expectedFraction = expectedFraction,
             barColor = barColor,
-            // A decorative track, not text: the no-alpha rule governs secondary *text*, and there is
-            // no theme token for "slightly lighter than primary" that stays correct in both themes.
-            trackColor = onBand.copy(alpha = 0.26f),
+            trackColor = brand.track,
             markerColor = onBand,
         )
         Spacer(Modifier.height(Spacing.sm))

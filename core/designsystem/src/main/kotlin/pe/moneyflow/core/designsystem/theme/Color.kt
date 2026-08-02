@@ -158,6 +158,65 @@ val MaterialTheme.moneyColors: MoneyColors
     get() = LocalMoneyColors.current
 
 /**
+ * Content roles for a **brand-colored surface** — one filled with the brand indigo rather than a
+ * page/card neutral. The dashboard hero band is the first consumer.
+ *
+ * These exist because such a surface inverts every normal assumption: `onSurfaceVariant` is
+ * unreadable on it, and the money-direction red dies against indigo, so a component painting one has
+ * to pick its own roles. The hero did exactly that, and got dark mode wrong twice — Material's
+ * `primary` is a *light* lavender in dark theme (`#B7B4FF`), so the band rendered as a bright block
+ * with dark text, and `tertiaryContainer` is a dark amber (`#7A5300`) that vanishes on it. Deriving
+ * these per component means the next brand surface repeats both mistakes.
+ *
+ * | role         | light             | dark              |
+ * |--------------|-------------------|-------------------|
+ * | container    | `#4F46E5` indigo  | `#3730A3` deep    |
+ * | content      | white 6.4:1       | white 8.9:1       |
+ * | mutedContent | `#E1E0FF` 5.5:1   | `#B7B4FF` 4.6:1   |
+ * | alert        | `#FDEBC8`         | `#FDEBC8`         |
+ *
+ * `mutedContent` is a real token, not alpha over [content] — the handoff's one normative color rule
+ * bans opacity for secondary text, and that rule does not stop applying because the background is
+ * branded. [track] is the exception and is deliberately translucent: it backs a progress bar, not
+ * text, and no theme token means "slightly lighter than the container" in both themes.
+ *
+ * Resolve via [brandSurface] — never import the raw values.
+ */
+data class BrandSurfaceColors(
+    val container: Color,
+    val content: Color,
+    val mutedContent: Color,
+    /** Over-budget signal. Amber, because red is illegible on indigo in either theme. */
+    val alert: Color,
+    /** Decorative progress-bar track. The one role allowed to be translucent. */
+    val track: Color,
+)
+
+internal val LightBrandSurface = BrandSurfaceColors(
+    container = Color(0xFF4F46E5),
+    content = Color(0xFFFFFFFF),
+    mutedContent = Color(0xFFE1E0FF),
+    alert = Color(0xFFFDEBC8),
+    track = Color(0x42FFFFFF),
+)
+
+internal val DarkBrandSurface = BrandSurfaceColors(
+    container = Color(0xFF3730A3),
+    content = Color(0xFFFFFFFF),
+    mutedContent = Color(0xFFB7B4FF),
+    alert = Color(0xFFFDEBC8),
+    track = Color(0x42FFFFFF),
+)
+
+internal val LocalBrandSurface = staticCompositionLocalOf { LightBrandSurface }
+
+/** Theme-resolved roles for brand-colored surfaces. Provided by [MoneyFlowTheme]. */
+val MaterialTheme.brandSurface: BrandSurfaceColors
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalBrandSurface.current
+
+/**
  * Fixed brand tint for the dashboard hero ([pe.moneyflow.core.designsystem.component.GlassCard]).
  * Deliberately *not* sourced from the color scheme so Material You / dynamic color can't repaint
  * the hero with a saturated wallpaper color — it only adapts light↔dark for legibility.
