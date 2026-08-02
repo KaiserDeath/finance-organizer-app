@@ -2,6 +2,8 @@ package pe.moneyflow.feature.budgets
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -16,7 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,6 +60,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
@@ -75,6 +80,7 @@ import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Spacing
+import pe.moneyflow.core.ui.util.toMonthNameOnly
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.BudgetProgress
 import pe.moneyflow.core.model.BudgetPeriod
@@ -143,6 +149,11 @@ fun BudgetsScreen(
             if (uiState.isLoading) {
                 item { SkeletonBlocks(heroHeight = 116.dp, count = 3, blockHeight = 148.dp) }
             } else if (uiState.isEmpty) {
+                // Shown above the empty state too: with no category budgets yet, "you set aside X
+                // and have assigned none of it" is precisely the thing the screen should say.
+                if (uiState.hasRollup) {
+                    item { MonthAllocationCard(state = uiState) }
+                }
                 item {
                     MoneyCard(modifier = Modifier.fillMaxWidth()) {
                         EmptyState(
@@ -154,6 +165,9 @@ fun BudgetsScreen(
                     }
                 }
             } else {
+                if (uiState.hasRollup) {
+                    item { MonthAllocationCard(state = uiState) }
+                }
                 item {
                     OverallCard(
                         spentMinor = uiState.totalSpentMinor,
@@ -200,6 +214,93 @@ fun BudgetsScreen(
 
 /** Wrapper so "open the create sheet" (null progress) is distinguishable from "closed". */
 private data class EditorTarget(val progress: BudgetProgress?)
+
+/**
+ * How the month's budget has been divided up, above the per-category cards.
+ *
+ * The screen previously opened straight into the list, which answers "how is each category doing?"
+ * but never "how much of my month have I actually allocated?" — the question you ask *before*
+ * deciding a limit. It only appears when a month budget exists; without one there is nothing to
+ * divide, and the category limits stand alone.
+ *
+ * The closing line exists to keep two numbers from looking like a contradiction: spending outside
+ * every budget is normal, and the month total still counts it.
+ */
+@Composable
+private fun MonthAllocationCard(state: BudgetsUiState) {
+    val monthly = state.monthlyBudgetMinor ?: return
+    val currency = state.currencyCode
+
+    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Presupuesto de ${state.month.toMonthNameOnly()}",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = Money.format(monthly, currency),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+
+        Spacer(Modifier.height(Spacing.lg))
+        AllocationRow(
+            label = when (state.items.size) {
+                0 -> "Sin repartir en categorías"
+                1 -> "Repartido en 1 categoría"
+                else -> "Repartido en ${state.items.size} categorías"
+            },
+            amount = Money.format(state.totalLimitMinor, currency),
+            accent = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        AllocationRow(
+            label = "Sin asignar a ninguna categoría",
+            amount = Money.format(state.unassignedMinor ?: 0L, currency),
+            accent = MaterialTheme.colorScheme.outline,
+        )
+
+        if (state.unbudgetedSpentMinor > 0) {
+            Spacer(Modifier.height(Spacing.lg))
+            Text(
+                text = "De lo gastado este mes, " +
+                    "${Money.format(state.unbudgetedSpentMinor, currency)} cayó fuera de todo " +
+                    "presupuesto. El total del mes sigue siendo uno solo.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AllocationRow(label: String, amount: String, accent: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(accent),
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = amount,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
 
 @Composable
 private fun OverallCard(spentMinor: Long, limitMinor: Long, currencyCode: String) {
