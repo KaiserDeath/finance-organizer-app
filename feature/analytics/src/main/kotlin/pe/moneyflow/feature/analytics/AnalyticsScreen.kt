@@ -20,13 +20,11 @@ import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.Insights
-import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -70,7 +68,6 @@ import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.component.MoneyProgressBar
 import pe.moneyflow.core.designsystem.component.SectionHeader
 import pe.moneyflow.core.designsystem.component.ShimmerBox
-import pe.moneyflow.core.designsystem.component.StatTile
 import pe.moneyflow.core.designsystem.theme.CategoryPalette
 import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.designsystem.theme.IconSize
@@ -81,11 +78,13 @@ import pe.moneyflow.core.domain.model.BudgetProgress
 import pe.moneyflow.core.domain.model.CategoryDelta
 import pe.moneyflow.core.domain.model.Insight
 import pe.moneyflow.core.domain.model.MonthlyReport
+import pe.moneyflow.core.domain.usecase.GetAnalyticsUseCase
 import pe.moneyflow.core.ui.component.InsightCard
 import java.time.LocalDate
 import kotlin.math.abs
 import pe.moneyflow.core.ui.util.amountsHidden
 import pe.moneyflow.core.ui.util.money
+import pe.moneyflow.core.ui.util.toMonthNameOnly
 
 @Composable
 fun AnalyticsScreen(
@@ -472,7 +471,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(
     data: AnalyticsData,
     insights: List<Insight>,
 ) {
-    val hasData = data.totalExpenseMinor > 0 || data.totalIncomeMinor > 0
+    // The month figures and the charts have different windows, so emptiness has to be asked about
+    // both: a month that has not started yet is not a reason to hide five months of history.
+    val hasData = data.monthExpenseMinor > 0 ||
+        data.monthIncomeMinor > 0 ||
+        data.months.any { it.expenseMinor > 0 || it.incomeMinor > 0 }
     if (!hasData) {
         item {
             MoneyCard(modifier = Modifier.fillMaxWidth()) {
@@ -487,12 +490,18 @@ private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(
         return
     }
 
-    item { SummaryStatRow(data) }
     // Breakdown before the historical charts: the prototype's Análisis leads with the month total and
     // where it went, because that is what a category limit gets adjusted against. The month-over-month
     // cash-flow curve that used to lead here was removed — the user sessions found the comparison
     // against last month irrelevant, the same finding that took the delta out of the hero.
-    if (data.categoryBreakdown.isNotEmpty()) {
+    //
+    // A `Gasto total` / `Promedio diario` tile row used to sit above this card. Both are gone. The
+    // average was the last open item of the audit's Phase 1 — a retrospective mean answers no
+    // question, and it collided with the hero's *prescriptive* daily allowance, leaving two "per
+    // day" figures with opposite meanings and nothing to tell them apart. The total went with it
+    // rather than being relabelled, because this card now carries it: the month total appears on
+    // this screen exactly once.
+    if (data.monthExpenseMinor > 0) {
         item { CategoryBreakdownCard(data) }
     }
     item { MonthlyTrendCard(data) }
@@ -508,26 +517,6 @@ private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(
                 InsightCard(insight = insight, modifier = Modifier.fillMaxWidth())
             }
         }
-    }
-}
-
-@Composable
-private fun SummaryStatRow(data: AnalyticsData) {
-    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-        StatTile(
-            label = "Gasto total",
-            value = money(data.totalExpenseMinor, data.currencyCode),
-            icon = Icons.Rounded.Payments,
-            accent = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.weight(1f),
-        )
-        StatTile(
-            label = "Promedio diario",
-            value = money(data.avgDailyExpenseMinor, data.currencyCode),
-            icon = Icons.AutoMirrored.Rounded.TrendingUp,
-            accent = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.weight(1f),
-        )
     }
 }
 
@@ -554,13 +543,31 @@ private fun MonthlyTrendCard(data: AnalyticsData) {
     }
 }
 
+/**
+ * The month's spending: one total, and where it went.
+ *
+ * This card owns the month total for the whole screen. The figure in the ring is
+ * [AnalyticsData.monthExpenseMinor] — the same number the hero prints on Inicio, by construction
+ * rather than by coincidence — and the title names the month so it cannot be read as anything
+ * else. Both were true of neither before: the centre used to sum the slices it had, which quietly
+ * excluded spending no category claimed, so it disagreed with the total in the tile above it.
+ *
+ * When something is uncategorized it gets a neutral slice and a sentence. The slice matters more
+ * than it looks: it makes the ring add up to the figure at its centre, so a reader can check the
+ * number instead of trusting it.
+ */
 @Composable
 private fun CategoryBreakdownCard(data: AnalyticsData) {
+    val monthLabel = data.months.lastOrNull()?.month?.toMonthNameOnly()
     MoneyCard(modifier = Modifier.fillMaxWidth()) {
-        SectionHeader(title = "Por categoría", modifier = Modifier.fillMaxWidth())
+        SectionHeader(
+            title = if (monthLabel != null) "Gasto de $monthLabel" else "Gasto del mes",
+            modifier = Modifier.fillMaxWidth(),
+        )
         Spacer(Modifier.height(Spacing.lg))
+        val uncategorizedMinor = data.monthUncategorizedMinor
         Row(verticalAlignment = Alignment.CenterVertically) {
-            val slices = data.categoryBreakdown.mapIndexed { index, spend ->
+            val categorySlices = data.monthCategoryBreakdown.mapIndexed { index, spend ->
                 DonutSlice(
                     fraction = spend.fraction,
                     color = colorFromHex(
@@ -569,33 +576,45 @@ private fun CategoryBreakdownCard(data: AnalyticsData) {
                     ),
                 )
             }
-            val breakdownTotalMinor = data.categoryBreakdown.sumOf { it.amountMinor }
-            val topSpend = data.categoryBreakdown.firstOrNull()
+            // Deliberately not a CategoryPalette colour: this is the absence of a category, and a
+            // palette hue would read as one more of them.
+            val slices = if (uncategorizedMinor > 0 && data.monthExpenseMinor > 0) {
+                categorySlices + DonutSlice(
+                    fraction = uncategorizedMinor.toFloat() / data.monthExpenseMinor,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+            } else {
+                categorySlices
+            }
+            val topSpend = data.monthCategoryBreakdown.firstOrNull()
             DonutChart(
                 slices = slices,
                 diameter = 132.dp,
                 contentDescription = buildString {
-                    append("Gasto por categoría, total ")
-                    append(money(breakdownTotalMinor, data.currencyCode))
+                    append("Gasto de ${monthLabel ?: "este mes"}, ")
+                    append(money(data.monthExpenseMinor, data.currencyCode))
                     append(".")
                     if (topSpend != null) {
                         append(" Mayor: ${topSpend.category.name}, ")
                         append("${(topSpend.fraction * 100).toInt()}%.")
                     }
+                    if (uncategorizedMinor > 0) {
+                        append(" ${money(uncategorizedMinor, data.currencyCode)} sin categoría.")
+                    }
                 },
                 centerContent = {
-                    // Total spend, matching the dashboard — the count of categories is not the fact
+                    // The month total, matching the hero — the count of categories is not the fact
                     // worth the most privileged position in the chart.
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = money(breakdownTotalMinor, data.currencyCode),
+                            text = money(data.monthExpenseMinor, data.currencyCode),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center,
                         )
                         Text(
-                            text = if (data.categoryBreakdown.size == 1) "1 categoría"
-                            else "${data.categoryBreakdown.size} categorías",
+                            text = if (data.monthCategoryBreakdown.size == 1) "1 categoría"
+                            else "${data.monthCategoryBreakdown.size} categorías",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -608,7 +627,7 @@ private fun CategoryBreakdownCard(data: AnalyticsData) {
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                data.categoryBreakdown.take(5).forEachIndexed { index, spend ->
+                data.monthCategoryBreakdown.take(5).forEachIndexed { index, spend ->
                     LegendRow(
                         name = spend.category.name,
                         amount = money(spend.amountMinor, data.currencyCode),
@@ -620,6 +639,18 @@ private fun CategoryBreakdownCard(data: AnalyticsData) {
                     )
                 }
             }
+        }
+
+        // Same idea, same voice as Presupuestos' allocation card: name the remainder, then say the
+        // total still holds. Two numbers only look like a contradiction when nothing joins them.
+        if (uncategorizedMinor > 0) {
+            Spacer(Modifier.height(Spacing.lg))
+            Text(
+                text = "De este total, ${money(uncategorizedMinor, data.currencyCode)} no cayó " +
+                    "en ninguna categoría. El total del mes sigue siendo uno solo.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -658,7 +689,13 @@ private fun LegendRow(name: String, amount: String, percent: Float, color: Color
 @Composable
 private fun WeekdayCard(data: AnalyticsData) {
     MoneyCard(modifier = Modifier.fillMaxWidth()) {
-        SectionHeader(title = "Por día de la semana", modifier = Modifier.fillMaxWidth())
+        // Says its window. A single month gives four or five samples per weekday, which is too
+        // noisy to read anything into, so the six-month window stays — but the label has to admit
+        // it, or this reads as another figure about the current month.
+        SectionHeader(
+            title = "Por día de la semana · últimos ${GetAnalyticsUseCase.DEFAULT_MONTHS} meses",
+            modifier = Modifier.fillMaxWidth(),
+        )
         Spacer(Modifier.height(Spacing.lg))
         val hidden = amountsHidden()
         BarChart(

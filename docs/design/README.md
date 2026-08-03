@@ -1,5 +1,21 @@
 # Handoff: MoneyFlow — Propuesta C
 
+> **Documento histórico — no es la lista de trabajo pendiente.** Los seis bloques están
+> implementados y la auditoría del 2026-08-01 está cerrada. Se conserva porque explica *por qué* se
+> decidió cada cosa, que sigue siendo la razón para leerlo.
+>
+> Dos avisos, porque el texto de abajo quedó desactualizado y sus instrucciones ya no aplican:
+>
+> - **El bloque 6 (héroe) ya no está bloqueado.** Las sesiones con usuarios ocurrieron y mataron la
+>   variación mes a mes; el KDoc de `HeroBalanceCard` registra el resultado. La advertencia de
+>   "qué NO tocar" que sigue vigente en este archivo describe un estado que ya pasó.
+> - **Parte del prototipo fue rechazada al probarlo** — el héroe de dos números y el bloque
+>   "Cifras del cierre". No las reconstruyas desde aquí.
+>
+> Lo que sigue abierto: [`docs/open-items.md`](../open-items.md).
+> Lo que se decidió a contracorriente del prototipo, y por qué:
+> [`docs/design-decisions.md`](../design-decisions.md).
+
 ## Resumen
 
 Rediseño de MoneyFlow (app Android de gastos personales, Kotlin + Jetpack Compose, multi-módulo)
@@ -62,7 +78,7 @@ expresarse en la escala del design system del repo, no copiarse en dp exactos.
 |---|---|
 | `spec/Especificación de desarrollo — Propuesta C.dc.html` | **La fuente de verdad.** Once secciones, pantalla por pantalla, con archivos Kotlin y el razonamiento de cada decisión. Ábrelo en un navegador. |
 | `prototipo/MoneyFlow Prototipo C (standalone).html` | Prototipo navegable, funciona offline. Ábrelo en un navegador y recorre los cinco flujos. |
-| `TAREAS.md` | Los seis bloques en orden de dependencia, con criterio de terminado. |
+| ~~`TAREAS.md`~~ | Los seis bloques en orden de dependencia. **Eliminado**: los seis están hechos, y una lista terminada con las casillas sin marcar se lee como pendiente. Lo que queda abierto vive en [`docs/open-items.md`](../open-items.md). |
 
 **Lee la especificación antes de escribir código.** Cada sección explica *por qué* se decidió
 algo. Si al implementar aparece una restricción técnica que invalida la razón, la decisión se

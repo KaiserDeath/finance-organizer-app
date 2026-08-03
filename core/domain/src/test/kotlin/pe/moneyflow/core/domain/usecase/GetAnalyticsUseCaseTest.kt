@@ -32,8 +32,8 @@ class GetAnalyticsUseCaseTest {
         Transaction(id = "5", title = "Viejo", amountMinor = 9999, categoryId = "c1", type = TransactionType.EXPENSE, actualDate = LocalDate.of(2026, 1, 20)),
     )
 
-    private fun useCase() = GetAnalyticsUseCase(
-        transactionRepository = FakeTxRepo(transactions),
+    private fun useCase(txs: List<Transaction> = transactions) = GetAnalyticsUseCase(
+        transactionRepository = FakeTxRepo(txs),
         categoryRepository = FakeCatRepo(categories),
         settingsRepository = FakeSettings(),
         clock = clock,
@@ -46,8 +46,19 @@ class GetAnalyticsUseCaseTest {
         assertEquals(6, data.months.size)
         assertEquals(YearMonth.of(2026, 2), data.months.first().month)
         assertEquals(YearMonth.of(2026, 7), data.months.last().month)
-        assertEquals(3500L, data.totalExpenseMinor)
-        assertEquals(300000L, data.totalIncomeMinor)
+    }
+
+    @Test
+    fun `the month total is the month's, not the window's`() = runTest {
+        val data = useCase()().first()
+
+        // July holds 1000 + 500; June's 2000 is inside the window but not inside the month. The
+        // screen labels this figure "Gasto de julio" and the hero prints the same number, so a
+        // window-wide sum here was six months of spending under a one-month label.
+        assertEquals(1500L, data.monthExpenseMinor)
+        assertEquals(300000L, data.monthIncomeMinor)
+        // Still reachable through the trend series, which is the field that does span the window.
+        assertEquals(2000L, data.months.first { it.month == YearMonth.of(2026, 6) }.expenseMinor)
     }
 
     @Test
@@ -75,10 +86,41 @@ class GetAnalyticsUseCaseTest {
     }
 
     @Test
-    fun `category breakdown totals the window`() = runTest {
+    fun `category breakdown covers the month, not the window`() = runTest {
         val data = useCase()().first()
 
-        assertEquals(1, data.categoryBreakdown.size)
-        assertEquals(3500L, data.categoryBreakdown.first().amountMinor)
+        assertEquals(1, data.monthCategoryBreakdown.size)
+        assertEquals(1500L, data.monthCategoryBreakdown.first().amountMinor)
+        assertEquals(0L, data.monthUncategorizedMinor)
+    }
+
+    @Test
+    fun `spending no category claims is kept, not dropped`() = runTest {
+        val data = useCase(
+            transactions + listOf(
+                Transaction(id = "6", title = "Sin categoría", amountMinor = 700, type = TransactionType.EXPENSE, actualDate = LocalDate.of(2026, 7, 12)),
+                // Points at a category that no longer exists — the case the breakdown's mapNotNull
+                // swallowed silently, which is how the donut centre drifted from the total.
+                Transaction(id = "7", title = "Categoría borrada", amountMinor = 300, categoryId = "gone", type = TransactionType.EXPENSE, actualDate = LocalDate.of(2026, 7, 13)),
+            ),
+        )().first()
+
+        assertEquals(2500L, data.monthExpenseMinor)
+        assertEquals(1500L, data.monthCategoryBreakdown.sumOf { it.amountMinor })
+        assertEquals(1000L, data.monthUncategorizedMinor)
+    }
+
+    @Test
+    fun `the breakdown plus the remainder is exactly the month total`() = runTest {
+        val data = useCase(
+            transactions + Transaction(id = "6", title = "Suelto", amountMinor = 4321, type = TransactionType.EXPENSE, actualDate = LocalDate.of(2026, 7, 9)),
+        )().first()
+
+        // What the donut draws has to add up to the figure at its centre, or the ring is a picture
+        // of one number wrapped around a different one.
+        assertEquals(
+            data.monthExpenseMinor,
+            data.monthCategoryBreakdown.sumOf { it.amountMinor } + data.monthUncategorizedMinor,
+        )
     }
 }
