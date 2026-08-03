@@ -90,13 +90,37 @@ class FakeBudgetRepository(seed: List<Budget> = emptyList()) : BudgetRepository 
     }
 }
 
+/**
+ * Stateful, because "which method is the default" is a fact about the whole set that only a write
+ * can change — and a fake whose `upsert` returned `Unit` could not tell a use case that sets the
+ * default correctly from one that sets two.
+ *
+ * Preserves insertion order: the thing being guarded against is a consumer falling back to
+ * `firstOrNull { it.isDefault }` and answering by position, so the order has to be stable enough
+ * for a test to catch that.
+ */
 class FakePaymentMethodRepository(
-    private val items: List<PaymentMethod> = emptyList(),
+    seed: List<PaymentMethod> = emptyList(),
 ) : PaymentMethodRepository {
-    override fun observeAll(): Flow<List<PaymentMethod>> = flowOf(items)
-    override suspend fun getById(id: String): PaymentMethod? = items.firstOrNull { it.id == id }
-    override suspend fun upsert(paymentMethod: PaymentMethod) = Unit
-    override suspend fun delete(id: String) = Unit
+    private val store = MutableStateFlow(seed)
+
+    fun all(): List<PaymentMethod> = store.value
+
+    override fun observeAll(): Flow<List<PaymentMethod>> = store.asStateFlow()
+    override suspend fun getById(id: String): PaymentMethod? = store.value.firstOrNull { it.id == id }
+
+    override suspend fun upsert(paymentMethod: PaymentMethod) {
+        val existing = store.value.indexOfFirst { it.id == paymentMethod.id }
+        store.value = if (existing >= 0) {
+            store.value.toMutableList().also { it[existing] = paymentMethod }
+        } else {
+            store.value + paymentMethod
+        }
+    }
+
+    override suspend fun delete(id: String) {
+        store.value = store.value.filterNot { it.id == id }
+    }
 }
 
 class FakeRecurringExpenseRepository(
