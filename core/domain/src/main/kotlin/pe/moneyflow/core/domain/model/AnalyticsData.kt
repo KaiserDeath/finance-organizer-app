@@ -5,31 +5,49 @@ import java.time.DayOfWeek
 import java.time.YearMonth
 
 /**
- * Everything the Analytics screen shows over a rolling window of months, computed by
+ * Everything the Analytics screen shows, computed by
  * [pe.moneyflow.core.domain.usecase.GetAnalyticsUseCase]. Amounts are minor units (céntimos).
+ *
+ * **Two windows live here, and every field says which one it belongs to.** The `month*` fields
+ * describe the current calendar month and nothing else; [months] and [weekdays] span the rolling
+ * multi-month window. They used to share one set of names, so the screen printed six-month sums
+ * under labels a reader takes for "this month" — and the month total disagreed with the hero on
+ * Inicio, which was always month-scoped. A field whose window is not in its name is how that
+ * happened; keep the prefix.
  */
 data class AnalyticsData(
     /** One entry per calendar month in the window, oldest first. */
     val months: List<MonthlyPoint>,
-    /** Expense totals per category across the whole window, largest first. */
-    val categoryBreakdown: List<CategorySpend>,
-    /** Expense totals per weekday (Mon..Sun) across the window. */
+    /** Expense totals per category **for the current month**, largest first. */
+    val monthCategoryBreakdown: List<CategorySpend>,
+    /** Expense totals per weekday (Mon..Sun) across the whole window. */
     val weekdays: List<WeekdaySpend>,
-    val totalExpenseMinor: Long,
-    val totalIncomeMinor: Long,
-    /** Average daily expense across the days actually covered by the window. */
-    val avgDailyExpenseMinor: Long,
+    /**
+     * What was spent in the current month — PAID expenses only.
+     *
+     * Equal to `DashboardData.monthSpentMinor` by construction: same filter, same month. The two
+     * screens print one number, and this is it.
+     */
+    val monthExpenseMinor: Long,
+    /** Income recorded in the current month. */
+    val monthIncomeMinor: Long,
+    /**
+     * The part of [monthExpenseMinor] that no category claims — either because the transaction
+     * carries none, or because the category it points at is gone. Kept as its own figure so the
+     * breakdown can state the remainder instead of quietly dropping it.
+     */
+    val monthUncategorizedMinor: Long,
     val categoriesById: Map<String, Category>,
     val currencyCode: String,
 ) {
     companion object {
         val Empty = AnalyticsData(
             months = emptyList(),
-            categoryBreakdown = emptyList(),
+            monthCategoryBreakdown = emptyList(),
             weekdays = emptyList(),
-            totalExpenseMinor = 0,
-            totalIncomeMinor = 0,
-            avgDailyExpenseMinor = 0,
+            monthExpenseMinor = 0,
+            monthIncomeMinor = 0,
+            monthUncategorizedMinor = 0,
             categoriesById = emptyMap(),
             currencyCode = "PEN",
         )

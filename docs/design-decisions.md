@@ -3,6 +3,63 @@
 Standing rules that outlive any one audit. Each entry says what was decided and why, so a later
 reader can tell a deliberate divergence from drift.
 
+## The month total is the month's — on every screen that prints it
+
+`AnalyticsData` carries two windows and every field names the one it belongs to: `month*` fields
+describe the current calendar month, while `months` and `weekdays` span the rolling
+`DEFAULT_MONTHS` window.
+
+They used to share one set of names. `GetAnalyticsUseCase` aggregated six months and
+`AnalyticsScreen` labelled the result `Gasto total` and `Promedio diario` with no period at all —
+so the screen showed half a year of spending under labels a reader takes for *this month*, and it
+could never agree with the hero on Inicio, which was always month-scoped.
+
+Propuesta C block 3 asked to *"unificar el total del mes entre dona y héroe"*, and an earlier pass
+unified the **status** (PAID only) while leaving the **period** untouched. That is the shape of the
+bug worth remembering: the fix looked done, the use case even carried a comment asserting the two
+agreed, and the disagreement it named survived underneath.
+
+Three rules follow, and the tests in `GetAnalyticsUseCaseTest` pin all of them:
+
+- **One month total per screen.** Análisis prints it once, in the breakdown card's ring. The
+  `Gasto total` tile was deleted rather than relabelled — a second copy of a figure is a second
+  chance for the two to drift.
+- **The remainder is stated, never dropped.** `monthUncategorizedMinor` exists because the
+  breakdown's `mapNotNull` silently swallowed both uncategorized spending and transactions
+  pointing at a deleted category, which is exactly how the donut centre came to disagree with the
+  total above it. It gets a neutral `outlineVariant` slice — not a palette hue, which would read as
+  one more category — so the ring sums to the figure at its centre and a reader can check it
+  instead of trusting it. The wording follows `BudgetsScreen`'s allocation card: name the
+  remainder, then say the total still holds.
+- **A window that is not the month says so.** The weekday chart keeps six months because one month
+  gives four or five samples per weekday, which is too noisy to read anything into — so its title
+  carries the window. Any future figure spanning more than the month owes the same.
+
+`Promedio diario` was deleted with the tile row. It was the last open item of the 2026-08-01
+audit's Phase 1, and the argument that removed the transaction count applies to it unchanged: a
+retrospective arithmetic mean answers no question. It also collided with the hero's *prescriptive*
+daily allowance, leaving two "per day" figures with opposite meanings and nothing to tell them
+apart.
+
+## The shortcut toast keeps undo, not "Abrir Yape"
+
+The prototype's save toast carries both an undo and an "Abrir Yape" action, and the design notes
+call the launch out as nearly free: *"launchPaymentApp() ya existe en core/ui, sólo faltaba
+llamarla desde el guardado."*
+
+It is not free, because the premise does not survive the platform. The prototype is HTML and can
+render two actions in a toast; a Material 3 `Snackbar` carries exactly one. So this is a choice the
+design never had to make, and per the handoff's own rule — a decision whose premise breaks is a
+different decision — it gets made here rather than half-implemented.
+
+**Undo wins.** A shortcut saves an expense in one tap with no confirmation step, so a wrong amount
+is the failure the toast exists to catch, and it is unrecoverable once the toast expires. Not being
+able to open Yape from the toast costs the user one extra tap in their launcher; losing undo costs
+them a corrupt ledger they may not notice for days.
+
+Recorded as **decided**, not deferred: a reader comparing the app to the prototype will find this
+missing, and should stop there rather than build it.
+
 ## Month-over-month comparisons — scope, not ban
 
 Month-over-month comparisons are banned from ambient surfaces (Inicio, Análisis) and permitted in

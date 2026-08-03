@@ -203,6 +203,21 @@ class AnalyticsViewModelTest {
             transactions = listOf(expense("a", "comida", 3_000), expense("b", "comida", 7_000)),
         ).uiState.first { !it.isLoading }
 
-        assertEquals(10_000L, state.analytics.totalExpenseMinor)
+        assertEquals(10_000L, state.analytics.monthExpenseMinor)
+    }
+
+    @Test
+    fun `last month's spending stays out of this month's total`() = runTest {
+        val lastMonth = expense("old", "comida", 50_000).let {
+            it.copy(actualDate = today.minusMonths(1).withDayOfMonth(5))
+        }
+        val state = viewModel(
+            transactions = listOf(expense("a", "comida", 3_000), lastMonth),
+        ).uiState.first { !it.isLoading }
+
+        // The figure the screen labels with the month name, and the one the hero prints. A window
+        // sum here is what made the two disagree.
+        assertEquals(3_000L, state.analytics.monthExpenseMinor)
+        assertEquals(3_000L, state.analytics.monthCategoryBreakdown.sumOf { it.amountMinor })
     }
 }
