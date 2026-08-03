@@ -102,6 +102,20 @@ class TransactionsViewModel @Inject constructor(
         )
     }
 
+    /**
+     * Drops every category constraint — what the "Todas" chip means.
+     *
+     * The screen used to express this by iterating the current selection and calling
+     * [toggleCategory] on each id. That happened to work, because the set it iterated was an
+     * immutable snapshot from the last emission rather than the live one, so nothing was being
+     * mutated underneath the loop. But it read as though it were, and it made a single intent —
+     * "no category filter" — depend on that detail holding. One update, once.
+     *
+     * Distinct from [clearFilters], which also drops the query and the type filters; the chip row
+     * has no business resetting the search box above it.
+     */
+    fun clearCategories() = filterState.update { it.copy(categoryIds = emptySet()) }
+
     fun clearFilters() = filterState.update { TransactionFilter() }
 
     fun delete(id: String) {
