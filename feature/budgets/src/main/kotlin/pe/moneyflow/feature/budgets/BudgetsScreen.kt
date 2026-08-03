@@ -50,6 +50,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -80,6 +81,7 @@ import pe.moneyflow.core.designsystem.component.MoneyProgressBar
 import pe.moneyflow.core.designsystem.component.SkeletonBlocks
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.moneyColors
+import pe.moneyflow.core.designsystem.theme.noticeColors
 import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.ui.util.toMonthNameOnly
@@ -192,7 +194,17 @@ fun BudgetsScreen(
                     BudgetCard(
                         progress = progress,
                         onClick = { editorTarget = EditorTarget(progress) },
-                        onDelete = { viewModel.delete(progress.budget.id) },
+                        onDelete = {
+                            viewModel.delete(progress.budget)
+                            scope.launch {
+                                val result = snackbarHostState.showSnackbar(
+                                    message = "Presupuesto eliminado",
+                                    actionLabel = "Deshacer",
+                                    duration = SnackbarDuration.Short,
+                                )
+                                if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete()
+                            }
+                        },
                         modifier = animatedItem(),
                     )
                 }
@@ -407,9 +419,12 @@ private fun BudgetCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // `tertiary` used to serve as both the bar fill and the text tint. It works as a fill and fails
+    // as text — 2.15:1 on white — so the near-limit amber now comes from the design system, where it
+    // is dark enough to read, and the warning itself moved into a filled pill.
     val barColor = when {
         progress.isOverBudget -> MaterialTheme.moneyColors.negative
-        progress.isNearLimit -> MaterialTheme.colorScheme.tertiary
+        progress.isNearLimit -> MaterialTheme.noticeColors.warning
         else -> MaterialTheme.colorScheme.primary
     }
     val accent = colorFromHex(progress.category?.colorHex, MaterialTheme.colorScheme.primary)
@@ -467,23 +482,36 @@ private fun BudgetCard(
 
         if (progress.isOverBudget || progress.isNearLimit) {
             Spacer(Modifier.height(Spacing.sm))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Rounded.Warning,
-                    contentDescription = null,
-                    tint = barColor,
-                    modifier = Modifier.size(IconSize.sm),
-                )
-                Spacer(Modifier.padding(horizontal = Spacing.xxs))
-                Text(
-                    text = if (progress.isOverBudget) {
-                        "Superaste el límite por ${money(-progress.remainingMinor, progress.currencyCode)}"
-                    } else {
-                        "Te quedan ${money(progress.remainingMinor, progress.currencyCode)}"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = barColor,
-                )
+            val notice = MaterialTheme.noticeColors
+            val container =
+                if (progress.isOverBudget) notice.dangerContainer else notice.warningContainer
+            val onContainer =
+                if (progress.isOverBudget) notice.onDangerContainer else notice.onWarningContainer
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = container,
+                contentColor = onContainer,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Rounded.Warning,
+                        contentDescription = null,
+                        modifier = Modifier.size(IconSize.sm),
+                    )
+                    Spacer(Modifier.padding(horizontal = Spacing.xxs))
+                    Text(
+                        text = if (progress.isOverBudget) {
+                            "Superaste el límite por ${money(-progress.remainingMinor, progress.currencyCode)}"
+                        } else {
+                            "Te quedan ${money(progress.remainingMinor, progress.currencyCode)}"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         }
     }
@@ -619,6 +647,7 @@ private fun BudgetEditorSheet(
                         selected = period == value,
                         onClick = { period = value },
                         shape = SegmentedButtonDefaults.itemShape(index, periods.size),
+                        modifier = Modifier.heightIn(min = 48.dp),
                     ) { Text(label) }
                 }
             }
@@ -629,12 +658,14 @@ private fun BudgetEditorSheet(
                     selected = categoryId == null,
                     onClick = { categoryId = null },
                     label = { Text("General") },
+                    modifier = Modifier.heightIn(min = 48.dp),
                 )
                 categories.forEach { category ->
                     FilterChip(
                         selected = categoryId == category.id,
                         onClick = { categoryId = category.id },
                         label = { Text(category.name) },
+                        modifier = Modifier.heightIn(min = 48.dp),
                     )
                 }
             }

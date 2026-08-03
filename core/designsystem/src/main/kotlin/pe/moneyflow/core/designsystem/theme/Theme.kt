@@ -27,7 +27,7 @@ import androidx.core.view.WindowCompat
  * scroll behavior, the animated navigation-bar indicator, `PullToRefreshBox`, `PrimaryTabRow`) is in
  * use. Swap [Motion] for `MaterialTheme.motionScheme` when 1.5.0 ships stable.
  *
- * Also provides theme-resolved [MoneyColors] and [BrandSurfaceColors], and keeps the system bar
+ * Also provides theme-resolved [MoneyColors], [BrandSurfaceColors] and [NoticeColors], and keeps the system bar
  * icons legible against the current background.
  */
 @Composable
@@ -40,6 +40,7 @@ fun MoneyFlowTheme(
     val colorScheme = if (darkTheme) DarkColors else LightColors
     val moneyColors = if (darkTheme) DarkMoneyColors else LightMoneyColors
     val brandSurface = if (darkTheme) DarkBrandSurface else LightBrandSurface
+    val noticeColors = if (darkTheme) DarkNoticeColors else LightNoticeColors
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -56,6 +57,7 @@ fun MoneyFlowTheme(
     CompositionLocalProvider(
         LocalMoneyColors provides moneyColors,
         LocalBrandSurface provides brandSurface,
+        LocalNoticeColors provides noticeColors,
         LocalAmountsHidden provides amountsHidden,
     ) {
         MaterialTheme(

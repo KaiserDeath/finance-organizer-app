@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import pe.moneyflow.core.domain.model.Insight
 import pe.moneyflow.core.domain.repository.AccountRepository
 import pe.moneyflow.core.domain.repository.BudgetRepository
@@ -69,11 +70,24 @@ class FakeCategoryRepository(private val items: List<Category> = emptyList()) : 
     override suspend fun delete(id: String) = Unit
 }
 
-class FakeBudgetRepository(private val items: List<Budget> = emptyList()) : BudgetRepository {
-    override fun observeAll(): Flow<List<Budget>> = flowOf(items)
-    override suspend fun getById(id: String): Budget? = items.firstOrNull { it.id == id }
-    override suspend fun upsert(budget: Budget) = Unit
-    override suspend fun delete(id: String) = Unit
+/** Stateful for the same reason as [FakeTransactionRepository]: deleting a budget has an undo. */
+class FakeBudgetRepository(seed: List<Budget> = emptyList()) : BudgetRepository {
+    private val store = MutableStateFlow(seed.associateBy { it.id })
+
+    fun all(): List<Budget> = store.value.values.toList()
+
+    // Live rather than a `flowOf` snapshot: undo is only observable if a write re-emits, and a
+    // one-shot flow completes before the delete happens, so the state under test never changes.
+    override fun observeAll(): Flow<List<Budget>> = store.map { it.values.toList() }
+    override suspend fun getById(id: String): Budget? = store.value[id]
+
+    override suspend fun upsert(budget: Budget) {
+        store.value = store.value + (budget.id to budget)
+    }
+
+    override suspend fun delete(id: String) {
+        store.value = store.value - id
+    }
 }
 
 class FakePaymentMethodRepository(

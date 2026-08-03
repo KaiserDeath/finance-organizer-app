@@ -4,10 +4,10 @@ A modern, offline-first personal‑finance organizer for the Peru market — tra
 know where money goes, what's due, and how much remains. Built with Kotlin, Jetpack Compose,
 Material 3, and a clean multi‑module architecture designed to scale into a full product.
 
-> **Status: Phase 0 (foundation) + Phase 1 MVP slice.** The app launches to a themed dashboard,
-> seeds Peru categories & payment methods, and lets you add an expense and see it in the list and
-> month total. Later phases (budgets, analytics, accounts, security, widgets, AI) are architected
-> for but not yet implemented — see the roadmap.
+> **Status: Phases 0–6 implemented.** Expenses, budgets, upcoming payments and recurring templates,
+> analytics, accounts and savings, multi-currency, app lock, onboarding, the home-screen widget and
+> the rule-based insight engine all ship. The UI follows the Propuesta C redesign (`docs/design/`).
+> What is *not* done is listed in the roadmap and in `docs/audit-2026-08-01.md`.
 
 ---
 
@@ -44,7 +44,8 @@ Shared Gradle config lives in `build-logic/` convention plugins; all versions in
 `gradle/libs.versions.toml`.
 
 ```
-:app                     Application, MainActivity, theme wiring, NavHost + bottom bar
+:app                     Application, MainActivity, NavigationSuiteScaffold shell, onboarding,
+                         app lock, Tu dinero and Ajustes
 core/
   :core:model            pure-Kotlin domain models (Transaction, Account, Category, …)
   :core:common           Money (minor-unit) utils, dispatchers qualifiers
@@ -54,12 +55,20 @@ core/
   :core:data             repository impls, entity⇄domain mappers, DI (dispatchers, clock)
   :core:designsystem     theme, tokens, MoneyCard/StatTile/DonutChart/EmptyState/…
   :core:ui               AmountText, TransactionRow, date format, bank-app launcher
+  :core:testing          MainDispatcherRule and the shared repository fakes
 feature/
-  :feature:dashboard        month spend, today, income, category donut, recent list
+  :feature:dashboard        hero band, pace, shortcuts, insights, streak
   :feature:transactions     date-grouped list, swipe-to-delete + undo
   :feature:addedit          add/edit expense (amount, category, method, date, notes)
   :feature:categories       category CRUD with color/icon picker
   :feature:paymentmethods   payment methods + tap-to-launch bank apps
+  :feature:budgets          month budget allocation + per-category limits
+  :feature:upcoming         what's due, the pay sheet, "ya pagué por fuera"
+  :feature:recurring        recurring expense templates
+  :feature:analytics        trends and the monthly report
+  :feature:accounts         accounts and balances
+  :feature:savings          savings goals
+  :feature:currency         exchange rates and multi-currency
 ```
 
 ### Key design decisions
@@ -84,9 +93,13 @@ search. "Plin" has no standalone app (it lives inside partner bank apps), so it 
 
 ## Roadmap
 
-- **Phase 2** — Budgets, upcoming payments, recurring templates (WorkManager), reminders/notifications.
-- **Phase 3** — Analytics & monthly reports (Vico charts, CSV/PDF export).
-- **Phase 4** — Accounts, income, transfers, savings goals, net worth, multi-currency.
+> These phase numbers are the *product* roadmap. `docs/audit-2026-08-01.md` has its own,
+> unrelated phase numbering for design-system work — the two collide on "Phase 4" and mean
+> different things.
+
+- **Phase 2** — Budgets, upcoming payments, recurring templates (WorkManager), reminders/notifications ✅.
+- **Phase 3** — Analytics & monthly reports (Vico charts, CSV/PDF export) ✅.
+- **Phase 4** — Accounts, income, transfers, savings goals, net worth, multi-currency ✅.
 - **Phase 5** — Biometric/PIN lock, backup/restore (JSON), onboarding, full search/filters,
   home-screen widget (Glance) ✅.
 - **Phase 6** — Smart insights behind the `SmartInsights` interface (rule-based engine: cash-flow,
@@ -98,7 +111,7 @@ search. "Plin" has no standalone app (it lives inside partner bank apps), so it 
 Two suites, both run by CI on every pull request.
 
 ```bash
-./gradlew test                      # 164 unit tests, no device needed
+./gradlew test                      # 166 unit tests, no device needed
 ./gradlew connectedDebugAndroidTest # 49 instrumented tests, needs a device or emulator
 ```
 

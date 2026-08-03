@@ -42,7 +42,9 @@ import pe.moneyflow.core.designsystem.illustration.Illustration
 import pe.moneyflow.core.designsystem.illustration.MoneyFlowIllustration
 import pe.moneyflow.core.designsystem.theme.CategoryPalette
 import pe.moneyflow.core.designsystem.theme.Spacing
+import pe.moneyflow.core.designsystem.theme.brandSurface
 import pe.moneyflow.core.designsystem.theme.moneyColors
+import pe.moneyflow.core.designsystem.theme.noticeColors
 
 // ---------------------------------------------------------------------------------------------
 // Foundation specimens — these are the previews that verify the token layer itself.
@@ -87,6 +89,21 @@ private fun ColorSchemePreview() {
             Text("Money direction", style = MaterialTheme.typography.labelLarge)
             SwatchPair("positive", MaterialTheme.moneyColors.positive, scheme.surface)
             SwatchPair("negative", MaterialTheme.moneyColors.negative, scheme.surface)
+
+            Spacer(Modifier.height(Spacing.sm))
+            Text("Brand surface", style = MaterialTheme.typography.labelLarge)
+            val brand = MaterialTheme.brandSurface
+            SwatchPair("container / content", brand.container, brand.content)
+            SwatchPair("container / mutedContent", brand.container, brand.mutedContent)
+            SwatchPair("container / alert", brand.container, brand.alert)
+            SwatchPair("track", brand.track, brand.content)
+
+            Spacer(Modifier.height(Spacing.sm))
+            Text("Notices", style = MaterialTheme.typography.labelLarge)
+            val notice = MaterialTheme.noticeColors
+            SwatchPair("warningContainer", notice.warningContainer, notice.onWarningContainer)
+            SwatchPair("dangerContainer", notice.dangerContainer, notice.onDangerContainer)
+            SwatchPair("warning on surface", scheme.surface, notice.warning)
 
             Spacer(Modifier.height(Spacing.sm))
             Text("Category palette", style = MaterialTheme.typography.labelLarge)

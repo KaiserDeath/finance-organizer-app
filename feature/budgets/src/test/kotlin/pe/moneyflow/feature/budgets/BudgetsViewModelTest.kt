@@ -294,6 +294,29 @@ class BudgetsViewModelTest {
         )
     }
 
+    // -----------------------------------------------------------------------------------------
+    // Deleting a budget. The undo here has to reconstruct the whole row from a stash, because by
+    // the time it runs the record is gone — an id alone would bring back an empty budget.
+    // -----------------------------------------------------------------------------------------
+
+    @Test
+    fun `undo restores the deleted budget with its id and amount intact`() = runTest {
+        val vm = viewModel(budgets = listOf(budget("b1", "comida", 60_000)))
+        vm.uiState.first { !it.isLoading }
+
+        vm.delete(budget("b1", "comida", 60_000))
+        advanceUntilIdle()
+        assertTrue(vm.uiState.first { !it.isLoading }.items.isEmpty())
+
+        vm.undoDelete()
+        advanceUntilIdle()
+
+        val restored = vm.uiState.first { !it.isLoading }.items.single().budget
+        assertEquals("b1", restored.id)
+        assertEquals(60_000L, restored.amountMinor)
+        assertEquals("comida", restored.categoryId)
+    }
+
     @Test
     fun `the new amount reaches the roll-up`() = runTest {
         val settings = FakeSettingsRepository(monthlyBudgetMinor = null)

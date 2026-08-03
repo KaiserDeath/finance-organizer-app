@@ -217,6 +217,63 @@ val MaterialTheme.brandSurface: BrandSurfaceColors
     get() = LocalBrandSurface.current
 
 /**
+ * Warning and danger roles for **tinted notice pills on a neutral surface** — the "te quedan X" /
+ * "superaste el límite" block on a budget card, and anything like it.
+ *
+ * These exist because there was no legible amber. A near-limit warning used `colorScheme.tertiary`
+ * as *text* on `surface`, which measures **2.15:1** on white — under half the 4.5:1 AA requires for
+ * the label-size text it was applied to. The bar it also tinted was fine; the text was not, and one
+ * token was doing both jobs.
+ *
+ * The fix is the prototype's own: draw the notice as a filled pill, which turns one impossible
+ * question ("what amber reads on both white and near-black?") into two easy ones. [warning] stays
+ * for the rare case that still needs a bare on-surface tint, and is darkened until it clears AA.
+ *
+ * | role                                | light           | dark             |
+ * |-------------------------------------|-----------------|------------------|
+ * | onWarningContainer / warningContainer | `#92400E` 6.4:1 | `#FCD34D` 10.1:1 |
+ * | onDangerContainer / dangerContainer   | `#B91C1C` 5.3:1 | `#FCA5A5` 8.5:1  |
+ * | warning on `surface`                  | `#B45309` 5.0:1 | `#FBBF24` 10.8:1 |
+ *
+ * `danger*` is the container form of [MoneyColors.negative] and tracks the same red; it is separate
+ * because a pill needs a background and a foreground, and `negative` is a single on-surface value.
+ *
+ * Resolve via [noticeColors] — never import the raw values.
+ */
+data class NoticeColors(
+    val warningContainer: Color,
+    val onWarningContainer: Color,
+    val dangerContainer: Color,
+    val onDangerContainer: Color,
+    /** Bare warning tint, legible as text on `surface`. Prefer the container pair where a pill fits. */
+    val warning: Color,
+)
+
+internal val LightNoticeColors = NoticeColors(
+    warningContainer = Color(0xFFFEF3C7),
+    onWarningContainer = Color(0xFF92400E),
+    dangerContainer = Color(0xFFFEE2E2),
+    onDangerContainer = Color(0xFFB91C1C),
+    warning = Color(0xFFB45309),
+)
+
+internal val DarkNoticeColors = NoticeColors(
+    warningContainer = Color(0xFF422006),
+    onWarningContainer = Color(0xFFFCD34D),
+    dangerContainer = Color(0xFF450A0A),
+    onDangerContainer = Color(0xFFFCA5A5),
+    warning = Color(0xFFFBBF24),
+)
+
+internal val LocalNoticeColors = staticCompositionLocalOf { LightNoticeColors }
+
+/** Theme-resolved warning/danger notice roles. Provided by [MoneyFlowTheme]. */
+val MaterialTheme.noticeColors: NoticeColors
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalNoticeColors.current
+
+/**
  * Fallback palette used to color category slices/chips when a stored hex is missing, cycled as
  * `CategoryPalette[index % size]`.
  *

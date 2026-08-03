@@ -86,6 +86,9 @@ class BudgetsViewModel @Inject constructor(
      */
     private var previousMonthlyBudget: MonthBudgetUndo? = null
 
+    /** The budget as it was before the last delete, for the snackbar's deshacer. */
+    private var deletedPrevious: Budget? = null
+
     val uiState: StateFlow<BudgetsUiState> =
         combine(
             getBudgetsProgress(),
@@ -153,8 +156,25 @@ class BudgetsViewModel @Inject constructor(
         viewModelScope.launch { saveBudget(previous) }
     }
 
-    fun delete(id: String) {
-        viewModelScope.launch { deleteBudget(id) }
+    /**
+     * Deletes, stashing the whole [budget] for [undoDelete] — not just the id, which is all the
+     * repository needs. Undo has to put back the name, category, amount and period, and once the
+     * row is gone there is nowhere left to read them from.
+     *
+     * Takes the budget rather than an id so the stash never depends on `uiState.value` being current:
+     * the caller is rendering this exact row, and re-deriving it from a cached state was a way to
+     * stash nothing at all and silently lose the undo.
+     */
+    fun delete(budget: Budget) {
+        deletedPrevious = budget
+        viewModelScope.launch { deleteBudget(budget.id) }
+    }
+
+    /** Re-saves with the original id, so the budget comes back as itself rather than as a copy. */
+    fun undoDelete() {
+        val previous = deletedPrevious ?: return
+        deletedPrevious = null
+        viewModelScope.launch { saveBudget(previous) }
     }
 
     /**

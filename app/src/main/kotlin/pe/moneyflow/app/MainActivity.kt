@@ -45,8 +45,9 @@ class MainActivity : FragmentActivity() {
         val activity = this
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
-            // Remembers that the user finished onboarding this launch, so the app can open the
-            // first-transaction form once the graph is shown.
+            // Remembers that the user asked to log their first expense on the way out of onboarding,
+            // so the app can open that form once the graph is shown. The summary's other exit goes
+            // straight to the dashboard instead.
             var justOnboarded by rememberSaveable { mutableStateOf(false) }
             val darkTheme = when (state.preferences.themeMode) {
                 ThemeMode.LIGHT -> false
@@ -66,8 +67,8 @@ class MainActivity : FragmentActivity() {
                         // setKeepOnScreenCondition above), so there is nothing to draw underneath it.
                         state.isLoading -> Unit
                         state.showOnboarding -> OnboardingScreen(
-                            onFinish = {
-                                justOnboarded = true
+                            onFinish = { openAddTransaction ->
+                                justOnboarded = openAddTransaction
                                 viewModel.completeOnboarding()
                             },
                         )

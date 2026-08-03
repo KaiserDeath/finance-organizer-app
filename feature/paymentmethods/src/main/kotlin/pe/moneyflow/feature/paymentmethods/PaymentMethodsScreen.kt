@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -34,7 +35,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -44,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -86,6 +88,7 @@ import kotlinx.coroutines.launch
 import pe.moneyflow.core.designsystem.component.animatedItem
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.icon.iconForKey
+import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.ui.legal.LegalText
@@ -172,12 +175,31 @@ fun PaymentMethodsScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             item {
-                Text(
-                    text = "Toca un método para editarlo, o \"Abrir\" para ir a su app oficial " +
-                        "(saldrás de MoneyFlow).",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // A tinted container, not loose text: this explains that "Abrir" leaves the app,
+                // which is the one thing on this screen a user should not discover by accident.
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(Spacing.lg),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Link,
+                            contentDescription = null,
+                            modifier = Modifier.size(IconSize.sm),
+                        )
+                        Spacer(Modifier.width(Spacing.md))
+                        Text(
+                            text = "Toca un método para editarlo, o \"Abrir\" para ir a su app " +
+                                "oficial (saldrás de MoneyFlow).",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
             }
 
             if (uiState.isLoading) {
@@ -328,17 +350,21 @@ private fun PaymentMethodRow(method: PaymentMethod, onClick: () -> Unit, onLaunc
         }
         if (!method.deepLinkPackage.isNullOrBlank()) {
             // Transparent redirection: name the destination so the user knows they're leaving.
-            AssistChip(
+            // An outlined button rather than an AssistChip: chips default to ~32 dp, under the
+            // handoff's 48 dp floor, and this is the row's one non-row-wide tap target.
+            OutlinedButton(
                 onClick = onLaunch,
-                label = { Text("Abrir ${method.name}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                },
-            )
+                modifier = Modifier.heightIn(min = 48.dp),
+                contentPadding = PaddingValues(horizontal = Spacing.md),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(Spacing.xs))
+                Text("Abrir ${method.name}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }
