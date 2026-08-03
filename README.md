@@ -24,15 +24,15 @@ Material 3, and a clean multi‑module architecture designed to scale into a ful
 
 1. Open the `Finance organizer` folder in **Android Studio** ("Open", select the folder with
    `settings.gradle.kts`).
-2. Let Gradle sync. Android Studio will generate the Gradle wrapper JAR if it's missing.
-   - CLI alternative (needs a local Gradle 8.11): `gradle wrapper` then `./gradlew assembleDebug`.
+2. Let Gradle sync. The wrapper (Gradle 8.13) is committed, so no local Gradle install
+   is needed — `./gradlew` works from a fresh clone.
 3. Run the `app` configuration on an emulator or device (API 26+).
 
 Build from the command line:
 
 ```bash
 ./gradlew assembleDebug        # build the debug APK
-./gradlew test                 # run JVM unit tests (Money, GetDashboardUseCase)
+./gradlew test                 # run every unit test (see Testing below)
 ./gradlew :app:installDebug    # install on a connected device
 ```
 
@@ -95,7 +95,39 @@ search. "Plin" has no standalone app (it lives inside partner bank apps), so it 
 
 ## Testing
 
-- `core:common` — `MoneyTest` (format/parse/rounding).
-- `core:domain` — `GetDashboardUseCaseTest` (month/today/income aggregation with fakes).
+Two suites, both run by CI on every pull request.
 
-Run with `./gradlew test`.
+```bash
+./gradlew test                      # 164 unit tests, no device needed
+./gradlew connectedDebugAndroidTest # 49 instrumented tests, needs a device or emulator
+```
+
+**Use `test`, not `testDebugUnitTest`.** The latter is an Android-only task, so it
+silently skips `core:common` and `core:domain` — which between them hold 96 of the 164
+unit tests.
+
+Unit tests cover the ViewModels, use cases and money formatting. Instrumented tests
+cover the things a JVM test cannot see: Room migrations against real SQLite
+(`core:database`), the settings file surviving a round trip (`core:datastore`), and
+composition-level defects such as touch-target size and behaviour at 200% font scale
+(`core:ui`, `feature:dashboard`, `feature:upcoming`).
+
+### Read the count, not the build result
+
+A Gradle test task reports `BUILD SUCCESSFUL` when it executes nothing. That is not
+hypothetical here: `core:ui`'s accessibility suite ran zero tests for months while
+looking green, because only `:app` declared a `testInstrumentationRunner`. CI therefore
+runs `.github/scripts/check_test_counts.py`, which fails when any module with test
+sources produced no results. If you run a suite by hand, check the count the same way:
+
+```bash
+python3 .github/scripts/check_test_counts.py unit
+python3 .github/scripts/check_test_counts.py instrumented
+```
+
+### CI
+
+`.github/workflows/ci.yml` runs both suites on every pull request, and both are required
+checks on `main`. The emulator job is skipped only when a pull request changes nothing
+but documentation — never on the basis of which test files changed, since instrumented
+tests exercise the main sources.
