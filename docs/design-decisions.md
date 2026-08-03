@@ -56,13 +56,24 @@ a reader across the table whether they are looking at hundreds or tens of thousa
   masking them makes the control unusable rather than private.
 - **Onboarding.** It runs before the setting can have been turned on.
 
-### Known weak point
+### Insight messages carry amounts as data
 
-Insight messages are assembled in `core/domain` with amounts already formatted into Spanish prose,
-so there is no number left for the UI to mask. `redactAmounts` patches them at the render edge by
-matching the shape `Money.format` emits. It works and it is tested, but it is a stopgap: the
-structural fix is for `InsightEngine` to carry the amount and let the UI format it. Anyone changing
-the money format should check that helper.
+`Insight.message` is a `List<MessagePart>` — literal prose interleaved with
+`MessagePart.Amount(amountMinor, currencyCode)` — rather than a finished sentence. `InsightEngine`
+does not call `Money.format` at all; `core:ui`'s `insightMessage(...)` formats each amount through
+`money()`, so the mask applies like anywhere else.
+
+This replaced a regular expression that matched formatted amounts back out of the rendered text.
+That worked, but it tied the mask to the exact output of `Money.format`: changing the separator or
+the symbol spacing would have stopped the mask matching, leaking the figures it exists to hide,
+with nothing failing to say so.
+
+`plainMessage` renders with amounts always visible, for tests and exports — the same
+ambient-versus-requested line drawn above. UI code should not use it.
+
+`InsightEngineTest` pins the rule directly: every insight the engine can emit is checked for a
+currency-shaped string in its text parts, so inlining an amount fails the build rather than
+quietly reopening the hole.
 
 ## Navigation: what follows the spec, and the one thing that does not
 

@@ -20,6 +20,8 @@ import pe.moneyflow.core.designsystem.preview.ThemeAndScalePreviews
 import pe.moneyflow.core.designsystem.preview.ThemePreviews
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.domain.model.Insight
+import pe.moneyflow.core.domain.model.amount
+import pe.moneyflow.core.domain.model.msg
 import pe.moneyflow.core.domain.model.InsightKind
 import pe.moneyflow.core.domain.model.InsightSeverity
 import pe.moneyflow.core.model.Category
@@ -139,7 +141,7 @@ private fun InsightCardPreview() {
                     kind = InsightKind.SPENDING_SPIKE,
                     severity = InsightSeverity.WARNING,
                     title = "Gastaste 30% más en Comida",
-                    message = "S/ 420 este mes frente a S/ 323 el mes pasado.",
+                    message = msg(amount(42_000, "PEN"), " este mes frente a ", amount(32_300, "PEN"), " el mes pasado."),
                 ),
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -149,7 +151,7 @@ private fun InsightCardPreview() {
                     kind = InsightKind.CASHFLOW,
                     severity = InsightSeverity.POSITIVE,
                     title = "Vas mejor que el mes pasado",
-                    message = "Has gastado S/ 180 menos hasta la fecha.",
+                    message = msg("Has gastado ", amount(18_000, "PEN"), " menos hasta la fecha."),
                 ),
                 onClick = {},
                 modifier = Modifier.fillMaxWidth(),
@@ -160,7 +162,7 @@ private fun InsightCardPreview() {
                     kind = InsightKind.UPCOMING_BILLS,
                     severity = InsightSeverity.INFO,
                     title = "3 pagos por vencer",
-                    message = "Total S/ 780.00 en los próximos 7 días.",
+                    message = msg("Total ", amount(78_000, "PEN"), " en los próximos 7 días."),
                 ),
                 onClick = {},
                 modifier = Modifier.fillMaxWidth(),

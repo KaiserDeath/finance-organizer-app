@@ -1,6 +1,8 @@
 package pe.moneyflow.core.domain.usecase
 
 import org.junit.Assert.assertEquals
+import pe.moneyflow.core.domain.model.MessagePart
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import pe.moneyflow.core.domain.model.InsightKind
@@ -31,6 +33,12 @@ class InsightEngineTest {
         status = TransactionStatus.PAID, actualDate = date,
     )
 
+    /** A bill that has not been paid: drives the overdue and upcoming insights. */
+    private fun pending(id: String, amount: Long, due: LocalDate) = Transaction(
+        id = id, title = id, amountMinor = amount, type = TransactionType.EXPENSE,
+        status = TransactionStatus.PENDING, estimatedDate = due,
+    )
+
     @Test
     fun `no transactions yields a getting-started insight`() {
         val insights = InsightEngine.generate(emptyList(), categories, today, "PEN")
@@ -47,8 +55,46 @@ class InsightEngineTest {
         val insights = InsightEngine.generate(txs, categories, today, "PEN")
         val spike = insights.first { it.kind == InsightKind.SPENDING_SPIKE }
         assertEquals(InsightSeverity.WARNING, spike.severity)
-        assertTrue(spike.message.contains("100%"))
-        assertTrue(spike.message.contains("Comida"))
+        assertTrue(spike.plainMessage.contains("100%"))
+        assertTrue(spike.plainMessage.contains("Comida"))
+        // The figure is carried as data, not formatted into the sentence. This is what lets the
+        // UI mask it; if an amount ever gets inlined as text again, discreet mode leaks it and
+        // nothing else would notice.
+        assertEquals(
+            listOf(MessagePart.Amount(20_000, "PEN")),
+            spike.message.filterIsInstance<MessagePart.Amount>(),
+        )
+    }
+
+    /**
+     * Every insight the engine can emit, checked for inlined money.
+     *
+     * The rule this pins is "the domain does not format amounts". A regex over the rendered text
+     * is the only way to state it generally, and here it is the right tool: it is asserting the
+     * absence of a format, not trying to parse one back out.
+     */
+    @Test
+    fun `no insight bakes a formatted amount into its text`() {
+        val txs = listOf(
+            expense("p1", "food", 10_000, LocalDate.of(2026, 6, 10)),
+            expense("t1", "food", 20_000, LocalDate.of(2026, 7, 5)),
+            expense("t2", "transport", 5_000, LocalDate.of(2026, 7, 6)),
+            income("i1", 300_000, LocalDate.of(2026, 7, 1)),
+            pending("b1", 12_000, LocalDate.of(2026, 7, 20)),
+            pending("b2", 8_000, LocalDate.of(2026, 6, 20)),
+        )
+        val insights = InsightEngine.generate(txs, categories, today, "PEN")
+        assertTrue("expected the engine to produce insights", insights.isNotEmpty())
+
+        val currencyLike = Regex("""[^\s\d.,]{1,3}\s\d[\d,]*\.\d{2}""")
+        insights.forEach { insight ->
+            insight.message.filterIsInstance<MessagePart.Text>().forEach { part ->
+                assertNull(
+                    "amount formatted into text of '${insight.id}': ${part.value}",
+                    currencyLike.find(part.value),
+                )
+            }
+        }
     }
 
     @Test

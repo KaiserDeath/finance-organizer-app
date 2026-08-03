@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.theme.LocalAmountsHidden
+import pe.moneyflow.core.domain.model.MessagePart
 
 /**
  * Formats an amount for display, masked when discreet mode is on.
@@ -23,23 +24,26 @@ fun money(amountMinor: Long, currencyCode: String = "PEN"): String =
     Money.format(amountMinor, currencyCode, hidden = LocalAmountsHidden.current)
 
 /**
- * Replaces every formatted amount inside an already-built sentence with the mask.
+ * Renders an insight's message, formatting each amount through [money] so discreet mode applies.
  *
- * For text the domain assembled — insight messages embed figures directly in Spanish prose, so
- * there is no amount to pass through [money]. Matching the exact shape [Money.format] emits is a
- * stopgap at the display edge, and it is marked as one: the structural fix is for the domain to
- * carry the number and let the UI render it, rather than formatting money inside a message.
- *
- * Kept because the alternative is a hole. Análisis renders these messages, and an insight reading
- * "Este mes llevas S/ 4,120.00 en gastos" would sit two cards below a masked band.
+ * This replaced a regular expression that matched formatted amounts back out of finished prose.
+ * That worked, but it coupled the mask to the exact output of `Money.format` — change the
+ * separator or the symbol spacing and the mask silently stops matching, leaking the figures it
+ * exists to hide, with nothing failing. The domain now hands over the numbers instead.
  */
 @Composable
 @ReadOnlyComposable
-fun redactAmounts(text: String): String =
-    if (LocalAmountsHidden.current) text.replace(AmountPattern) { Money.mask(it.groupValues[1]) } else text
-
-/** `S/ 1,234.56` / `$ 1,234.56` — the shape `Money.format` produces, symbol captured. */
-private val AmountPattern = Regex("""([^\s\d.,]{1,3})\s\d[\d,]*\.\d{2}""")
+fun insightMessage(parts: List<MessagePart>): String {
+    // Read the flag once: joinToString's lambda is not a composable context.
+    val hidden = LocalAmountsHidden.current
+    return parts.joinToString("") { part ->
+        when (part) {
+            is MessagePart.Text -> part.value
+            is MessagePart.Amount ->
+                Money.format(part.amountMinor, part.currencyCode, hidden = hidden)
+        }
+    }
+}
 
 /**
  * True when discreet mode is on, for the callers that have to change more than a number — a

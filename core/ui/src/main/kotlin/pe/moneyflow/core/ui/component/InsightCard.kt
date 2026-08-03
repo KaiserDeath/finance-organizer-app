@@ -35,7 +35,7 @@ import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.domain.model.Insight
 import pe.moneyflow.core.domain.model.InsightKind
 import pe.moneyflow.core.domain.model.InsightSeverity
-import pe.moneyflow.core.ui.util.redactAmounts
+import pe.moneyflow.core.ui.util.insightMessage
 
 /**
  * The one place an [Insight] is rendered.
@@ -88,9 +88,7 @@ fun InsightCard(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    // Insight text is assembled in the domain with amounts already
-                    // formatted into it, so the mask has to be applied to the sentence.
-                    text = redactAmounts(insight.message),
+                    text = insightMessage(insight.message),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = maxMessageLines,
