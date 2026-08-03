@@ -2,6 +2,8 @@ package pe.moneyflow.core.domain.usecase
 
 import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.domain.model.Insight
+import pe.moneyflow.core.domain.model.amount
+import pe.moneyflow.core.domain.model.msg
 import pe.moneyflow.core.domain.model.InsightKind
 import pe.moneyflow.core.domain.model.InsightSeverity
 import pe.moneyflow.core.model.Category
@@ -36,7 +38,9 @@ object InsightEngine {
                     kind = InsightKind.GETTING_STARTED,
                     severity = InsightSeverity.INFO,
                     title = "Empieza a registrar",
-                    message = "Agrega tus gastos e ingresos para recibir sugerencias personalizadas.",
+                    message = msg(
+                        "Agrega tus gastos e ingresos para recibir sugerencias personalizadas.",
+                    ),
                 ),
             )
         }
@@ -84,15 +88,19 @@ object InsightEngine {
                 kind = InsightKind.CASHFLOW,
                 severity = InsightSeverity.WARNING,
                 title = "Gastas más de lo que ingresas",
-                message = "Este mes llevas ${Money.format(expense, currencyCode)} en gastos " +
-                    "frente a ${Money.format(income, currencyCode)} de ingresos.",
+                message = msg(
+                    "Este mes llevas ", amount(expense, currencyCode), " en gastos frente a ",
+                    amount(income, currencyCode), " de ingresos.",
+                ),
             )
             expense < income -> Insight(
                 id = "cashflow-positive",
                 kind = InsightKind.CASHFLOW,
                 severity = InsightSeverity.POSITIVE,
                 title = "Vas ahorrando",
-                message = "Este mes has ahorrado ${Money.format(income - expense, currencyCode)}.",
+                message = msg(
+                    "Este mes has ahorrado ", amount(income - expense, currencyCode), ".",
+                ),
             )
             else -> null
         }
@@ -124,8 +132,10 @@ object InsightEngine {
                 kind = InsightKind.SPENDING_SPIKE,
                 severity = InsightSeverity.WARNING,
                 title = "Más gasto en $name",
-                message = "Gastaste un $pct% más en $name que el mes pasado " +
-                    "(${Money.format(thisAmount, currencyCode)}).",
+                message = msg(
+                    "Gastaste un $pct% más en $name que el mes pasado (",
+                    amount(thisAmount, currencyCode), ").",
+                ),
             )
         }
             .sortedByDescending { (categoryId, _) -> thisByCat[categoryId] ?: 0 }
@@ -152,7 +162,10 @@ object InsightEngine {
             kind = InsightKind.TOP_CATEGORY,
             severity = InsightSeverity.INFO,
             title = "Tu mayor gasto",
-            message = "$name es tu categoría con más gasto este mes: ${Money.format(amount, currencyCode)}.",
+            message = msg(
+                "$name es tu categoría con más gasto este mes: ",
+                amount(amountMinor = amount, currencyCode = currencyCode), ".",
+            ),
         )
     }
 
@@ -173,7 +186,9 @@ object InsightEngine {
             kind = InsightKind.OVERDUE_BILLS,
             severity = InsightSeverity.WARNING,
             title = "Pagos vencidos",
-            message = "Tienes ${overdue.size} pago(s) vencido(s) por ${Money.format(total, currencyCode)}.",
+            message = msg(
+                "Tienes ${overdue.size} pago(s) vencido(s) por ", amount(total, currencyCode), ".",
+            ),
         )
     }
 
@@ -195,8 +210,10 @@ object InsightEngine {
             kind = InsightKind.UPCOMING_BILLS,
             severity = InsightSeverity.INFO,
             title = "Pagos próximos",
-            message = "Tienes ${upcoming.size} pago(s) por ${Money.format(total, currencyCode)} " +
-                "en los próximos 7 días.",
+            message = msg(
+                "Tienes ${upcoming.size} pago(s) por ", amount(total, currencyCode),
+                " en los próximos 7 días.",
+            ),
         )
     }
 
