@@ -111,6 +111,7 @@ fun TransactionsScreen(
                     state = uiState,
                     onQueryChange = viewModel::onQueryChange,
                     onToggleCategory = viewModel::toggleCategory,
+                    onClearCategories = viewModel::clearCategories,
                     onOpenFilters = { showFilters = true },
                 )
             }
@@ -149,6 +150,7 @@ private fun FiltersHeader(
     state: TransactionsUiState,
     onQueryChange: (String) -> Unit,
     onToggleCategory: (String) -> Unit,
+    onClearCategories: () -> Unit,
     onOpenFilters: () -> Unit,
 ) {
     Column {
@@ -169,10 +171,7 @@ private fun FiltersHeader(
                     val noneSelected = state.filter.categoryIds.isEmpty()
                     FilterChip(
                         selected = noneSelected,
-                        onClick = {
-                            // Deselect every active category; the ViewModel API stays untouched.
-                            state.filter.categoryIds.forEach(onToggleCategory)
-                        },
+                        onClick = onClearCategories,
                         label = { Text("Todas") },
                     )
                 }
