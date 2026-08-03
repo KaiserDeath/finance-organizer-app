@@ -1,5 +1,6 @@
 package pe.moneyflow.core.ui.component
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,15 +19,74 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.component.pressScale
 import pe.moneyflow.core.designsystem.theme.Spacing
 
 /** The decimal separator [pe.moneyflow.core.common.Money] parses. */
 private const val DecimalSeparator = '.'
 private const val MaxDecimals = 2
+
+/**
+ * The read-out half of the keypad pattern: the amount as a headline, tappable to bring the keypad
+ * back. Deliberately **not** a text field — there is no IME here, so the keypad is the only way to
+ * change the value and the two can never disagree about what was typed.
+ *
+ * Lives beside [AmountKeypad] because they are always used together: display on top, keypad below,
+ * both fed by the same string. It started private inside add/edit and moved here when the budget
+ * sheets needed the same control — entering an amount should not look like two different jobs
+ * depending on which screen you are standing on.
+ *
+ * Never masked by discreet mode: you are entering this number, so hiding it makes the control
+ * unusable rather than private.
+ */
+@Composable
+fun AmountDisplay(
+    amountText: String,
+    currencyCode: String,
+    modifier: Modifier = Modifier,
+    label: String = "Monto",
+    /**
+     * What tapping the read-out does — normally "bring the keypad back". Null where the keypad is
+     * always on screen and there is nothing to reveal: a tap target that does nothing still
+     * announces itself as a button to TalkBack, which is a promise the control cannot keep.
+     */
+    onClick: (() -> Unit)? = null,
+) {
+    val hasValue = amountText.isNotEmpty()
+    Column(
+        modifier = modifier
+            // The whole read-out is the target, not just the glyphs.
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick, role = Role.Button).heightIn(min = 48.dp)
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = "${Money.symbolFor(currencyCode)} ${if (hasValue) amountText else "0"}",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = if (hasValue) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+    }
+}
 
 /**
  * An in-app numeric keypad for money entry, open from the start instead of waiting for the IME.

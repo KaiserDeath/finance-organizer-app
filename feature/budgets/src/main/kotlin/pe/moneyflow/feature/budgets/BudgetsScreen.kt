@@ -1,6 +1,8 @@
 package pe.moneyflow.feature.budgets
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.background
@@ -66,8 +68,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -88,6 +88,8 @@ import pe.moneyflow.core.ui.util.toMonthNameOnly
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.BudgetProgress
 import pe.moneyflow.core.model.BudgetPeriod
+import pe.moneyflow.core.ui.component.AmountDisplay
+import pe.moneyflow.core.ui.component.AmountKeypad
 import pe.moneyflow.core.ui.component.CategoryAvatar
 import java.time.YearMonth
 import pe.moneyflow.core.ui.util.money
@@ -517,9 +519,11 @@ private fun BudgetCard(
     }
 }
 
+// internal rather than private so the instrumented test can compose the sheet directly; which
+// control the amount is entered with is the thing under test, and a wrapper would not reproduce it.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MonthBudgetSheet(
+internal fun MonthBudgetSheet(
     currentMinor: Long?,
     currencyCode: String,
     onDismiss: () -> Unit,
@@ -553,12 +557,16 @@ private fun MonthBudgetSheet(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            OutlinedTextField(
+            // The same control add/edit uses, rather than a decimal-keyboard text field. Entering an
+            // amount is one job and it should not look like two depending on the screen.
+            AmountDisplay(
+                amountText = amountText,
+                currencyCode = currencyCode,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            AmountKeypad(
                 value = amountText,
                 onValueChange = { amountText = it },
-                label = { Text("Monto ($currencyCode)") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
             )
             Button(
@@ -579,9 +587,10 @@ private fun MonthBudgetSheet(
     }
 }
 
+// internal for the same reason as [MonthBudgetSheet].
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun BudgetEditorSheet(
+internal fun BudgetEditorSheet(
     existing: BudgetProgress?,
     categories: List<pe.moneyflow.core.model.Category>,
     onDismiss: () -> Unit,
@@ -595,6 +604,14 @@ private fun BudgetEditorSheet(
     }
     var categoryId by remember { mutableStateOf(existing?.budget?.categoryId) }
     var period by remember { mutableStateOf(existing?.budget?.period ?: BudgetPeriod.MONTHLY) }
+    // Open from the start, in both modes. Creating a budget, the limit is the point; editing one,
+    // the entry point is Análisis's "Ajustar el límite", which is a user who came to change exactly
+    // this number. Making the edit case wait for a tap would charge that path an extra one.
+    var showKeypad by remember { mutableStateOf(true) }
+    val nameInteraction = remember { MutableInteractionSource() }
+    LaunchedEffect(nameInteraction) {
+        nameInteraction.interactions.collect { if (it is PressInteraction.Release) showKeypad = false }
+    }
 
     val amountMinor = Money.parseToMinor(amountText) ?: 0L
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -618,20 +635,36 @@ private fun BudgetEditorSheet(
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+            // Amount first, name second — the same order add/edit uses, and for the same reason:
+            // the limit is what the sheet is for, whether you arrived to create one or came from
+            // Análisis's "Ajustar el límite" to change it.
+            AmountDisplay(
+                amountText = amountText,
+                currencyCode = currencyCode,
+                onClick = { showKeypad = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (showKeypad) {
+                AmountKeypad(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            // Tapping the name hands the sheet back to the IME — two keyboards stacked on one sheet
+            // is the state to avoid.
+            //
+            // Keyed off a press rather than focus, which is what add/edit can afford to use. A
+            // ModalBottomSheet grants focus to its text field the moment it opens, so a focus
+            // handler here fired on the first frame and closed the keypad before the sheet had
+            // settled. A press is the user saying they want to type a name; the sheet's own
+            // housekeeping never emits one.
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Nombre") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = amountText,
-                onValueChange = { amountText = it },
-                label = { Text("Monto") },
-                prefix = { Text("${Money.symbolFor(currencyCode)} ") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                interactionSource = nameInteraction,
                 modifier = Modifier.fillMaxWidth(),
             )
 

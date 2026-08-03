@@ -8,7 +8,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -66,12 +65,10 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.component.pressScale
 import pe.moneyflow.core.designsystem.theme.IconSize
@@ -82,6 +79,7 @@ import pe.moneyflow.core.model.TransactionType
 import pe.moneyflow.core.ui.component.PaymentDisplayStatus
 import pe.moneyflow.core.ui.component.PaymentStatusPill
 import pe.moneyflow.core.ui.component.paymentDisplayStatus
+import pe.moneyflow.core.ui.component.AmountDisplay
 import pe.moneyflow.core.ui.component.AmountKeypad
 import pe.moneyflow.core.ui.paymentmethod.PaymentMethodSelector
 import pe.moneyflow.core.ui.paymentmethod.toCardKind
@@ -418,34 +416,6 @@ fun AddEditScreen(
         ) {
             DatePicker(state = datePickerState)
         }
-    }
-}
-
-/** The amount as a large read-only figure; tapping it brings the keypad back. */
-@Composable
-private fun AmountDisplay(
-    amountText: String,
-    currencyCode: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val hasValue = amountText.isNotEmpty()
-    Column(modifier = modifier.clickable(onClick = onClick)) {
-        Text(
-            text = "Monto",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = "${Money.symbolFor(currencyCode)} ${if (hasValue) amountText else "0"}",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = if (hasValue) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
     }
 }
 
