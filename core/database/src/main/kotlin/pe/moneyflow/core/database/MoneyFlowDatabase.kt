@@ -43,7 +43,7 @@ import pe.moneyflow.core.database.entity.TransactionTagCrossRef
         ExchangeRateEntity::class,
         AttachmentEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

@@ -27,7 +27,7 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -161,27 +161,35 @@ private fun FiltersHeader(
             onOpenFilters = onOpenFilters,
         )
         if (state.expenseCategories.isNotEmpty()) {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = Spacing.lg),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                item(key = "all") {
-                    val noneSelected = state.filter.categoryIds.isEmpty()
-                    FilterChip(
-                        selected = noneSelected,
-                        onClick = {
-                            // Deselect every active category; the ViewModel API stays untouched.
-                            state.filter.categoryIds.forEach(onToggleCategory)
-                        },
-                        label = { Text("Todas") },
-                    )
-                }
-                items(items = state.expenseCategories, key = { it.id }) { category ->
-                    FilterChip(
-                        selected = category.id in state.filter.categoryIds,
-                        onClick = { onToggleCategory(category.id) },
-                        label = { Text(category.name) },
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text(
+                    text = "Categorías rápidas",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = Spacing.lg),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    item(key = "all") {
+                        val noneSelected = state.filter.categoryIds.isEmpty()
+                        FilterChip(
+                            selected = noneSelected,
+                            onClick = {
+                                // Deselect every active category; the ViewModel API stays untouched.
+                                state.filter.categoryIds.forEach(onToggleCategory)
+                            },
+                            label = { Text("Todas") },
+                        )
+                    }
+                    items(items = state.expenseCategories, key = { it.id }) { category ->
+                        FilterChip(
+                            selected = category.id in state.filter.categoryIds,
+                            onClick = { onToggleCategory(category.id) },
+                            label = { Text(category.name) },
+                        )
+                    }
                 }
             }
         }
@@ -198,6 +206,12 @@ private fun TransactionsList(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 96.dp, top = Spacing.md),
     ) {
+        val movementCount = state.sections.sumOf { it.items.size }
+        if (!state.isFilterActive && movementCount in 1..2) {
+            item(key = "low-data-hint") {
+                LowDataHint(count = movementCount)
+            }
+        }
         if (state.sections.isEmpty()) {
             item(key = "no-matches") {
                 EmptyState(
@@ -234,18 +248,19 @@ private fun TransactionsList(
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun SearchRow(
     query: String,
     activeFilterCount: Int,
     onQueryChange: (String) -> Unit,
     onOpenFilters: () -> Unit,
 ) {
-    Row(
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         OutlinedTextField(
             value = query,
@@ -260,13 +275,19 @@ private fun SearchRow(
                     }
                 }
             },
+            // FlowRow wraps this field and the filter button onto separate lines when the
+            // available width or font scale makes the compact row unsafe.
             modifier = Modifier.weight(1f),
         )
         BadgedBox(
             badge = { if (activeFilterCount > 0) Badge { Text(activeFilterCount.toString()) } },
         ) {
-            FilledTonalIconButton(onClick = onOpenFilters) {
-                Icon(Icons.Rounded.Tune, contentDescription = "Filtros")
+            FilledTonalButton(
+                onClick = onOpenFilters,
+                contentPadding = PaddingValues(horizontal = Spacing.md),
+            ) {
+                Icon(Icons.Rounded.Tune, contentDescription = null)
+                Text("Filtros", modifier = Modifier.padding(start = Spacing.xs))
             }
         }
     }
@@ -310,8 +331,8 @@ private fun FilterSheet(
             }
 
             // Category chips moved to the fixed header, where their state is always visible;
-            // the sheet keeps only the type filters.
-            Text("Tipo", style = MaterialTheme.typography.labelLarge)
+            // the sheet keeps the broader movement-type filter.
+            Text("Tipo de movimiento", style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 val typeLabels = listOf(
                     TransactionType.EXPENSE to "Gastos",
@@ -327,6 +348,27 @@ private fun FilterSheet(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LowDataHint(count: Int) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Text(
+            text = if (count == 1) {
+                "Tienes 1 movimiento. Añade otro para empezar a ver patrones."
+            } else {
+                "Tienes $count movimientos. Añade más para comparar tus días."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(Spacing.md),
+        )
     }
 }
 

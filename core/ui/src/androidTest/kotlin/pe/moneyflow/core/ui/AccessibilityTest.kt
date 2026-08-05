@@ -19,13 +19,18 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import pe.moneyflow.core.common.Money
 import org.junit.Rule
 import org.junit.Test
 import pe.moneyflow.core.designsystem.component.SectionHeader
 import pe.moneyflow.core.designsystem.component.StatTile
 import pe.moneyflow.core.designsystem.theme.MoneyFlowTheme
+import pe.moneyflow.core.model.Transaction
+import pe.moneyflow.core.model.TransactionType
+import pe.moneyflow.core.ui.component.TransactionRow
 import pe.moneyflow.core.ui.component.ColorSwatchPicker
 import pe.moneyflow.core.ui.component.IconChoicePicker
+import java.time.LocalDate
 
 /**
  * Regression guards for the accessibility defects found in the design audit. Each test corresponds to
@@ -38,13 +43,14 @@ class AccessibilityTest {
 
     private fun setThemedContent(
         fontScale: Float = 1f,
+        amountsHidden: Boolean = false,
         content: @Composable () -> Unit,
     ) = rule.setContent {
         val base = LocalDensity.current
         CompositionLocalProvider(
             LocalDensity provides Density(density = base.density, fontScale = fontScale),
         ) {
-            MoneyFlowTheme(darkTheme = false) { content() }
+            MoneyFlowTheme(darkTheme = false, amountsHidden = amountsHidden) { content() }
         }
     }
 
@@ -108,6 +114,33 @@ class AccessibilityTest {
         }
         // titleLarge is 20sp/26sp line height; at 2x that is a ~52dp line, so >70dp proves two lines.
         rule.onNodeWithText("S/ 1,234.56").assertHeightIsAtLeast(70.dp)
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // Discreet mode. Movimientos uses the shared row, so this catches a screen-level amount that
+    // accidentally bypasses the composition-aware money formatter.
+    // -----------------------------------------------------------------------------------------
+
+    @Test
+    fun transactionRow_masksAmount_whenDiscreetModeIsOn() {
+        setThemedContent(amountsHidden = true) {
+            TransactionRow(
+                transaction = Transaction(
+                    id = "lunch",
+                    title = "Almuerzo",
+                    amountMinor = 12_345,
+                    type = TransactionType.EXPENSE,
+                    actualDate = LocalDate.of(2026, 8, 5),
+                ),
+                category = null,
+                onClick = {},
+            )
+        }
+
+        // AmountText intentionally prefixes expenses with a minus sign, so match the mask inside
+        // the signed label rather than requiring the whole semantics text to equal the mask.
+        rule.onNodeWithText(Money.mask("PEN"), substring = true).assertExists()
+        rule.onNodeWithText(Money.format(12_345, "PEN"), substring = true).assertDoesNotExist()
     }
 
     // -----------------------------------------------------------------------------------------

@@ -36,6 +36,24 @@ internal fun Project.configureKotlinAndroid(
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
+
+    // Some IDEs and generic Gradle integrations ask Android projects for the Java-style
+    // `unitTestClasses` lifecycle task. AGP names the actual variant task
+    // `compileDebugUnitTestSources`, so provide a stable compatibility alias instead of forcing
+    // callers to know the Android-specific name.
+    tasks.register("unitTestClasses") {
+        group = "verification"
+        description = "Compiles the debug unit-test classes."
+        dependsOn("compileDebugUnitTestSources")
+    }
+
+    // Instrumented-test equivalent of the compatibility alias above. AGP exposes variant-specific
+    // compilation tasks but some IDE launchers still request the Java-style lifecycle name.
+    tasks.register("androidTestClasses") {
+        group = "verification"
+        description = "Compiles the debug Android-test classes."
+        dependsOn("compileDebugAndroidTestSources")
+    }
 }
 
 /** Shared configuration for pure Kotlin/JVM (domain) modules. */

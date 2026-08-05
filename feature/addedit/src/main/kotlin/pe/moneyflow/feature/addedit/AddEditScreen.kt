@@ -88,6 +88,7 @@ import pe.moneyflow.core.ui.paymentmethod.toCardKind
 import pe.moneyflow.core.ui.paymentmethod.toNature
 import pe.moneyflow.core.ui.recurrence.RecurrenceEditor
 import pe.moneyflow.core.ui.util.toDueRelativeLabel
+import pe.moneyflow.core.ui.util.toRelativeLabel
 import pe.moneyflow.core.ui.util.toFullLabel
 import java.time.Instant
 import java.time.LocalDate
@@ -211,6 +212,27 @@ fun AddEditScreen(
                     // Typing a description hands the screen back to the IME.
                     .onFocusChanged { if (it.isFocused) showKeypad = false },
             )
+
+            QuickEntrySummary(
+                paymentMethod = uiState.paymentMethods
+                    .firstOrNull { it.id == uiState.paymentMethodId }
+                    ?.name
+                    ?: "Sin método",
+                date = uiState.date.toRelativeLabel(),
+                onOpenDetails = { showDetails = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            val suggestedCategory = CategorySuggester.suggest(uiState.title, uiState.categories)
+            if (!uiState.isEditing && suggestedCategory != null &&
+                uiState.categoryId == suggestedCategory.id
+            ) {
+                Text(
+                    text = "Categoría sugerida: ${suggestedCategory.name}. Puedes cambiarla abajo.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             // Category
             FieldLabel("Categoría")
@@ -446,6 +468,49 @@ private fun AmountDisplay(
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
+    }
+}
+
+/**
+ * Keeps the two choices users most often need to confirm visible while the IME covers the form.
+ * Tapping the summary opens the existing advanced section, so it is a shortcut rather than a second
+ * source of truth for payment method or date.
+ */
+@Composable
+private fun QuickEntrySummary(
+    paymentMethod: String,
+    date: String,
+    onOpenDetails: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.clickable(onClick = onOpenDetails),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Método de pago",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(text = paymentMethod, style = MaterialTheme.typography.labelLarge)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "Fecha",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(text = date, style = MaterialTheme.typography.labelLarge)
+            }
+        }
     }
 }
 

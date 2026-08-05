@@ -3,7 +3,6 @@ package pe.moneyflow.feature.transactions
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -57,9 +56,14 @@ class TransactionsViewModel @Inject constructor(
 
     private var recentlyDeleted: Transaction? = null
 
+    // This ViewModel only needs the one optional argument. Reading the generated Navigation key
+    // directly avoids decoding the whole route (and keeps this state transition testable on the
+    // JVM, where Navigation's Bundle-backed decoder is not available).
+    private val initialCategoryId: String? = savedStateHandle.get<String>("categoryId")
+
     private val filterState = MutableStateFlow(
         TransactionFilter(
-            categoryIds = setOfNotNull(savedStateHandle.toRoute<TransactionsRoute>().categoryId),
+            categoryIds = setOfNotNull(initialCategoryId),
         ),
     )
 

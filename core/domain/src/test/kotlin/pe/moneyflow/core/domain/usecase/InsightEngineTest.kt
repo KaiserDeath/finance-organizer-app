@@ -55,6 +55,7 @@ class InsightEngineTest {
         val insights = InsightEngine.generate(txs, categories, today, "PEN")
         val spike = insights.first { it.kind == InsightKind.SPENDING_SPIKE }
         assertEquals(InsightSeverity.WARNING, spike.severity)
+        assertEquals("food", spike.categoryId)
         assertTrue(spike.plainMessage.contains("100%"))
         assertTrue(spike.plainMessage.contains("Comida"))
         // The figure is carried as data, not formatted into the sentence. This is what lets the
@@ -64,6 +65,18 @@ class InsightEngineTest {
             listOf(MessagePart.Amount(20_000, "PEN")),
             spike.message.filterIsInstance<MessagePart.Amount>(),
         )
+    }
+
+    @Test
+    fun `top category carries its category for a filtered movement action`() {
+        val insights = InsightEngine.generate(
+            listOf(expense("e1", "food", 20_000, LocalDate.of(2026, 7, 5))),
+            categories,
+            today,
+            "PEN",
+        )
+
+        assertEquals("food", insights.first { it.kind == InsightKind.TOP_CATEGORY }.categoryId)
     }
 
     /**

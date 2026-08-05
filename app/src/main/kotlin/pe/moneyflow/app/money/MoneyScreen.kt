@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -79,18 +81,15 @@ fun MoneyScreen(
                 MoneyRow(
                     icon = Icons.Rounded.TrackChanges,
                     title = "Presupuestos",
-                    figure = if (state.budgetsAtRisk > 0) "${state.budgetsAtRisk} en riesgo" else "Todo en orden",
+                    figure = budgetRiskSummary(state.budgetsAtRisk),
                     figureColor = if (state.budgetsAtRisk > 0) {
                         MaterialTheme.moneyColors.negative
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                    figureDescription = if (state.budgetsAtRisk > 0) {
-                        "${state.budgetsAtRisk} presupuesto(s) en riesgo"
-                    } else {
-                        "Ningún presupuesto en riesgo"
-                    },
+                    figureDescription = budgetRiskDescription(state.budgetsAtRisk),
                     isLoading = state.isLoading,
+                    showChevron = true,
                     onClick = onOpenBudgets,
                 )
                 MoneyDivider()
@@ -98,13 +97,14 @@ fun MoneyScreen(
                     icon = Icons.Rounded.CalendarMonth,
                     title = "Próximos pagos",
                     figure = money(state.upcomingTotalMinor, state.currencyCode),
-                    caption = if (state.overdueCount > 0) "${state.overdueCount} vencido(s)" else null,
+                    caption = overdueSummary(state.overdueCount),
                     captionColor = MaterialTheme.moneyColors.negative,
                     figureDescription = buildString {
                         append("Pendiente ${money(state.upcomingTotalMinor, state.currencyCode)}")
-                        if (state.overdueCount > 0) append(", ${state.overdueCount} pago(s) vencido(s)")
+                        overdueDescription(state.overdueCount)?.let { append(", $it") }
                     },
                     isLoading = state.isLoading,
+                    showChevron = true,
                     onClick = onOpenUpcoming,
                 )
                 MoneyDivider()
@@ -115,6 +115,7 @@ fun MoneyScreen(
                     figureDescription =
                         "Saldo total ${money(state.accountsBalanceMinor, state.currencyCode)}",
                     isLoading = state.isLoading,
+                    showChevron = true,
                     onClick = onOpenAccounts,
                 )
                 MoneyDivider()
@@ -125,15 +126,17 @@ fun MoneyScreen(
                     figureDescription =
                         "Ahorrado ${money(state.savingsBalanceMinor, state.currencyCode)}",
                     isLoading = state.isLoading,
+                    showChevron = true,
                     onClick = onOpenSavings,
                 )
                 MoneyDivider()
                 MoneyRow(
                     icon = Icons.Rounded.CreditCard,
                     title = "Métodos de pago",
-                    figure = "${state.methodsCount} configurado(s)",
-                    figureDescription = "${state.methodsCount} método(s) de pago configurado(s)",
+                    figure = configuredMethodsSummary(state.methodsCount),
+                    figureDescription = configuredMethodsDescription(state.methodsCount),
                     isLoading = state.isLoading,
+                    showChevron = true,
                     onClick = onOpenPaymentMethods,
                 )
             }
@@ -219,6 +222,8 @@ private fun MoneyRow(
                     text = figure,
                     style = MaterialTheme.typography.labelLarge,
                     color = figureColor,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.widthIn(min = 96.dp, max = 136.dp),
                 )
                 if (caption != null) {
                     Text(
@@ -234,7 +239,38 @@ private fun MoneyRow(
                 imageVector = Icons.Rounded.ChevronRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = Spacing.sm),
             )
         }
     }
+}
+
+private fun budgetRiskSummary(count: Int): String = "$count en riesgo"
+
+private fun budgetRiskDescription(count: Int): String = when (count) {
+    0 -> "Ningún presupuesto en riesgo"
+    1 -> "1 presupuesto en riesgo"
+    else -> "$count presupuestos en riesgo"
+}
+
+private fun overdueSummary(count: Int): String? = when (count) {
+    0 -> null
+    1 -> "1 vencido"
+    else -> "$count vencidos"
+}
+
+private fun overdueDescription(count: Int): String? = when (count) {
+    0 -> null
+    1 -> "1 pago vencido"
+    else -> "$count pagos vencidos"
+}
+
+private fun configuredMethodsSummary(count: Int): String = when (count) {
+    1 -> "1 configurado"
+    else -> "$count configurados"
+}
+
+private fun configuredMethodsDescription(count: Int): String = when (count) {
+    1 -> "1 método de pago configurado"
+    else -> "$count métodos de pago configurados"
 }

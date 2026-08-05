@@ -34,6 +34,8 @@ data class Insight(
      * discreet mode. [plainMessage] is the fallback for callers with no composition.
      */
     val message: List<MessagePart>,
+    /** Category this suggestion is about, when tapping it can open filtered movements. */
+    val categoryId: String? = null,
 ) {
     /**
      * The message with every amount formatted normally.

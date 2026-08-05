@@ -3,6 +3,29 @@
 Standing rules that outlive any one audit. Each entry says what was decided and why, so a later
 reader can tell a deliberate divergence from drift.
 
+## The hero — block 6 is unblocked, and what it settled
+
+`docs/design/TAREAS.md` block 6 reads **BLOQUEADO**, and that file is the handoff as delivered, so it
+still will. The sessions it was waiting for happened. This is the entry that supersedes it.
+
+The open question was two numbers (what's left / out of how much) against the seven figures the code
+showed, with `HeroBalanceCard.kt` arguing that a figure without a reference is data, not information.
+Neither side was validated, which is why the block was frozen rather than decided.
+
+**The result was neither posture wholesale.** The headline keeps its two references — a denominator
+("de S/ 2,000", with a bar giving the number a scale) and a projection of where today's rate lands by
+month end, the only forward-looking figure in the app and the one that lets someone change course
+while it still matters. What died is the third reference:
+
+- **The month-over-month delta.** Participants did not use it and did not find it relevant.
+- **The "Cifras del cierre" block** the prototype proposed on Análisis. The delta was removed rather
+  than relocated because the same sessions rejected the one surface it could have moved to.
+
+**Do not reintroduce either from the prototype.** Their absence is a result, not an oversight — the
+prototype predates the sessions, so on this one point the code is newer than the spec. The scope rule
+in the next entry is what remains of the comparison: gone from ambient surfaces, alive in the report
+you explicitly ask for.
+
 ## Month-over-month comparisons — scope, not ban
 
 Month-over-month comparisons are banned from ambient surfaces (Inicio, Análisis) and permitted in

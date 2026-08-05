@@ -2,12 +2,12 @@ package pe.moneyflow.app
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Add
@@ -17,7 +17,6 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,7 +24,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
@@ -34,7 +35,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -43,6 +44,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -55,7 +57,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlinx.serialization.Serializable
-import pe.moneyflow.core.designsystem.component.pressScale
+import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.app.backup.BackupScreen
 import pe.moneyflow.app.money.MoneyScreen
 import pe.moneyflow.app.security.SecurityScreen
@@ -211,8 +213,52 @@ fun MoneyFlowApp(
                             Icon(destination.icon, contentDescription = null)
                         }
                     },
-                    label = { Text(destination.label) },
+                    label = {
+                        Text(
+                            text = destination.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                        )
+                    },
                 )
+                if (destination == TopLevelDestination.TRANSACTIONS) {
+                    item(
+                        selected = false,
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            navController.navigateToAddEdit()
+                        },
+                        icon = {
+                            // The navigation item keeps the standard 24 dp icon measurement while
+                            // the primary action intentionally overflows it. This preserves the
+                            // regular bar height and gives the + the raised, central emphasis from
+                            // the approved design.
+                            Box(
+                                modifier = Modifier.size(24.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Surface(
+                                    modifier = Modifier
+                                        .offset(y = (-8).dp)
+                                        .requiredSize(64.dp)
+                                        .semantics { contentDescription = "Nuevo gasto" },
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                    shadowElevation = 8.dp,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Add,
+                                        contentDescription = null,
+                                        modifier = Modifier.padding(16.dp),
+                                    )
+                                }
+                            }
+                        },
+                        label = null,
+                        alwaysShowLabel = false,
+                    )
+                }
             }
         },
         containerColor = MaterialTheme.colorScheme.background,
@@ -231,11 +277,7 @@ fun MoneyFlowApp(
         // Inicio draws its brand band under the status bar, so it must not be inset from the top —
         // it applies `statusBarsPadding()` to the band's *content* instead, which is what puts the
         // colour behind the clock. Every other destination keeps the default.
-        contentWindowInsets = if (topLevel == TopLevelDestination.DASHBOARD) {
-            WindowInsets.systemBars.only(WindowInsetsSides.Bottom)
-        } else {
-            ScaffoldDefaults.contentWindowInsets
-        },
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
         topBar = {
             // The dashboard has no app bar: its hero header *is* the top of the screen, and it owns
             // the month selector. The bar used to print the month too, which both duplicated the
@@ -248,11 +290,12 @@ fun MoneyFlowApp(
                         // Análisis leads with the overrun card; the monthly report is a place you go
                         // on purpose, so it lives here rather than in a tab competing with it.
                         if (topLevel == TopLevelDestination.ANALYTICS) {
-                            IconButton(onClick = { navController.navigate(MonthlyReportRoute) }) {
+                            TextButton(onClick = { navController.navigate(MonthlyReportRoute) }) {
                                 Icon(
                                     imageVector = Icons.Rounded.Assessment,
-                                    contentDescription = "Reporte mensual",
+                                    contentDescription = null,
                                 )
+                                Text("Reporte", modifier = Modifier.padding(start = Spacing.xs))
                             }
                         }
                     },
@@ -262,21 +305,6 @@ fun MoneyFlowApp(
                         scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                     ),
                 )
-            }
-        },
-        floatingActionButton = {
-            if (isTopLevel) {
-                val fabInteraction = remember { MutableInteractionSource() }
-                FloatingActionButton(
-                    onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        navController.navigateToAddEdit()
-                    },
-                    interactionSource = fabInteraction,
-                    modifier = Modifier.pressScale(fabInteraction),
-                ) {
-                    Icon(Icons.Rounded.Add, contentDescription = "Agregar movimiento")
-                }
             }
         },
     ) { innerPadding ->

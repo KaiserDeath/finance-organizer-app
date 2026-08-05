@@ -78,14 +78,14 @@ class MigrationTest {
      * migration that runs but produces the wrong shape fails here rather than at the first query.
      */
     @Test
-    fun migratesAll_from4To8_preservingData() {
+    fun migratesAll_from4To9_preservingData() {
         helper.createDatabase(TEST_DB, 4).use { db ->
             db.insertCategoryV4(id = "c1", name = "Alquiler", isDefault = 1)
             db.insertPaymentMethodV4(id = "pm1", name = "Efectivo")
             db.insertTransactionV4(id = "t1", amountMinor = 1_850)
         }
 
-        val db = helper.runMigrationsAndValidate(TEST_DB, 8, true, *ALL_MIGRATIONS)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 9, true, *ALL_MIGRATIONS)
 
         // The point of the exercise: the user's ledger survived four version bumps.
         assertEquals(1, db.count("transactions"))
@@ -164,5 +164,37 @@ class MigrationTest {
         assertEquals("1", db.queryOne("SELECT isFixed FROM categories WHERE id = 'c1'"))
         assertEquals("0", db.queryOne("SELECT isFixed FROM categories WHERE id = 'c2'"))
         assertEquals("0", db.queryOne("SELECT isFixed FROM categories WHERE id = 'c3'"))
+    }
+
+    @Test
+    fun migration8To9_replacesOnlyObsoleteBankPackageIds() {
+        helper.createDatabase(TEST_DB, 8).use { db ->
+            db.execSQL(
+                "INSERT INTO payment_methods " +
+                    "(id, name, type, cardKind, iconKey, colorHex, accountId, deepLinkPackage, " +
+                    "playStoreId, isDefault, sortOrder, archived) VALUES " +
+                    "('bcp', 'BCP', 'BANK', NULL, 'account_balance', '#EA7600', NULL, " +
+                    "'pe.com.bcp.bancamovil', NULL, 1, 0, 0), " +
+                    "('interbank', 'Interbank', 'BANK', NULL, 'account_balance', '#00A94F', NULL, " +
+                    "'pe.interbank.mobilebanking', NULL, 1, 1, 0), " +
+                    "('custom', 'Mi banco', 'BANK', NULL, 'account_balance', '#000000', NULL, " +
+                    "'example.user.bank', NULL, 0, 2, 0)",
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 9, true, MIGRATION_8_9)
+
+        assertEquals(
+            "com.bcp.bank.bcp",
+            db.queryOne("SELECT deepLinkPackage FROM payment_methods WHERE id = 'bcp'"),
+        )
+        assertEquals(
+            "pe.com.interbank.mobilebanking",
+            db.queryOne("SELECT deepLinkPackage FROM payment_methods WHERE id = 'interbank'"),
+        )
+        assertEquals(
+            "example.user.bank",
+            db.queryOne("SELECT deepLinkPackage FROM payment_methods WHERE id = 'custom'"),
+        )
     }
 }

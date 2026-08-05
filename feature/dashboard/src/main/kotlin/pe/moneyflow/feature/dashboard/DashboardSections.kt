@@ -66,6 +66,7 @@ import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.domain.model.BudgetProgress
 import pe.moneyflow.core.domain.model.StreakDay
+import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.QuickShortcut
 import pe.moneyflow.core.ui.component.CategoryAvatar
 import pe.moneyflow.core.ui.util.toMonthTitle
@@ -223,52 +224,67 @@ private fun BudgetMiniRow(progress: BudgetProgress) {
 fun ShortcutsRow(
     shortcuts: List<QuickShortcut>,
     currencyCode: String,
+    categoriesById: Map<String, Category> = emptyMap(),
     onShortcut: (QuickShortcut) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+    val shown = shortcuts.take(4)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         Text(
-            text = "De un toque",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = "Gasto rápido",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(start = Spacing.xs),
         )
-        // Chunked into rows of two rather than a LazyVerticalGrid: this sits inside a LazyColumn,
-        // where a nested lazy grid in the same direction cannot measure.
-        shortcuts.chunked(2).forEach { pair ->
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                pair.forEach { shortcut ->
-                    val interaction = remember { MutableInteractionSource() }
-                    MoneyCard(
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 64.dp)
-                            .pressScale(interaction)
-                            .clickable(interactionSource = interaction, indication = null) {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onShortcut(shortcut)
-                            },
-                        shadowElevation = 0.dp,
-                        contentPadding = PaddingValues(Spacing.md),
-                    ) {
-                        Text(
-                            text = shortcut.label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = money(shortcut.amountMinor, currencyCode),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            shown.forEach { shortcut ->
+                val interaction = remember { MutableInteractionSource() }
+                val category = shortcut.categoryId?.let(categoriesById::get)
+                val accent = colorFromHex(category?.colorHex, MaterialTheme.colorScheme.primary)
+                val amountLabel = money(shortcut.amountMinor, currencyCode)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 104.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .pressScale(interaction)
+                        .clickable(interactionSource = interaction, indication = null) {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onShortcut(shortcut)
+                        }
+                        .semantics(mergeDescendants = true) {
+                            contentDescription =
+                                "${shortcut.label}, $amountLabel"
+                        }
+                        .padding(vertical = Spacing.xs),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    CategoryAvatar(
+                        icon = iconForKey(category?.iconKey ?: "bolt"),
+                        accent = accent,
+                        size = 48.dp,
+                    )
+                    Text(
+                        text = shortcut.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = amountLabel,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
                 }
-                // Keeps a lone trailing shortcut half-width instead of stretching it across the row.
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
+            repeat(4 - shown.size) { Spacer(Modifier.weight(1f)) }
         }
     }
 }

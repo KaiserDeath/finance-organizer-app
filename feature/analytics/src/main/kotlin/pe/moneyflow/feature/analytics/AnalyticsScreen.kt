@@ -218,7 +218,7 @@ private fun AnalyticsContent(
         // meant to lead, and the prototype has no tab row here. The report is now a stacked
         // destination behind the app bar's action — a place you deliberately go, not a mode this
         // screen sits in half the time.
-        trendsTab(state.analytics, state.insights)
+        trendsTab(state.analytics, state.insights, onSeeExpenses)
     }
     }
 }
@@ -471,6 +471,7 @@ private fun NoOverrunCard(
 private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(
     data: AnalyticsData,
     insights: List<Insight>,
+    onSeeExpenses: (String) -> Unit,
 ) {
     val hasData = data.totalExpenseMinor > 0 || data.totalIncomeMinor > 0
     if (!hasData) {
@@ -493,7 +494,13 @@ private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(
     // cash-flow curve that used to lead here was removed — the user sessions found the comparison
     // against last month irrelevant, the same finding that took the delta out of the hero.
     if (data.categoryBreakdown.isNotEmpty()) {
-        item { CategoryBreakdownCard(data) }
+        item {
+            if (data.categoryBreakdown.size == 1) {
+                SingleCategorySummaryCard(data.categoryBreakdown.single(), data.currencyCode)
+            } else {
+                CategoryBreakdownCard(data)
+            }
+        }
     }
     item { MonthlyTrendCard(data) }
     item { WeekdayCard(data) }
@@ -505,9 +512,45 @@ private fun androidx.compose.foundation.lazy.LazyListScope.trendsTab(
         }
         insights.forEach { insight ->
             item(key = "insight-${insight.id}") {
-                InsightCard(insight = insight, modifier = Modifier.fillMaxWidth())
+                InsightCard(
+                    insight = insight,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = insight.categoryId?.let { categoryId ->
+                        { onSeeExpenses(categoryId) }
+                    },
+                )
             }
         }
+    }
+}
+
+/** A single-category dataset does not need a 100% donut; state the useful conclusion directly. */
+@Composable
+private fun SingleCategorySummaryCard(
+    spend: pe.moneyflow.core.domain.model.CategorySpend,
+    currencyCode: String,
+) {
+    MoneyCard(modifier = Modifier.fillMaxWidth()) {
+        SectionHeader(title = "Por categoría", modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(Spacing.md))
+        Text(
+            text = "Todo tu gasto está en ${spend.category.name}",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            text = money(spend.amountMinor, currencyCode),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        Text(
+            text = "Cuando registres otra categoría, aquí podrás comparar cómo se reparte tu gasto.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -581,6 +624,14 @@ private fun CategoryBreakdownCard(data: AnalyticsData) {
                     if (topSpend != null) {
                         append(" Mayor: ${topSpend.category.name}, ")
                         append("${(topSpend.fraction * 100).toInt()}%.")
+                    }
+                    append(" Detalle: ")
+                    data.categoryBreakdown.take(5).forEachIndexed { index, spend ->
+                        if (index > 0) append("; ")
+                        append(spend.category.name)
+                        append(" ")
+                        append(money(spend.amountMinor, data.currencyCode))
+                        append(" (${(spend.fraction * 100).toInt()}%)")
                     }
                 },
                 centerContent = {

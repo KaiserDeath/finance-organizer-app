@@ -36,6 +36,7 @@ fun AnimatedAmount(
     style: TextStyle = LocalTextStyle.current,
     color: Color = Color.Unspecified,
     maxLines: Int = 2,
+    trimTrailingZeroCents: Boolean = false,
 ) {
     // Discreet mode short-circuits the count entirely: there is nothing to watch a masked figure
     // count towards, and animating towards it would still recompose on every frame.
@@ -57,8 +58,13 @@ fun AnimatedAmount(
         animationSpec = Motion.progress(),
         label = "amount-count",
     )
+    val formatted = Money.format((animated * 100).toLong(), currencyCode)
     Text(
-        text = Money.format((animated * 100).toLong(), currencyCode),
+        text = if (trimTrailingZeroCents && amountMinor % 100L == 0L) {
+            formatted.removeSuffix(".00")
+        } else {
+            formatted
+        },
         style = style.copy(fontFeatureSettings = TabularFigures),
         color = color,
         maxLines = maxLines,

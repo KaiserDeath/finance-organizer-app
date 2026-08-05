@@ -183,9 +183,13 @@ val MaterialTheme.moneyColors: MoneyColors
  * Resolve via [brandSurface] — never import the raw values.
  */
 data class BrandSurfaceColors(
+    /** Darker origin for the subtle hero gradient. */
+    val gradientStart: Color,
     val container: Color,
     val content: Color,
     val mutedContent: Color,
+    /** High-contrast brand accent used for progress and positive emphasis on the indigo surface. */
+    val accent: Color,
     /** Over-budget signal. Amber, because red is illegible on indigo in either theme. */
     val alert: Color,
     /** Decorative progress-bar track. The one role allowed to be translucent. */
@@ -193,17 +197,21 @@ data class BrandSurfaceColors(
 )
 
 internal val LightBrandSurface = BrandSurfaceColors(
+    gradientStart = Color(0xFF3730A3),
     container = Color(0xFF4F46E5),
     content = Color(0xFFFFFFFF),
     mutedContent = Color(0xFFE1E0FF),
+    accent = Color(0xFF5EEAD4),
     alert = Color(0xFFFDEBC8),
     track = Color(0x42FFFFFF),
 )
 
 internal val DarkBrandSurface = BrandSurfaceColors(
+    gradientStart = Color(0xFF312E81),
     container = Color(0xFF3730A3),
     content = Color(0xFFFFFFFF),
     mutedContent = Color(0xFFB7B4FF),
+    accent = Color(0xFF5EEAD4),
     alert = Color(0xFFFDEBC8),
     track = Color(0x42FFFFFF),
 )

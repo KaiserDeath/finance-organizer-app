@@ -4,21 +4,27 @@ A modern, offline-first personal‑finance organizer for the Peru market — tra
 know where money goes, what's due, and how much remains. Built with Kotlin, Jetpack Compose,
 Material 3, and a clean multi‑module architecture designed to scale into a full product.
 
-> **Status: Phases 0–6 implemented.** Expenses, budgets, upcoming payments and recurring templates,
-> analytics, accounts and savings, multi-currency, app lock, onboarding, the home-screen widget and
-> the rule-based insight engine all ship. The UI follows the Propuesta C redesign (`docs/design/`).
-> What is *not* done is listed in the roadmap and in `docs/audit-2026-08-01.md`.
+> **Status: Phases 0–6 implemented; the Propuesta C redesign is applied.** Expenses, budgets,
+> upcoming payments and recurring templates, analytics, accounts and savings, multi-currency,
+> app lock, onboarding, the home-screen widget and the rule-based insight engine all ship. The
+> UI follows the Propuesta C redesign (`docs/design/`), whose six blocks are all landed, and the
+> five phases of `docs/audit-2026-08-01.md` are closed out.
+>
+> What remains open is the on-device pay round trip (opening a real bank app and coming back with
+> the payment recorded has never been run against a real install) and final real-device validation
+> of the bank-app integration.
 
 ---
 
 ## Requirements
 
 - **Android Studio** Ladybug (2024.2) or newer.
-- **JDK 17–21** for the Gradle build. ⚠️ The build targets JDK 17 bytecode and Gradle 8.11 runs
+- **JDK 17–21** for the Gradle build. ⚠️ The build targets JDK 17 bytecode and Gradle 8.13 runs
   on JDK 17–21. A newer system JDK (e.g. 25) is **not** supported by this Gradle/AGP combo. In
   Android Studio this is automatic (it bundles a compatible JDK). From the command line, point
-  Gradle at JDK 21, e.g. `JAVA_HOME=/path/to/jdk-21` or `-Dorg.gradle.java.home=...`.
-- **Android SDK** with API 35 installed (compileSdk 35, minSdk 26).
+  Gradle at JDK 21, e.g. `JAVA_HOME=/path/to/jdk-21` or `-Dorg.gradle.java.home=...` — the JBR
+  that ships with Android Studio works and is the easiest one to point at.
+- **Android SDK** with API 35 installed (compileSdk 35, targetSdk 35, minSdk 26).
 
 ## Getting started
 
@@ -53,8 +59,10 @@ core/
   :core:database         Room: entities, DAOs, converters, Peru seed data, DI
   :core:datastore        DataStore-backed SettingsRepository
   :core:data             repository impls, entity⇄domain mappers, DI (dispatchers, clock)
-  :core:designsystem     theme, tokens, MoneyCard/StatTile/DonutChart/EmptyState/…
-  :core:ui               AmountText, TransactionRow, date format, bank-app launcher
+  :core:designsystem     theme, tokens, brandSurface/moneyColors/NoticeColors roles,
+                         MoneyCard/StatTile/DonutChart/BarChart/EmptyState/…, LocalAmountsHidden
+  :core:ui               AmountText, AmountKeypad, TransactionRow, PaymentStatusPill, InsightCard,
+                         money() (the discreet-mode formatter), date format, bank-app launcher
   :core:testing          MainDispatcherRule and the shared repository fakes
 feature/
   :feature:dashboard        hero band, pace, shortcuts, insights, streak
@@ -83,13 +91,24 @@ feature/
   are added per phase.
 - **Reactive**: DAOs expose `Flow`, repositories map to domain models, ViewModels expose a single
   immutable `StateFlow<UiState>`, everything constructor-injected via Hilt (testable with fakes).
+- **One brand palette, no Material You.** There is no `dynamicColor` path: a wallpaper-derived
+  scheme silently discarded the brand identity the redesign is about. Semantic colour lives in
+  theme roles (`brandSurface`, `moneyColors`, `NoticeColors`), never in a component's local `when`.
+- **Discreet mode is read from the composition.** Screens format money through `money()`
+  (`core:ui/util/MoneyDisplay.kt`), which consults `LocalAmountsHidden`, so hiding amounts is the
+  default and opting out is the deliberate act. The widget reads the flag directly.
 
-### ⚠️ Peru bank package ids
+Standing decisions — and the divergences from the spec that were taken on purpose — are recorded in
+[docs/design-decisions.md](docs/design-decisions.md). Read that before "fixing" something that looks
+inconsistent with the prototype.
+
+### Peru bank package ids
 
 Payment-method deep links (`core:database/SeedData.kt` and the `<queries>` in the app manifest)
-use best-known package ids for Yape/BCP/Interbank/BBVA. **Verify these before release** — if an
-id is wrong, `launchPaymentApp` (`core:ui/util/AppLauncher.kt`) safely falls back to a Play Store
-search. "Plin" has no standalone app (it lives inside partner bank apps), so it has no deep link.
+match the Google Play listings verified on 2026-08-05 for Yape, BCP, Interbank, and BBVA. Migration
+8→9 replaces the two obsolete BCP/Interbank ids on existing installs without touching user-created
+methods. `launchPaymentApp` (`core:ui/util/AppLauncher.kt`) still falls back to a Play Store search
+if an app is unavailable. "Plin" has no standalone app, so it has no deep link.
 
 ## Roadmap
 
@@ -98,7 +117,9 @@ search. "Plin" has no standalone app (it lives inside partner bank apps), so it 
 > different things.
 
 - **Phase 2** — Budgets, upcoming payments, recurring templates (WorkManager), reminders/notifications ✅.
-- **Phase 3** — Analytics & monthly reports (Vico charts, CSV/PDF export) ✅.
+- **Phase 3** — Analytics & monthly reports, CSV/PDF export ✅. Charts are drawn in Compose
+  (`DonutChart`, `BarChart`, `MoneyProgressBar`); Vico is declared in `libs.versions.toml` but
+  deliberately not wired, so nothing depends on it.
 - **Phase 4** — Accounts, income, transfers, savings goals, net worth, multi-currency ✅.
 - **Phase 5** — Biometric/PIN lock, backup/restore (JSON), onboarding, full search/filters,
   home-screen widget (Glance) ✅.
@@ -111,19 +132,25 @@ search. "Plin" has no standalone app (it lives inside partner bank apps), so it 
 Two suites, both run by CI on every pull request.
 
 ```bash
-./gradlew test                      # 166 unit tests, no device needed
-./gradlew connectedDebugAndroidTest # 49 instrumented tests, needs a device or emulator
+./gradlew test                      # 171 unit tests, no device needed
+./gradlew connectedDebugAndroidTest # 51 instrumented tests, needs a device or emulator
 ```
 
 **Use `test`, not `testDebugUnitTest`.** The latter is an Android-only task, so it
-silently skips `core:common` and `core:domain` — which between them hold 96 of the 164
+silently skips `core:common` and `core:domain` — which between them hold 97 of the 171
 unit tests.
 
-Unit tests cover the ViewModels, use cases and money formatting. Instrumented tests
-cover the things a JVM test cannot see: Room migrations against real SQLite
+Unit tests cover the use cases and domain models (`core:domain`, 90), money formatting
+(`core:common`), backup serialization (`core:data`), the pure-Kotlin UI helpers
+(`core:ui`) and the ViewModels, including focused filter/section/delete-and-undo coverage for
+`TransactionsViewModel`. `core:testing` holds the shared
+harness: `MainDispatcherRule` and the repository fakes, which are stateful, so a test
+can observe a write rather than just watch it disappear.
+
+Instrumented tests cover what a JVM test cannot see: Room migrations against real SQLite
 (`core:database`), the settings file surviving a round trip (`core:datastore`), and
-composition-level defects such as touch-target size and behaviour at 200% font scale
-(`core:ui`, `feature:dashboard`, `feature:upcoming`).
+composition-level defects such as touch-target size, discreet mode and behaviour at 200%
+font scale (`core:ui`, `feature:dashboard`, `feature:upcoming`).
 
 ### Read the count, not the build result
 
@@ -144,3 +171,17 @@ python3 .github/scripts/check_test_counts.py instrumented
 checks on `main`. The emulator job is skipped only when a pull request changes nothing
 but documentation — never on the basis of which test files changed, since instrumented
 tests exercise the main sources.
+
+The unit job also runs `compileDebugAndroidTestKotlin`. `compileDebugKotlin` does not build
+`androidTest`, so a composable gaining a parameter leaves the main sources green while every
+UI test that constructs it fails to compile — discovered only at the next device run, which
+is the slow, skippable job. Compiling them in the fast job catches it in minutes.
+
+## Documentation
+
+| File | What it is |
+|---|---|
+| [context.md](context.md) | Orientation for someone (or some agent) picking this repo up cold: where things are, what is settled, what to check before changing anything. |
+| [docs/design-decisions.md](docs/design-decisions.md) | Standing decisions that outlive any one audit, including the deliberate divergences from the spec. |
+| [docs/audit-2026-08-01.md](docs/audit-2026-08-01.md) | The architecture and UX audit, its five-phase plan, and what each phase actually shipped. |
+| [docs/design/](docs/design/) | The Propuesta C handoff **as delivered** — spec, navigable prototype, `TAREAS.md`. A historical artefact; it is not updated as work lands, so read implementation status from `context.md`, not from its checkboxes. |

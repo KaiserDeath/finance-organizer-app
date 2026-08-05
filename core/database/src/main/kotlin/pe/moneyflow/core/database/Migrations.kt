@@ -42,5 +42,25 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+/** v8 → v9: replace obsolete Android package ids without changing user-created methods. */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "UPDATE payment_methods SET deepLinkPackage = 'com.bcp.bank.bcp' " +
+                "WHERE deepLinkPackage = 'pe.com.bcp.bancamovil'",
+        )
+        db.execSQL(
+            "UPDATE payment_methods SET deepLinkPackage = 'pe.com.interbank.mobilebanking' " +
+                "WHERE deepLinkPackage = 'pe.interbank.mobilebanking'",
+        )
+    }
+}
+
 /** Every migration, in order, for the Room builder. */
-val ALL_MIGRATIONS = arrayOf(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+val ALL_MIGRATIONS = arrayOf(
+    MIGRATION_4_5,
+    MIGRATION_5_6,
+    MIGRATION_6_7,
+    MIGRATION_7_8,
+    MIGRATION_8_9,
+)

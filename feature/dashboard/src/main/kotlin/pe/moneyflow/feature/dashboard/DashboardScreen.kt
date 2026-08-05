@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -133,8 +134,6 @@ private fun DashboardContent(
     // items below it rather than to the list.
     val sidePadding = Modifier.padding(horizontal = Spacing.lg)
     val listState = rememberLazyListState()
-    val bandCoversStatusBar = listState.firstVisibleItemIndex == 0
-    StatusBarIconsOverBand(bandCoversStatusBar = bandCoversStatusBar)
     Box(modifier = modifier.fillMaxWidth()) {
     LazyColumn(
         state = listState,
@@ -194,6 +193,7 @@ private fun DashboardContent(
                 ShortcutsRow(
                     shortcuts = state.shortcuts,
                     currencyCode = data.currencyCode,
+                    categoriesById = data.categoriesById,
                     onShortcut = onShortcut,
                     modifier = sidePadding.fillMaxWidth(),
                 )
@@ -209,6 +209,47 @@ private fun DashboardContent(
                     onOpenShortcuts = onOpenShortcuts,
                     modifier = sidePadding.fillMaxWidth(),
                 )
+            }
+        }
+
+        item {
+            SectionHeader(
+                title = "Movimientos recientes",
+                actionLabel = if (data.recent.isNotEmpty()) "Ver todo" else null,
+                onActionClick = if (data.recent.isNotEmpty()) onSeeAllTransactions else null,
+                modifier = sidePadding.fillMaxWidth(),
+            )
+        }
+
+        if (data.recent.isEmpty()) {
+            item {
+                MoneyCard(modifier = sidePadding.fillMaxWidth(), shadowElevation = 0.dp) {
+                    EmptyState(
+                        icon = Icons.AutoMirrored.Rounded.ReceiptLong,
+                        title = "Aún no hay gastos",
+                        subtitle = "Toca el botón + para registrar tu primer gasto.",
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        } else {
+            item {
+                Column(modifier = sidePadding.fillMaxWidth()) {
+                    data.recent.take(4).forEachIndexed { index, tx ->
+                        TransactionRow(
+                            transaction = tx,
+                            category = tx.categoryId?.let { data.categoriesById[it] },
+                            onClick = { onTransactionClick(tx.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (index < data.recent.take(4).lastIndex) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = 64.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -237,59 +278,12 @@ private fun DashboardContent(
 
         item { StatRow(data, pace = state.pace, modifier = sidePadding) }
 
-        item {
-            SectionHeader(
-                title = "Movimientos recientes",
-                actionLabel = if (data.recent.isNotEmpty()) "Ver todo" else null,
-                onActionClick = if (data.recent.isNotEmpty()) onSeeAllTransactions else null,
-                modifier = sidePadding.fillMaxWidth(),
-            )
-        }
-
-        if (data.recent.isEmpty()) {
-            item {
-                MoneyCard(modifier = sidePadding.fillMaxWidth(), shadowElevation = 0.dp) {
-                    EmptyState(
-                        icon = Icons.AutoMirrored.Rounded.ReceiptLong,
-                        title = "Aún no hay gastos",
-                        subtitle = "Toca el botón + para registrar tu primer gasto.",
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-        } else {
-            item {
-                MoneyCard(
-                    modifier = sidePadding.fillMaxWidth(),
-                    shadowElevation = 0.dp,
-                    contentPadding = PaddingValues(vertical = Spacing.xs),
-                ) {
-                    data.recent.forEach { tx ->
-                        TransactionRow(
-                            transaction = tx,
-                            category = tx.categoryId?.let { data.categoriesById[it] },
-                            onClick = { onTransactionClick(tx.id) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-            }
-        }
     }
 
     // Once the band has scrolled away the list runs edge to edge under the status bar, so rows
     // collide with the clock. This backs the bar with the page colour the moment the band stops
     // covering it — the band keeps the top edge while it is there, and nothing overlaps once it
     // isn't. Drawn over the list rather than padding it, so scrolling stays continuous.
-    if (!bandCoversStatusBar) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
-                .background(MaterialTheme.colorScheme.background),
-        )
-    }
     }
 }
 

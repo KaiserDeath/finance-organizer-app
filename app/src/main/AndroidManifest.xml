@@ -12,8 +12,8 @@
     -->
     <queries>
         <package android:name="com.bcp.innovacxion.yapeapp" />
-        <package android:name="pe.com.bcp.bancamovil" />
-        <package android:name="pe.interbank.mobilebanking" />
+        <package android:name="com.bcp.bank.bcp" />
+        <package android:name="pe.com.interbank.mobilebanking" />
         <package android:name="com.bbva.nxt_peru" />
         <intent>
             <action android:name="android.intent.action.VIEW" />

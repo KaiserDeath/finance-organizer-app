@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -70,11 +71,12 @@ class HeroAndShortcutsTest {
     // -----------------------------------------------------------------------------------------
 
     @Test
-    fun withABudget_theFigureGetsItsDenominatorAndRemaining() {
+    fun withABudget_showsAvailableSpentAndBudgetContext() {
         showHero()
 
-        rule.onNodeWithText("de S/ 2,000.00 presupuestado").assertIsDisplayed()
-        rule.onNodeWithText("Quedan", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Disponibles este mes").assertIsDisplayed()
+        rule.onNodeWithText("de S/ 2,000 este mes").assertIsDisplayed()
+        rule.onNodeWithText("gastado").assertIsDisplayed()
     }
 
     /** Skipping the onboarding budget must degrade the band, not blank or break it. */
@@ -82,9 +84,9 @@ class HeroAndShortcutsTest {
     fun withoutABudget_theDenominatorIsAbsentButTheFigureRemains() {
         showHero(pace = pace(budget = null))
 
-        rule.onNodeWithText("presupuestado", substring = true).assertDoesNotExist()
-        rule.onNodeWithText("Gastado este mes").assertIsDisplayed()
-        rule.onNodeWithText("A este ritmo", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Disponibles este mes").assertDoesNotExist()
+        rule.onNodeWithText("Gastado en julio", ignoreCase = true).assertIsDisplayed()
+        rule.onNodeWithText("por día", substring = true).assertDoesNotExist()
     }
 
     /**
@@ -95,8 +97,8 @@ class HeroAndShortcutsTest {
     fun aPastMonth_showsNoProjectionAndNoBudget() {
         showHero(data = data().copy(month = YearMonth.of(2026, 6)), pace = null)
 
-        rule.onNodeWithText("A este ritmo", substring = true).assertDoesNotExist()
-        rule.onNodeWithText("presupuestado", substring = true).assertDoesNotExist()
+        rule.onNodeWithText("por día", substring = true).assertDoesNotExist()
+        rule.onNodeWithText("Disponibles este mes").assertDoesNotExist()
         // ignoreCase deliberately: `toMonthNameOnly()` title-cases, so this reads "Gastado en
         // Junio" while Spanish orthography — and the prototype's "Presupuesto de julio" — want it
         // lowercase mid-sentence. Not this test's call to settle, and it must not cement either.
@@ -119,7 +121,7 @@ class HeroAndShortcutsTest {
     }
 
     @Test
-    fun withStreakData_theRowCountsTheDaysLogged() {
+    fun withStreakData_theRemovedStreakRowStaysAbsent() {
         val days = (0..6).map {
             StreakDay(
                 date = july10.minusDays((6 - it).toLong()),
@@ -129,7 +131,7 @@ class HeroAndShortcutsTest {
         }
         showHero(streak = days)
 
-        rule.onNodeWithText("4/7").assertIsDisplayed()
+        rule.onNodeWithText("4/7").assertDoesNotExist()
     }
 
     // -----------------------------------------------------------------------------------------
@@ -174,7 +176,7 @@ class HeroAndShortcutsTest {
             }
         }
 
-        rule.onNodeWithText("Almuerzo")
+        rule.onNodeWithContentDescription("Almuerzo, S/ 15.00")
             .assertHasClickAction()
             .assertHeightIsAtLeast(48.dp)
     }

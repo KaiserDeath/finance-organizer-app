@@ -15,13 +15,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.MaterialTheme
@@ -33,10 +35,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.theme.Motion
@@ -98,130 +101,171 @@ fun HeroBalanceCard(
     val brand = MaterialTheme.brandSurface
     val onBand = brand.content
     val onBandMuted = brand.mutedContent
+    val remaining = pace?.remainingBudgetMinor
+    val hasBudget = pace?.monthBudgetMinor != null && remaining != null
+    val available = remaining?.coerceAtLeast(0L) ?: 0L
+    val budgetFraction = (pace?.budgetFraction ?: 0f).coerceIn(0f, 1f)
+    val percentUsed = (budgetFraction * 100).roundToInt()
+    val hiddenNow = amountsHidden()
 
-    Surface(
-        modifier = modifier,
-        color = brand.container,
-        contentColor = onBand,
-        // Only the bottom corners round: the band runs to the top edge, under the status bar.
-        shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp),
-    ) {
-        // The band itself runs under the status bar — the shell hands this destination the top inset
-        // rather than consuming it — so the padding goes on the *content*, keeping brand colour
-        // behind the clock instead of a strip of page background above it.
-        Column(
+    Column(modifier = modifier) {
+        MonthSelector(
+            month = data.month,
+            canGoForward = canGoForward,
+            onPrevious = onPreviousMonth,
+            onNext = onNextMonth,
             modifier = Modifier
-                .statusBarsPadding()
-                .padding(
-                    start = Spacing.xl,
-                    end = Spacing.xl,
-                    top = Spacing.xs,
-                    bottom = Spacing.xl,
-                ),
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg),
+        )
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.xl),
+            color = brand.gradientStart,
+            contentColor = onBand,
+            shape = RoundedCornerShape(28.dp),
         ) {
-            // The mask toggle rides in the band's own corner rather than adding a row of chrome
-            // above the figure it hides. One tap, no PIN: biometrics for a number the owner
-            // already knows is friction dressed as security.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                MonthSelector(
-                    month = data.month,
-                    canGoForward = canGoForward,
-                    onPrevious = onPreviousMonth,
-                    onNext = onNextMonth,
-                    contentColor = onBand,
-                    mutedColor = onBandMuted,
-                    modifier = Modifier.weight(1f),
-                )
-                val hiddenNow = amountsHidden()
-                IconButton(onClick = onToggleAmountsHidden) {
-                    Icon(
-                        imageVector = if (hiddenNow) {
-                            Icons.Rounded.VisibilityOff
-                        } else {
-                            Icons.Rounded.Visibility
-                        },
-                        contentDescription = if (hiddenNow) {
-                            "Mostrar los montos"
-                        } else {
-                            "Ocultar los montos"
-                        },
-                        tint = onBand,
+            Column(
+                modifier = Modifier
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(brand.gradientStart, brand.container),
+                        ),
                     )
-                }
-            }
-
-            Text(
-                text = if (pace == null) {
-                    "Gastado en ${data.month.toMonthNameOnly()}"
-                } else {
-                    "Gastado este mes"
-                },
-                style = MaterialTheme.typography.labelLarge,
-                color = onBandMuted,
-            )
-
-            // The headline. Counts to its value so logging an expense visibly moves it.
-            AnimatedAmount(
-                amountMinor = data.monthSpentMinor,
-                currencyCode = data.currencyCode,
-                style = MaterialTheme.typography.displayMedium,
-                color = onBand,
-            )
-
-            // ---- Projection: where this month is heading ---------------------------------------
-            if (pace != null && !pace.isComplete) {
-                Spacer(Modifier.height(Spacing.sm))
-                HeroPaceRow(pace = pace, currencyCode = data.currencyCode, mutedColor = onBandMuted)
-            }
-
-            // ---- Denominator: the budget this spend is measured against -------------------------
-            val budgetMinor = pace?.monthBudgetMinor
-            if (budgetMinor != null) {
-                Spacer(Modifier.height(Spacing.md))
-                HeroProgressBar(
-                    pace = pace,
-                    currencyCode = data.currencyCode,
-                    onOpenBudgets = onOpenBudgets,
-                )
-            }
-
-            // ---- Balance ------------------------------------------------------------------------
-            // On a first run the balance is a third zero under two others, and "Balance S/ 0.00"
-            // is not the answer to a screen the user has not fed yet. One line saying what the
-            // first entry unlocks takes its place.
-            Spacer(Modifier.height(Spacing.md))
-            if (isFirstRun) {
-                Text(
-                    text = "Tu primer gasto pone en marcha el resto: el ritmo, el presupuesto " +
-                        "y la racha.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = onBandMuted,
-                )
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
+                    .padding(
+                        horizontal = Spacing.xxl,
+                        vertical = Spacing.lg,
+                    ),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Balance",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = onBandMuted,
-                    )
-                    Text(
-                        text = money(data.balanceMinor, data.currencyCode),
+                        text = if (hasBudget) {
+                            "Disponibles este mes"
+                        } else {
+                            "Gastado en ${data.month.toMonthNameOnly()}"
+                        },
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
                         color = onBand,
+                        modifier = Modifier.weight(1f),
                     )
+                    IconButton(onClick = onToggleAmountsHidden) {
+                        Icon(
+                            imageVector = if (hiddenNow) {
+                                Icons.Rounded.VisibilityOff
+                            } else {
+                                Icons.Rounded.Visibility
+                            },
+                            contentDescription = if (hiddenNow) {
+                                "Mostrar los montos"
+                            } else {
+                                "Ocultar los montos"
+                            },
+                            tint = onBand,
+                        )
+                    }
                 }
-            }
 
-            // ---- Streak, inside the band ---------------------------------------------------------
-            if (streak.isNotEmpty()) {
-                Spacer(Modifier.height(Spacing.lg))
-                HorizontalDivider(color = onBandMuted)
-                Spacer(Modifier.height(Spacing.md))
-                StreakRow(days = streak, contentColor = onBand, mutedColor = onBandMuted)
+                if (hasBudget) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            AnimatedAmount(
+                                amountMinor = available,
+                                currencyCode = data.currencyCode,
+                                style = MaterialTheme.typography.displayLarge,
+                                color = onBand,
+                                maxLines = 1,
+                                trimTrailingZeroCents = true,
+                            )
+                            Text(
+                                text = "disponibles",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = onBand,
+                            )
+                            Spacer(Modifier.height(Spacing.sm))
+                            HorizontalDivider(color = brand.track)
+                            Spacer(Modifier.height(Spacing.sm))
+                            Text(
+                                text = money(data.monthSpentMinor, data.currencyCode).removeSuffix(".00"),
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = onBand,
+                            )
+                            Text(
+                                text = "gastado",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = onBandMuted,
+                            )
+                            Text(
+                                text = if (hiddenNow) {
+                                    "de tu presupuesto del mes"
+                                } else {
+                                    "de ${money(pace?.monthBudgetMinor ?: 0L, data.currencyCode).removeSuffix(".00")} este mes"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = onBandMuted,
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .padding(top = Spacing.xl)
+                                .size(92.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(
+                                progress = { budgetFraction },
+                                modifier = Modifier.size(88.dp),
+                                color = brand.accent,
+                                trackColor = brand.track,
+                                strokeWidth = 9.dp,
+                                strokeCap = StrokeCap.Round,
+                            )
+                            Text(
+                                text = "$percentUsed%",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = onBand,
+                            )
+                        }
+                    }
+                } else {
+                    Column {
+                        AnimatedAmount(
+                            amountMinor = data.monthSpentMinor,
+                            currencyCode = data.currencyCode,
+                            style = MaterialTheme.typography.displayMedium,
+                            color = onBand,
+                            maxLines = 1,
+                        )
+                    }
+                }
+
+                pace?.remainingDailyAllowanceMinor?.let { allowance ->
+                    if (!pace.isComplete) {
+                        Spacer(Modifier.height(Spacing.md))
+                        HorizontalDivider(color = brand.track)
+                        Spacer(Modifier.height(Spacing.md))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
+                                contentDescription = null,
+                                tint = brand.accent,
+                                modifier = Modifier.size(24.dp),
+                            )
+                            Text(
+                                text = "${money(allowance, data.currencyCode)} por día",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = onBand,
+                            )
+                        }
+                    }
+                }
             }
         }
     }

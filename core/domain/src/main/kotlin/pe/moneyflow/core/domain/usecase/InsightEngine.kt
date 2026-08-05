@@ -136,6 +136,7 @@ object InsightEngine {
                     "Gastaste un $pct% más en $name que el mes pasado (",
                     amount(thisAmount, currencyCode), ").",
                 ),
+                categoryId = categoryId,
             )
         }
             .sortedByDescending { (categoryId, _) -> thisByCat[categoryId] ?: 0 }
@@ -166,6 +167,7 @@ object InsightEngine {
                 "$name es tu categoría con más gasto este mes: ",
                 amount(amountMinor = amount, currencyCode = currencyCode), ".",
             ),
+            categoryId = categoryId,
         )
     }
 
