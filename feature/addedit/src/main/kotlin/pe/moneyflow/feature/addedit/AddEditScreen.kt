@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -45,6 +47,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -58,6 +64,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,11 +73,14 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.component.pressScale
@@ -90,6 +100,8 @@ import pe.moneyflow.core.ui.recurrence.RecurrenceEditor
 import pe.moneyflow.core.ui.util.toDueRelativeLabel
 import pe.moneyflow.core.ui.util.toRelativeLabel
 import pe.moneyflow.core.ui.util.toFullLabel
+import pe.moneyflow.core.ui.preset.FinancePresets
+import pe.moneyflow.core.ui.util.launchPaymentApp
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -103,6 +115,14 @@ fun AddEditScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val haptics = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var payAfterSave by remember { mutableStateOf(false) }
+    // Set once the bank app has actually launched, so the resume handler below can settle the
+    // charge on return. Guarded by `wasPaused` so opening the screen itself never counts as a return.
+    var awaitingReturn by remember { mutableStateOf(false) }
+    var wasPaused by remember { mutableStateOf(false) }
 
     // On save: the button itself confirms, then we leave.
     //
@@ -118,8 +138,48 @@ fun AddEditScreen(
         if (uiState.saved) {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             confirmation.animateTo(1f, animationSpec = Motion.spatialSlow())
-            onDone()
+            val method = uiState.paymentMethods.firstOrNull { it.id == uiState.paymentMethodId }
+            val launched = payAfterSave && method != null && launchPaymentApp(
+                context = context,
+                packageName = method.deepLinkPackage,
+                appName = method.name,
+                playStoreId = method.playStoreId,
+                webBankingUrl = FinancePresets.webUrlFor(method.deepLinkPackage),
+            )
+            if (launched) {
+                // Stay on screen: the bank round trip is what settles this charge, and the
+                // confirmation snackbar needs a live screen under it — the same reason the
+                // "Guardado" state above waits here instead of firing on a screen about to be
+                // destroyed.
+                awaitingReturn = true
+            } else {
+                onDone()
+            }
         }
+    }
+
+    // Coming back from the bank app settles the pending charge just saved — the same outcome as
+    // returning from Inicio's or Próximos' pay sheet, so the gesture means one thing regardless of
+    // which screen sent the user there, instead of only this one leaving the charge pending.
+    LifecycleResumeEffect(Unit) {
+        if (wasPaused && awaitingReturn) {
+            awaitingReturn = false
+            val methodName = uiState.paymentMethods
+                .firstOrNull { it.id == uiState.paymentMethodId }
+                ?.name
+            scope.launch {
+                viewModel.settlePendingPayment()
+                val result = snackbarHostState.showSnackbar(
+                    message = if (methodName != null) "Pagado con $methodName" else "Pagado",
+                    actionLabel = "Deshacer",
+                    duration = SnackbarDuration.Long,
+                )
+                if (result == SnackbarResult.ActionPerformed) viewModel.undoSettlePendingPayment()
+                onDone()
+            }
+        }
+        wasPaused = false
+        onPauseOrDispose { wasPaused = true }
     }
 
     var showDatePicker by remember { mutableStateOf(false) }
@@ -158,6 +218,7 @@ fun AddEditScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -236,8 +297,13 @@ fun AddEditScreen(
 
             // Category
             FieldLabel("Categoría")
+            val orderedCategories = if (suggestedCategory != null) {
+                listOf(suggestedCategory) + uiState.categories.filterNot { it.id == suggestedCategory.id }
+            } else {
+                uiState.categories
+            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                uiState.categories.forEach { category ->
+                orderedCategories.forEach { category ->
                     FilterChip(
                         selected = uiState.categoryId == category.id,
                         onClick = {
@@ -412,6 +478,34 @@ fun AddEditScreen(
                         )
                     }
                 }
+            }
+
+            // A pending expense has an immediate next step. Keep the same linked-app action that
+            // appears from the movement detail, but save first so returning from the bank never
+            // loses the charge the user just entered.
+            val linkedMethod = uiState.paymentMethods.firstOrNull { method ->
+                method.id == uiState.paymentMethodId && !method.deepLinkPackage.isNullOrBlank()
+            }
+            if (uiState.isPending && linkedMethod != null) {
+                OutlinedButton(
+                    onClick = {
+                        payAfterSave = true
+                        viewModel.save()
+                    },
+                    enabled = uiState.canSave && !uiState.saved,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp),
+                ) {
+                    Icon(Icons.Rounded.OpenInNew, contentDescription = null)
+                    Spacer(Modifier.width(Spacing.sm))
+                    Text("Pagar con ${linkedMethod.name}")
+                }
+                Text(
+                    text = "Se guardará como pendiente y abrirá ${linkedMethod.name} al terminar.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             Spacer(Modifier.height(Spacing.xl))

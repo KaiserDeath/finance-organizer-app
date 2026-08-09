@@ -22,6 +22,8 @@ import pe.moneyflow.core.domain.model.SpendingPace
 import pe.moneyflow.core.domain.model.StreakDay
 import pe.moneyflow.core.domain.model.UpcomingPayment
 import pe.moneyflow.core.domain.model.streakOf
+import pe.moneyflow.core.domain.model.suggestedMethod
+import pe.moneyflow.core.domain.repository.PaymentMethodRepository
 import pe.moneyflow.core.domain.repository.SettingsRepository
 import pe.moneyflow.core.domain.usecase.DeleteTransactionUseCase
 import pe.moneyflow.core.domain.usecase.GetBudgetsProgressUseCase
@@ -31,7 +33,9 @@ import pe.moneyflow.core.domain.usecase.GetInsightsUseCase
 import pe.moneyflow.core.domain.usecase.GetUpcomingPaymentsUseCase
 import pe.moneyflow.core.domain.usecase.ObserveTransactionsUseCase
 import pe.moneyflow.core.domain.usecase.SaveTransactionUseCase
+import pe.moneyflow.core.domain.usecase.SettleUpcomingPaymentUseCase
 import pe.moneyflow.core.model.BudgetPeriod
+import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.QuickShortcut
 import pe.moneyflow.core.model.Transaction
 import pe.moneyflow.core.model.TransactionStatus
@@ -47,6 +51,9 @@ data class UpcomingNudge(
     val overdueCount: Int,
     val dueSoonCount: Int,
     val totalAmountMinor: Long,
+    val payments: List<UpcomingPayment>,
+    /** How many pending charges exist beyond the [payments] shown, so the card can say "y N más". */
+    val hiddenCount: Int,
 ) {
     val actionableCount: Int get() = overdueCount + dueSoonCount
 }
@@ -70,7 +77,13 @@ data class DashboardUiState(
     val shortcuts: List<QuickShortcut> = emptyList(),
     /** Last seven days against the variable daily allowance; empty on past months. */
     val streak: List<StreakDay> = emptyList(),
+    /** Payment methods keyed by id, so the inline pay sheet can resolve a launchable app. */
+    val methodsById: Map<String, PaymentMethod> = emptyMap(),
 ) {
+    /** The method the pay sheet pre-selects for [payment]: its own method, else the user's default. */
+    fun suggestedMethodFor(payment: UpcomingPayment): PaymentMethod? =
+        payment.suggestedMethod(methodsById)
+
     val isCurrentMonth: Boolean get() = data.month == YearMonth.now()
 
     /**
@@ -87,6 +100,7 @@ data class DashboardUiState(
     val isFirstRun: Boolean
         get() = !isLoading &&
             isCurrentMonth &&
+            upcomingNudge == null &&
             data.recent.isEmpty() &&
             data.monthSpentMinor == 0L
 
@@ -106,13 +120,20 @@ class DashboardViewModel @Inject constructor(
     getBudgetsProgress: GetBudgetsProgressUseCase,
     getFrequentShortcuts: GetFrequentShortcutsUseCase,
     observeTransactions: ObserveTransactionsUseCase,
+    private val paymentMethodRepository: PaymentMethodRepository,
     private val settingsRepository: SettingsRepository,
     private val saveTransaction: SaveTransactionUseCase,
     private val deleteTransaction: DeleteTransactionUseCase,
+    private val settleUpcomingPayment: SettleUpcomingPaymentUseCase,
     private val clock: Clock,
 ) : ViewModel() {
 
     private val selectedMonth = MutableStateFlow(YearMonth.now(clock))
+
+    // How to revert the last settle from the inline "Pagar" action: restore the original row (real
+    // payments) or delete the row that materialized (projections). Mirrors Próximos' own undo so the
+    // gesture means the same thing from either entry point.
+    private var lastSettleUndo: (suspend () -> Unit)? = null
 
     /** The last shortcut-logged movement, so its snackbar's deshacer can remove it. */
     private var lastShortcutId: String? = null
@@ -150,24 +171,36 @@ class DashboardViewModel @Inject constructor(
                 settingsRepository.preferences,
                 observeTransactions(),
                 getFrequentShortcuts(),
-            ) { core, prefs, transactions, inferredShortcuts ->
+                paymentMethodRepository.observeAll(),
+            ) { core, prefs, transactions, inferredShortcuts, methods ->
                 val (data, upcoming, insights, budgets) = core
                 val today = LocalDate.now(clock)
                 val isCurrentMonth = YearMonth.from(today) == month
 
-                // The nudge is about things the user can act on right now, so projected occurrences
-                // are out: they have no row behind them yet. "Soon" stays a one-week horizon.
+                // The dashboard card is the ledger's "Por pagar" section: every real pending charge
+                // belongs there, even when its due date is later than a week away. Also include
+                // projected recurring occurrences for the month currently shown, so the home page
+                // agrees with Próximos pagos instead of hiding the recurring commitments until they
+                // are materialized.
                 val soonCutoff = today.plusDays(7)
-                val actionable = upcoming.filter { payment ->
-                    !payment.isProjected && payment.dueDate?.isAfter(soonCutoff) != true
+                val pending = upcoming.filter { payment ->
+                    !payment.isProjected || (
+                        isCurrentMonth &&
+                            payment.dueDate?.let { YearMonth.from(it) == month } == true
+                        )
                 }
-                val overdue = actionable.count { it.isOverdue }
-                val dueSoon = actionable.size - overdue
-                val nudge = if (actionable.isNotEmpty()) {
+                val overdue = pending.count { it.isOverdue }
+                val dueSoon = pending.count { payment ->
+                    !payment.isOverdue && payment.dueDate?.isAfter(soonCutoff) != true
+                }
+                val shownPayments = pending.take(3)
+                val nudge = if (pending.isNotEmpty()) {
                     UpcomingNudge(
                         overdueCount = overdue,
                         dueSoonCount = dueSoon,
-                        totalAmountMinor = actionable.sumOf { it.transaction.amountMinor },
+                        totalAmountMinor = pending.sumOf { it.transaction.amountMinor },
+                        payments = shownPayments,
+                        hiddenCount = pending.size - shownPayments.size,
                     )
                 } else {
                     null
@@ -237,6 +270,7 @@ class DashboardViewModel @Inject constructor(
                     } else {
                         emptyList()
                     },
+                    methodsById = methods.associateBy { it.id },
                 )
             }
         }
@@ -245,6 +279,24 @@ class DashboardViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = DashboardUiState(isLoading = true),
         )
+
+    /**
+     * Settles a pending charge from the inline "Pagar" action on the dashboard nudge — the same
+     * outcome as settling from Próximos, via the same shared use case, so returning from the bank
+     * app means one thing regardless of which screen sent the user there.
+     */
+    fun settle(payment: UpcomingPayment, methodId: String? = null) {
+        val settlement = settleUpcomingPayment(payment, methodId)
+        lastSettleUndo = settlement.undo
+        viewModelScope.launch { settlement.apply() }
+    }
+
+    /** Reverts the last [settle] (the snackbar's "Deshacer"). */
+    fun undoSettle() {
+        val undo = lastSettleUndo ?: return
+        lastSettleUndo = null
+        viewModelScope.launch { undo() }
+    }
 
     /** Saves the shortcut as a paid movement of today, in one tap. Undone by [undoShortcut]. */
     fun logShortcut(shortcut: QuickShortcut, currencyCode: String) {

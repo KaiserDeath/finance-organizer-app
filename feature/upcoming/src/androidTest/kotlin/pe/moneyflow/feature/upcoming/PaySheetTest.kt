@@ -16,6 +16,7 @@ import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.Transaction
 import pe.moneyflow.core.model.TransactionStatus
 import pe.moneyflow.core.model.TransactionType
+import pe.moneyflow.core.ui.paysheet.PaySheet
 import java.time.LocalDate
 
 /**

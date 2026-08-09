@@ -15,16 +15,21 @@ import pe.moneyflow.core.domain.usecase.GetDashboardUseCase
 import pe.moneyflow.core.domain.usecase.GetFrequentShortcutsUseCase
 import pe.moneyflow.core.domain.usecase.GetInsightsUseCase
 import pe.moneyflow.core.domain.usecase.GetUpcomingPaymentsUseCase
+import pe.moneyflow.core.domain.usecase.MarkTransactionPaidUseCase
 import pe.moneyflow.core.domain.usecase.ObserveTransactionsUseCase
 import pe.moneyflow.core.domain.usecase.SaveTransactionUseCase
+import pe.moneyflow.core.domain.usecase.SettleUpcomingPaymentUseCase
 import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.CategoryType
+import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.QuickShortcut
+import pe.moneyflow.core.model.RecurringExpense
 import pe.moneyflow.core.model.Transaction
 import pe.moneyflow.core.model.TransactionStatus
 import pe.moneyflow.core.model.TransactionType
 import pe.moneyflow.core.testing.FakeBudgetRepository
 import pe.moneyflow.core.testing.FakeCategoryRepository
+import pe.moneyflow.core.testing.FakePaymentMethodRepository
 import pe.moneyflow.core.testing.FakeRecurringExpenseRepository
 import pe.moneyflow.core.testing.FakeSettingsRepository
 import pe.moneyflow.core.testing.FakeSmartInsights
@@ -76,10 +81,22 @@ class DashboardViewModelTest {
         actualDate = date,
     )
 
+    private fun pendingExpense(id: String, amountMinor: Long, date: LocalDate) = Transaction(
+        id = id,
+        title = id,
+        amountMinor = amountMinor,
+        categoryId = "comida",
+        type = TransactionType.EXPENSE,
+        status = TransactionStatus.PENDING,
+        estimatedDate = date,
+    )
+
     private fun viewModel(
         repo: FakeTransactionRepository = FakeTransactionRepository(),
         shortcuts: List<QuickShortcut> = emptyList(),
         monthlyBudgetMinor: Long? = null,
+        paymentMethods: List<PaymentMethod> = emptyList(),
+        recurringExpenses: List<RecurringExpense> = emptyList(),
         settings: FakeSettingsRepository = FakeSettingsRepository(
             monthlyBudgetMinor = monthlyBudgetMinor,
             shortcuts = shortcuts,
@@ -89,7 +106,7 @@ class DashboardViewModelTest {
         return DashboardViewModel(
             getDashboard = GetDashboardUseCase(repo, catRepo, settings, clock),
             getUpcoming = GetUpcomingPaymentsUseCase(
-                repo, catRepo, FakeRecurringExpenseRepository(), clock,
+                repo, catRepo, FakeRecurringExpenseRepository(recurringExpenses), clock,
             ),
             getInsights = GetInsightsUseCase(FakeSmartInsights()),
             getBudgetsProgress = GetBudgetsProgressUseCase(
@@ -97,9 +114,16 @@ class DashboardViewModelTest {
             ),
             getFrequentShortcuts = GetFrequentShortcutsUseCase(repo, clock),
             observeTransactions = ObserveTransactionsUseCase(repo),
+            paymentMethodRepository = FakePaymentMethodRepository(paymentMethods),
             settingsRepository = settings,
             saveTransaction = SaveTransactionUseCase(repo),
             deleteTransaction = DeleteTransactionUseCase(repo),
+            settleUpcomingPayment = SettleUpcomingPaymentUseCase(
+                markTransactionPaid = MarkTransactionPaidUseCase(repo, clock),
+                saveTransaction = SaveTransactionUseCase(repo),
+                deleteTransaction = DeleteTransactionUseCase(repo),
+                clock = clock,
+            ),
             clock = clock,
         )
     }
@@ -201,6 +225,85 @@ class DashboardViewModelTest {
         val state = viewModel(repo).uiState.first { !it.isLoading }
 
         assertEquals(false, state.isFirstRun)
+    }
+
+    @Test
+    fun `a pending-only ledger still shows the normal dashboard`() = runTest {
+        val repo = FakeTransactionRepository(listOf(pendingExpense("due", 5_000, today)))
+
+        val state = viewModel(repo).uiState.first { !it.isLoading }
+
+        assertEquals(false, state.isFirstRun)
+        assertNotNull(state.upcomingNudge)
+    }
+
+    /**
+     * Pins the nudge's overdue/due-soon split: a charge past its date counts as overdue and one
+     * within the week-out cutoff counts as due-soon, never both and never neither.
+     */
+    @Test
+    fun `overdue and due-soon pending charges are split correctly in the nudge`() = runTest {
+        val repo = FakeTransactionRepository(
+            listOf(
+                pendingExpense("late", 3_000, today.minusDays(2)),
+                pendingExpense("soon", 4_000, today.plusDays(3)),
+            ),
+        )
+
+        val nudge = viewModel(repo).uiState.first { !it.isLoading }.upcomingNudge
+
+        assertNotNull(nudge)
+        assertEquals(1, nudge!!.overdueCount)
+        assertEquals(1, nudge.dueSoonCount)
+    }
+
+    /**
+     * Pins the reversal recorded in docs/design-decisions.md: Inicio's nudge now includes a
+     * recurring occurrence projected for the month on screen, so it agrees with Próximos instead of
+     * hiding a real commitment until it materializes. The nudge previously excluded every projection.
+     */
+    @Test
+    fun `a recurring occurrence projected for the current month is included in the nudge`() = runTest {
+        val template = RecurringExpense(
+            id = "rent",
+            title = "Alquiler",
+            amountMinor = 150_000,
+            categoryId = "comida",
+            daysOfMonth = listOf(28),
+            interval = 1,
+            nextRunDate = LocalDate.of(2026, 8, 28),
+        )
+
+        val nudge = viewModel(recurringExpenses = listOf(template))
+            .uiState.first { !it.isLoading }.upcomingNudge
+
+        assertNotNull(nudge)
+        assertEquals(1, nudge!!.payments.size)
+        assertTrue(nudge.payments.single().isProjected)
+    }
+
+    /**
+     * The same template, from a *past* month view, must not surface a next-month projection: the
+     * nudge only pulls in projections for the month the user is actually looking at.
+     */
+    @Test
+    fun `a projection is not pulled into the nudge for a month other than the one on screen`() = runTest {
+        val repo = FakeTransactionRepository(listOf(expense("a", 5_000, today.minusMonths(1))))
+        val template = RecurringExpense(
+            id = "rent",
+            title = "Alquiler",
+            amountMinor = 150_000,
+            categoryId = "comida",
+            daysOfMonth = listOf(28),
+            interval = 1,
+            nextRunDate = LocalDate.of(2026, 8, 28),
+        )
+        val vm = viewModel(repo, recurringExpenses = listOf(template))
+
+        vm.showPreviousMonth()
+        val state = vm.uiState.first { !it.isLoading && !it.isCurrentMonth }
+
+        assertNull(state.upcomingNudge)
     }
 
     /**

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -34,20 +35,27 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.launch
 import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.component.EmptyState
@@ -59,9 +67,15 @@ import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.domain.model.DashboardData
 import pe.moneyflow.core.domain.model.SpendingPace
+import pe.moneyflow.core.domain.model.UpcomingPayment
+import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.QuickShortcut
 import pe.moneyflow.core.ui.component.TransactionRow
+import pe.moneyflow.core.ui.paysheet.PaySheet
+import pe.moneyflow.core.ui.preset.FinancePresets
+import pe.moneyflow.core.ui.util.launchPaymentApp
 import pe.moneyflow.core.ui.util.money
+import pe.moneyflow.core.ui.util.toShortLabel
 
 @Composable
 fun DashboardScreen(
@@ -75,8 +89,12 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var paySheetFor by remember { mutableStateOf<UpcomingPayment?>(null) }
+    var awaitingReturn by remember { mutableStateOf<Pair<UpcomingPayment, PaymentMethod>?>(null) }
+    var wasPaused by remember { mutableStateOf(false) }
 
     // A one-tap save is automatic enough to demand a way back: 4 s of deshacer.
     val onShortcut: (QuickShortcut) -> Unit = { shortcut ->
@@ -91,6 +109,28 @@ fun DashboardScreen(
         }
     }
 
+    val settleWithUndo: (UpcomingPayment, PaymentMethod?) -> Unit = { payment, method ->
+        viewModel.settle(payment, method?.id)
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = if (method != null) "Pagado con ${method.name}" else "Pagado",
+                actionLabel = "Deshacer",
+                duration = SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed) viewModel.undoSettle()
+        }
+    }
+
+    LifecycleResumeEffect(Unit) {
+        val pending = awaitingReturn
+        if (wasPaused && pending != null) {
+            awaitingReturn = null
+            settleWithUndo(pending.first, pending.second)
+        }
+        wasPaused = false
+        onPauseOrDispose { wasPaused = true }
+    }
+
     Scaffold(
         modifier = modifier,
         containerColor = Color.Transparent,
@@ -102,6 +142,7 @@ fun DashboardScreen(
             onSeeAllTransactions = onSeeAllTransactions,
             onTransactionClick = onTransactionClick,
             onOpenUpcoming = onOpenUpcoming,
+            onPayUpcoming = { paySheetFor = it },
             onOpenBudgets = onOpenBudgets,
             onAddExpense = onAddExpense,
             onOpenShortcuts = onOpenShortcuts,
@@ -112,6 +153,30 @@ fun DashboardScreen(
             modifier = Modifier.padding(innerPadding),
         )
     }
+
+    paySheetFor?.let { payment ->
+        PaySheet(
+            payment = payment,
+            methods = uiState.methodsById.values.toList(),
+            suggestedMethodId = uiState.suggestedMethodFor(payment)?.id,
+            onLaunchApp = { method ->
+                paySheetFor = null
+                val launched = launchPaymentApp(
+                    context = context,
+                    packageName = method.deepLinkPackage,
+                    appName = method.name,
+                    playStoreId = method.playStoreId,
+                    webBankingUrl = FinancePresets.webUrlFor(method.deepLinkPackage),
+                )
+                if (launched) awaitingReturn = payment to method
+            },
+            onSettle = { method ->
+                paySheetFor = null
+                settleWithUndo(payment, method)
+            },
+            onDismiss = { paySheetFor = null },
+        )
+    }
 }
 
 @Composable
@@ -120,6 +185,7 @@ private fun DashboardContent(
     onSeeAllTransactions: () -> Unit,
     onTransactionClick: (String) -> Unit,
     onOpenUpcoming: () -> Unit,
+    onPayUpcoming: (UpcomingPayment) -> Unit,
     onOpenBudgets: () -> Unit,
     onAddExpense: () -> Unit,
     onOpenShortcuts: () -> Unit,
@@ -212,6 +278,20 @@ private fun DashboardContent(
             }
         }
 
+        // Payments are the next action after shortcuts: a pending or overdue charge should not be
+        // buried underneath the history list when the user opens Inicio to see what needs doing.
+        state.upcomingNudge?.let { nudge ->
+            item {
+                UpcomingNudgeCard(
+                    nudge = nudge,
+                    currencyCode = data.currencyCode,
+                    onClick = onOpenUpcoming,
+                    onPay = onPayUpcoming,
+                    modifier = sidePadding,
+                )
+            }
+        }
+
         item {
             SectionHeader(
                 title = "Movimientos recientes",
@@ -250,17 +330,6 @@ private fun DashboardContent(
                         }
                     }
                 }
-            }
-        }
-
-        state.upcomingNudge?.let { nudge ->
-            item {
-                UpcomingNudgeCard(
-                    nudge = nudge,
-                    currencyCode = data.currencyCode,
-                    onClick = onOpenUpcoming,
-                    modifier = sidePadding,
-                )
             }
         }
 
@@ -316,55 +385,113 @@ private fun UpcomingNudgeCard(
     nudge: UpcomingNudge,
     currencyCode: String,
     onClick: () -> Unit,
+    onPay: (UpcomingPayment) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val hasOverdue = nudge.overdueCount > 0
     val accent =
         if (hasOverdue) MaterialTheme.moneyColors.negative
         else MaterialTheme.colorScheme.tertiary
-    val title = when {
-        hasOverdue && nudge.dueSoonCount > 0 ->
-            "${nudge.overdueCount} vencido(s) y ${nudge.dueSoonCount} por vencer"
-        hasOverdue -> "${nudge.overdueCount} pago(s) vencido(s)"
-        else -> "${nudge.dueSoonCount} pago(s) por vencer"
+    // Urgency has to survive without color: a warning carried only by tint fails for anyone who
+    // can't see it, and it dropped the actual count. The subtitle now says it in words too.
+    val subtitle = buildString {
+        append("Total ")
+        append(money(nudge.totalAmountMinor, currencyCode))
+        if (hasOverdue) {
+            append(" · ")
+            append(nudge.overdueCount)
+            append(if (nudge.overdueCount == 1) " vencido" else " vencidos")
+        }
     }
-
     MoneyCard(modifier = modifier.fillMaxWidth(), shadowElevation = 0.dp) {
-        Row(
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(accent.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center,
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(accent.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (hasOverdue) Icons.Rounded.Warning else Icons.Rounded.CalendarToday,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                Column(modifier = Modifier.weight(1f).padding(horizontal = Spacing.md)) {
+                    Text(
+                        text = "Por pagar",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (hasOverdue) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Icon(
-                    imageVector = if (hasOverdue) Icons.Rounded.Warning else Icons.Rounded.CalendarToday,
-                    contentDescription = null,
-                    tint = accent,
-                    modifier = Modifier.size(22.dp),
+                    imageVector = Icons.Rounded.ChevronRight,
+                    contentDescription = "Ver próximos",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Column(modifier = Modifier.weight(1f).padding(horizontal = Spacing.md)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "Total ${money(nudge.totalAmountMinor, currencyCode)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Icon(
-                imageVector = Icons.Rounded.ChevronRight,
-                contentDescription = "Ver próximos",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            Text(
+                text = "Pendiente de pago — no incluido en el gasto del mes.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                nudge.payments.forEach { payment ->
+                    val dueDate = payment.dueDate
+                    val payeeLabel = payment.transaction.description ?: payment.transaction.title
+                    val amountLabel = money(payment.transaction.amountMinor, currencyCode)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = payeeLabel,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                            )
+                            Text(
+                                text = when {
+                                    dueDate == null -> "Sin fecha"
+                                    payment.isProjected -> "Programado · ${dueDate.toShortLabel()}"
+                                    else -> dueDate.toShortLabel()
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text(
+                            text = amountLabel,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = Spacing.sm),
+                        )
+                        TextButton(
+                            onClick = { onPay(payment) },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Pagar $payeeLabel, $amountLabel"
+                            },
+                        ) { Text("Pagar") }
+                    }
+                }
+                if (nudge.hiddenCount > 0) {
+                    TextButton(onClick = onClick, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text("y ${nudge.hiddenCount} más")
+                    }
+                }
+            }
         }
     }
 }

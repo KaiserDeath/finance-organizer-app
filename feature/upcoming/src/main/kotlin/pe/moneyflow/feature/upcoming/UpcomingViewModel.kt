@@ -10,19 +10,17 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import pe.moneyflow.core.domain.model.UpcomingBucket
 import pe.moneyflow.core.domain.model.UpcomingPayment
+import pe.moneyflow.core.domain.model.suggestedMethod
 import pe.moneyflow.core.domain.repository.PaymentMethodRepository
 import pe.moneyflow.core.domain.usecase.DeleteTransactionUseCase
 import pe.moneyflow.core.domain.usecase.GetUpcomingPaymentsUseCase
-import pe.moneyflow.core.domain.usecase.MarkTransactionPaidUseCase
 import pe.moneyflow.core.domain.usecase.SaveTransactionUseCase
+import pe.moneyflow.core.domain.usecase.SettleUpcomingPaymentUseCase
 import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.Transaction
-import pe.moneyflow.core.model.TransactionStatus
 import pe.moneyflow.core.ui.util.toMonthTitle
 import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
-import java.util.UUID
 import javax.inject.Inject
 
 data class UpcomingSection(
@@ -60,14 +58,14 @@ data class UpcomingUiState(
 
     /** The method the pay sheet pre-selects: the payment's own, else the user's default. */
     fun suggestedMethodFor(payment: UpcomingPayment): PaymentMethod? =
-        methodFor(payment) ?: methodsById.values.firstOrNull { it.isDefault }
+        payment.suggestedMethod(methodsById)
 }
 
 @HiltViewModel
 class UpcomingViewModel @Inject constructor(
     getUpcoming: GetUpcomingPaymentsUseCase,
     paymentMethodRepository: PaymentMethodRepository,
-    private val markTransactionPaid: MarkTransactionPaidUseCase,
+    private val settleUpcomingPayment: SettleUpcomingPaymentUseCase,
     private val saveTransaction: SaveTransactionUseCase,
     private val deleteTransaction: DeleteTransactionUseCase,
     private val clock: Clock,
@@ -105,9 +103,9 @@ class UpcomingViewModel @Inject constructor(
      * turns into ledger data.
      */
     fun settle(payment: UpcomingPayment, methodId: String? = null) {
-        val (apply, undo) = settleActionFor(payment, methodId)
-        lastSettleUndo = undo
-        viewModelScope.launch { apply() }
+        val settlement = settleUpcomingPayment(payment, methodId)
+        lastSettleUndo = settlement.undo
+        viewModelScope.launch { settlement.apply() }
     }
 
     /**
@@ -122,48 +120,11 @@ class UpcomingViewModel @Inject constructor(
      */
     fun settleAll(payments: List<UpcomingPayment>, methodId: String? = null) {
         if (payments.isEmpty()) return
-        val actions = payments.map { settleActionFor(it, methodId) }
+        val settlements = payments.map { settleUpcomingPayment(it, methodId) }
         // Undone in reverse, so a projection's materialized row is removed before anything that
         // followed it — the same order a user would expect from stepping back.
-        lastSettleUndo = { actions.reversed().forEach { (_, undo) -> undo() } }
-        viewModelScope.launch { actions.forEach { (apply, _) -> apply() } }
-    }
-
-    /**
-     * The settle as a pair of suspend functions: do it, and put it back.
-     *
-     * Held as data rather than executed inline so one settle and a batch of them can share the
-     * same two behaviours — a real pending row is marked paid in place, while a projected
-     * occurrence has no row yet and materializes as already paid.
-     */
-    private fun settleActionFor(
-        payment: UpcomingPayment,
-        methodId: String?,
-    ): Pair<suspend () -> Unit, suspend () -> Unit> {
-        val tx = payment.transaction
-        return if (payment.isProjected) {
-            val today = LocalDate.now(clock)
-            val now = Instant.now(clock)
-            val newId = UUID.randomUUID().toString()
-            val apply: suspend () -> Unit = {
-                saveTransaction(
-                    tx.copy(
-                        id = newId,
-                        status = TransactionStatus.PAID,
-                        actualDate = today,
-                        paymentMethodId = methodId ?: tx.paymentMethodId,
-                        createdAt = now,
-                        updatedAt = now,
-                    ),
-                )
-            }
-            apply to { deleteTransaction(newId) }
-        } else {
-            // `tx` is the row as it was before settling, so restoring it undoes both the status
-            // flip and any method change in one step.
-            val apply: suspend () -> Unit = { markTransactionPaid(tx.id, methodId) }
-            apply to { saveTransaction(tx) }
-        }
+        lastSettleUndo = { settlements.reversed().forEach { it.undo() } }
+        viewModelScope.launch { settlements.forEach { it.apply() } }
     }
 
     /** Reverts the last [settle] (the snackbar's "Deshacer"). */

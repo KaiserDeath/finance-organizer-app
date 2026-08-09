@@ -18,8 +18,10 @@ import pe.moneyflow.core.domain.repository.PaymentMethodRepository
 import pe.moneyflow.core.domain.repository.SettingsRepository
 import pe.moneyflow.core.domain.usecase.GenerateDueRecurringUseCase
 import pe.moneyflow.core.domain.usecase.GetTransactionUseCase
+import pe.moneyflow.core.domain.usecase.MarkTransactionPaidUseCase
 import pe.moneyflow.core.domain.usecase.SaveRecurringExpenseUseCase
 import pe.moneyflow.core.domain.usecase.SaveTransactionUseCase
+import pe.moneyflow.core.domain.usecase.UnmarkTransactionPaidUseCase
 import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.CardKind
 import pe.moneyflow.core.model.Category
@@ -81,6 +83,8 @@ class AddEditViewModel @Inject constructor(
     private val saveRecurring: SaveRecurringExpenseUseCase,
     private val generateDueRecurring: GenerateDueRecurringUseCase,
     private val getTransaction: GetTransactionUseCase,
+    private val markTransactionPaid: MarkTransactionPaidUseCase,
+    private val unmarkTransactionPaid: UnmarkTransactionPaidUseCase,
     private val categoryRepository: CategoryRepository,
     private val paymentMethodRepository: PaymentMethodRepository,
     private val accountRepository: AccountRepository,
@@ -95,6 +99,10 @@ class AddEditViewModel @Inject constructor(
 
     // Preserve the original creation timestamp when editing.
     private var createdAt: Instant = Instant.now()
+
+    // The transaction `save()` just wrote, held so a "Pagar con X" round trip can settle exactly
+    // that row on return — the same charge, not a re-derived lookup.
+    private var lastSaved: Transaction? = null
 
     /** Once the user picks a category by hand, description typing stops overriding it. */
     private var categoryManuallyChosen = false
@@ -252,8 +260,26 @@ class AddEditViewModel @Inject constructor(
 
         viewModelScope.launch {
             saveTransaction(transaction)
+            lastSaved = transaction
             _uiState.update { it.copy(saved = true) }
         }
+    }
+
+    /**
+     * Settles the pending charge [save] just wrote, as paid with its own method — the launch-and-
+     * return counterpart to "Pagar con X" in [pe.moneyflow.feature.addedit.AddEditScreen]. Mirrors
+     * what Inicio and Próximos do when the bank app is closed, so the gesture means the same thing
+     * regardless of which screen sent the user there instead of leaving the charge pending only here.
+     */
+    fun settlePendingPayment() {
+        val tx = lastSaved ?: return
+        viewModelScope.launch { markTransactionPaid(tx.id, tx.paymentMethodId) }
+    }
+
+    /** Reverts [settlePendingPayment] (the snackbar's "Deshacer"). */
+    fun undoSettlePendingPayment() {
+        val tx = lastSaved ?: return
+        viewModelScope.launch { unmarkTransactionPaid(tx.id) }
     }
 
     private fun saveRecurringTemplate(state: AddEditUiState, amount: Long) {

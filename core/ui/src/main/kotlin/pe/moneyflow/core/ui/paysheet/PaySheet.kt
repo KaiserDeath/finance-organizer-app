@@ -1,4 +1,4 @@
-package pe.moneyflow.feature.upcoming
+package pe.moneyflow.core.ui.paysheet
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -36,9 +36,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import pe.moneyflow.core.common.Money
 import pe.moneyflow.core.designsystem.theme.IconSize
 import pe.moneyflow.core.designsystem.theme.Spacing
+import pe.moneyflow.core.designsystem.theme.sheetScrimColor
 import pe.moneyflow.core.domain.model.UpcomingPayment
 import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.ui.util.toShortLabel
@@ -47,6 +47,10 @@ import pe.moneyflow.core.ui.util.money
 /**
  * The pay flow: amount, due date, and the method — then the user actually pays, instead of the
  * app only recording that they did.
+ *
+ * Shared by every screen that can settle a bill (Inicio's dashboard nudge, Próximos, and the
+ * "Pagar con X" action while creating a pending expense), so this is the one implementation —
+ * not one per feature module reaching into another's internals.
  *
  * Two states by selected method:
  *  - **With app** (Yape, BCP…): the primary action opens the app ("Abrir {app} y registrar"); on
@@ -66,7 +70,7 @@ import pe.moneyflow.core.ui.util.money
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-internal fun PaySheet(
+fun PaySheet(
     payment: UpcomingPayment,
     methods: List<PaymentMethod>,
     suggestedMethodId: String?,
@@ -81,7 +85,11 @@ internal fun PaySheet(
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        scrimColor = MaterialTheme.sheetScrimColor,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -202,7 +210,7 @@ internal fun PaySheet(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun PayBatchSheet(
+fun PayBatchSheet(
     payments: List<UpcomingPayment>,
     methods: List<PaymentMethod>,
     suggestedMethodId: String?,
@@ -215,7 +223,11 @@ internal fun PayBatchSheet(
     val totalMinor = payments.sumOf { it.transaction.amountMinor }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        scrimColor = MaterialTheme.sheetScrimColor,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

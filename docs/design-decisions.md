@@ -98,6 +98,46 @@ ambient-versus-requested line drawn above. UI code should not use it.
 currency-shaped string in its text parts, so inlining an amount fails the build rather than
 quietly reopening the hole.
 
+## Inicio's "Por pagar" nudge now includes this month's projected occurrences
+
+`DashboardViewModel`'s upcoming-payments nudge originally excluded every projected recurring
+occurrence: "they have no row behind them yet," so settling one from the dashboard would have
+materialized ledger data the user never saw as real. That rule is reversed for occurrences projected
+into the **month currently on screen** — a recurring bill due later this month now surfaces on Inicio
+the same way it already did on Próximos.
+
+**Why the reversal.** Inicio and Próximos disagreed about a real commitment: a rent charge due on the
+28th was invisible on the dashboard until the 27th (inside the old 7-day "due soon" window) even
+though Próximos had been showing it all month. That gap read as the dashboard hiding a bill, not as
+the dashboard being conservative about unmaterialized data.
+
+**What did not change.** Projections for *other* months (next month's occurrences, or any projection
+while browsing a past month) are still excluded from the nudge — only the month being viewed
+qualifies. Settling a projected occurrence from the card still goes through the same
+`SettleUpcomingPaymentUseCase` materialization path as Próximos: paying it writes a real PAID
+transaction; nothing is bulk-materialized just for being shown. `DashboardViewModelTest` pins both
+the inclusion (current-month projection appears) and the boundary (a past month's view excludes it).
+
+## Settling a payment is one implementation, not one per screen
+
+Inicio's dashboard nudge, Próximos, and AddEdit's "Pagar con X" action can all end with the user
+paying a bill and returning from a bank app. Each used to decide independently what "settled" means,
+and they drifted: returning from the bank app auto-settled the charge (with "Deshacer") from Inicio
+and Próximos, but silently left it pending when the same round trip started from AddEdit.
+
+The settle/undo pair (materialize-and-mark-paid for a projection, mark-paid-in-place for a real row)
+now lives once, as `SettleUpcomingPaymentUseCase` in `core:domain`, and the pay sheet itself
+(`PaySheet`/`PayBatchSheet`) lives once, in `core:ui`. `feature:dashboard` no longer depends on
+`feature:upcoming` to reuse either — that dependency violated the standing `:app → :feature:* →
+:core:*` rule and was only there because the sheet and the settle logic had nowhere shared to live.
+`AddEditViewModel` calls `MarkTransactionPaidUseCase`/`UnmarkTransactionPaidUseCase` directly for the
+same outcome, since the charge it settles is the row `save()` just wrote rather than an
+`UpcomingPayment` read back from a repository.
+
+**The rule going forward:** returning from a bank app always means "settled, with an undo snackbar,"
+regardless of which screen sent the user there. A future entry point that can't honor that should not
+reuse the launch-and-return pattern rather than reuse it with different semantics.
+
 ## Navigation: what follows the spec, and the one thing that does not
 
 The 2026-08-02 audit listed two navigation changes as "undocumented structural changes to confirm",

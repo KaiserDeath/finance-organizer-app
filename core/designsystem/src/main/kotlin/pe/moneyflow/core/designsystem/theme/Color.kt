@@ -282,6 +282,17 @@ val MaterialTheme.noticeColors: NoticeColors
     get() = LocalNoticeColors.current
 
 /**
+ * Scrim behind a modal bottom sheet (the pay sheet, the batch-pay sheet). Darker than M3's default
+ * (`colorScheme.scrim` at 32% alpha) because the default reads too light behind this app's mostly
+ * light, low-contrast card surfaces. One resolved value here instead of each sheet picking its own
+ * alpha keeps every sheet in the app equally legible against its content.
+ */
+val MaterialTheme.sheetScrimColor: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = this.colorScheme.scrim.copy(alpha = 0.52f)
+
+/**
  * Fallback palette used to color category slices/chips when a stored hex is missing, cycled as
  * `CategoryPalette[index % size]`.
  *

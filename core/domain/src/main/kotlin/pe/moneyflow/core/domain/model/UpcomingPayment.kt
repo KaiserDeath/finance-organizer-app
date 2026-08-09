@@ -1,6 +1,7 @@
 package pe.moneyflow.core.domain.model
 
 import pe.moneyflow.core.model.Category
+import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.Transaction
 import java.time.LocalDate
 
@@ -33,3 +34,13 @@ data class UpcomingPayment(
     /** True when [dueDate] is already past. Always false for projections. */
     val isOverdue: Boolean = false,
 )
+
+/**
+ * The method a pay sheet should preselect: the payment's own method, else the user's default.
+ *
+ * Shared by every screen offering a pay sheet (Inicio, Próximos), so the preselection means the
+ * same thing regardless of which screen opened it.
+ */
+fun UpcomingPayment.suggestedMethod(methodsById: Map<String, PaymentMethod>): PaymentMethod? =
+    transaction.paymentMethodId?.let { methodsById[it] }
+        ?: methodsById.values.firstOrNull { it.isDefault }

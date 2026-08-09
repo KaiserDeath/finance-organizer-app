@@ -13,6 +13,7 @@ import pe.moneyflow.core.domain.usecase.DeleteTransactionUseCase
 import pe.moneyflow.core.domain.usecase.GetUpcomingPaymentsUseCase
 import pe.moneyflow.core.domain.usecase.MarkTransactionPaidUseCase
 import pe.moneyflow.core.domain.usecase.SaveTransactionUseCase
+import pe.moneyflow.core.domain.usecase.SettleUpcomingPaymentUseCase
 import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.Transaction
 import pe.moneyflow.core.model.TransactionStatus
@@ -70,7 +71,12 @@ class UpcomingViewModelTest {
             clock = clock,
         ),
         paymentMethodRepository = FakePaymentMethodRepository(listOf(cash, yape)),
-        markTransactionPaid = MarkTransactionPaidUseCase(repo, clock),
+        settleUpcomingPayment = SettleUpcomingPaymentUseCase(
+            markTransactionPaid = MarkTransactionPaidUseCase(repo, clock),
+            saveTransaction = SaveTransactionUseCase(repo),
+            deleteTransaction = DeleteTransactionUseCase(repo),
+            clock = clock,
+        ),
         saveTransaction = SaveTransactionUseCase(repo),
         deleteTransaction = DeleteTransactionUseCase(repo),
         clock = clock,
