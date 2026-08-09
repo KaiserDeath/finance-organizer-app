@@ -14,3 +14,10 @@ local.properties
 
 # Eclipse/IDE compiled output
 bin/
+
+# Kotlin compiler daemon cache/logs
+/.kotlin/
+
+# Scratch build output (compiled stubs, generated reports) — not source
+/tmp/
+/output/
