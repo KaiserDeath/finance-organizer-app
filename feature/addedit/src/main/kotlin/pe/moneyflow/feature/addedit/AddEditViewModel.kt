@@ -271,15 +271,20 @@ class AddEditViewModel @Inject constructor(
      * what Inicio and Próximos do when the bank app is closed, so the gesture means the same thing
      * regardless of which screen sent the user there instead of leaving the charge pending only here.
      */
-    fun settlePendingPayment() {
+    // `suspend`, not a fire-and-forget `viewModelScope.launch`: the caller navigates away right
+    // after calling these (`onDone()`, immediately following `undoSettlePendingPayment()` with no
+    // suspension in between). A fire-and-forget child coroutine here raced the nav pop that clears
+    // this ViewModel's scope — the "Deshacer" write could lose that race and silently never happen.
+    // Being `suspend` makes the caller's own coroutine wait for the write before moving on.
+    suspend fun settlePendingPayment() {
         val tx = lastSaved ?: return
-        viewModelScope.launch { markTransactionPaid(tx.id, tx.paymentMethodId) }
+        markTransactionPaid(tx.id, tx.paymentMethodId)
     }
 
     /** Reverts [settlePendingPayment] (the snackbar's "Deshacer"). */
-    fun undoSettlePendingPayment() {
+    suspend fun undoSettlePendingPayment() {
         val tx = lastSaved ?: return
-        viewModelScope.launch { unmarkTransactionPaid(tx.id) }
+        unmarkTransactionPaid(tx.id)
     }
 
     private fun saveRecurringTemplate(state: AddEditUiState, amount: Long) {
