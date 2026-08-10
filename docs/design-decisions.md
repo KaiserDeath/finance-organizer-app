@@ -183,3 +183,47 @@ The remaining Ajustes rows (Categorías, Moneda, Atajos de un toque, Pagos recur
 seguridad, Seguridad, Acerca de) stay as their own screens, three levels below Tu dinero, per spec.
 Atajos de un toque is new (audit item U5) and follows the same rule: it is a picker with real
 content, not a wrapper.
+
+## Registrar un gasto — the preview-card redesign, and where it diverges from spec §4
+
+`AddEditScreen.kt` was a flat `Column` + `verticalScroll` where the primary Save button sat ~600 dp
+below the fold behind 23 inline category chips, with a second, lower-emphasis "Guardar" pinned in
+the top bar. Spec §4 asked for three specific fixes (open keypad, description-based category
+suggestion, method selector filtered to active methods) — all three were already in code. What
+wasn't in the spec, and what a 2026-08-10 audit changed, is the screen's structure.
+
+**What changed.** An indigo `brandSurface` header (matching the dashboard hero) holds the
+Gasto/Ingreso toggle and the live, thousands-grouped amount. Below it, a "De un toque"-sourced
+predictions strip fills the form on tap — it never saves by itself, the same clarity rule the rest
+of this document draws elsewhere: nothing enters the ledger without an explicit Guardar. Under
+that, a live preview card mirrors `TransactionRow`'s exact anatomy — avatar, title, status pill,
+method, date, amount — built from the real form state, so "what will this look like in
+Movimientos" is answered before saving instead of after. Every zone opens the control that changes
+it. A colored category grid (7 most-used + "Más" sheet) replaces the 23-chip wall. The keypad and a
+single "Guardar S/ 18.00" button are docked in the `Scaffold`'s `bottomBar`, always on screen — the
+two competing Guardar affordances collapse into one.
+
+**Título becomes optional.** `canSave` no longer requires a title; a blank one saves as the
+selected category's name ("Comida S/ 18"). This is a product change, not styling: spec §4 didn't
+touch the field's requiredness. The disabled-CTA model stays (no inline field errors were
+requested for this round) but is now unambiguous — amount is the only thing that can block Guardar.
+
+**Unsaved-changes guard.** Back (nav icon and system back) used to call `onDone()` straight through.
+It now asks "¿Descartar…?" whenever the form differs from what it loaded — new, since nothing in
+the app previously tracked dirty state on this screen.
+
+**Amount buffer bug fixed in passing.** Editing an existing transaction loaded
+`Money.formatPlain(amountMinor)`, which includes thousands commas, into a keypad whose only edit
+operation is `dropLast(1)` — a loaded "1,234.56" stranded a comma the user could only delete digit
+by digit. The buffer now always loads and edits as plain digits + one dot; grouping is display-only
+(`groupedAmountText`), computed from the plain buffer, never stored.
+
+**Same screen for create and edit**, per the standing rule that a redesign shouldn't produce two
+mental models for one object: editing precharges the preview card and skips the predictions strip
+and recurrence switch, same as it always excluded recurrence from edit.
+
+**Deliberately out of this round:** notification-based auto-capture (Yape/Plin push parsing) was
+discussed and liked, but is its own project — permission, per-app parsers, and a degrade path when
+a bank's notification format changes are not a screen redesign. The preview card is built so that
+capture, when it lands, opens this same screen pre-filled as its confirmation step rather than a
+new surface. `MovementDetailScreen`'s autosave sheet is untouched.

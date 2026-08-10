@@ -17,6 +17,7 @@ import pe.moneyflow.core.domain.repository.CategoryRepository
 import pe.moneyflow.core.domain.repository.PaymentMethodRepository
 import pe.moneyflow.core.domain.repository.SettingsRepository
 import pe.moneyflow.core.domain.usecase.GenerateDueRecurringUseCase
+import pe.moneyflow.core.domain.usecase.GetFrequentShortcutsUseCase
 import pe.moneyflow.core.domain.usecase.GetTransactionUseCase
 import pe.moneyflow.core.domain.usecase.MarkTransactionPaidUseCase
 import pe.moneyflow.core.domain.usecase.SaveRecurringExpenseUseCase
@@ -28,6 +29,7 @@ import pe.moneyflow.core.model.Category
 import pe.moneyflow.core.model.CategoryType
 import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.model.Priority
+import pe.moneyflow.core.model.QuickShortcut
 import pe.moneyflow.core.model.RecurringExpense
 import pe.moneyflow.core.model.Transaction
 import pe.moneyflow.core.model.TransactionStatus
@@ -58,6 +60,8 @@ data class AddEditUiState(
     val accounts: List<Account> = emptyList(),
     /** Drives the amount field's symbol prefix, which used to be hardcoded to "S/ ". */
     val currencyCode: String = "PEN",
+    /** One-tap presets that *fill* the form (never save) — shown only when creating. */
+    val predictions: List<QuickShortcut> = emptyList(),
     val saved: Boolean = false,
 ) {
     /** When the transaction is still pending, [date] is its due date rather than a paid date. */
@@ -71,9 +75,31 @@ data class AddEditUiState(
             it.type == if (type == TransactionType.INCOME) CategoryType.INCOME else CategoryType.EXPENSE
         }
 
+    val selectedCategory: Category?
+        get() = allCategories.firstOrNull { it.id == categoryId }
+
+    /**
+     * The title the movement will actually carry: what the user typed, or — since the title is
+     * optional — the category's name, so "Comida S/ 18" saves in two taps without naming it.
+     */
+    val effectiveTitle: String
+        get() = title.trim().ifBlank { selectedCategory?.name ?: "Movimiento" }
+
+    /**
+     * [amountText] with thousands separators for display only ("1234567.5" → "1,234,567.5").
+     * The raw buffer stays plain because the keypad edits it with dropLast.
+     */
+    val groupedAmountText: String
+        get() {
+            if (amountText.isEmpty()) return ""
+            val intPart = amountText.substringBefore('.')
+            val rest = amountText.drop(intPart.length)
+            val grouped = intPart.reversed().chunked(3).joinToString(",").reversed()
+            return grouped + rest
+        }
+
     val canSave: Boolean
-        get() = title.isNotBlank() &&
-            (Money.parseToMinor(amountText)?.let { it > 0 } == true) &&
+        get() = (Money.parseToMinor(amountText)?.let { it > 0 } == true) &&
             (!isRecurring || recurrence.isValid)
 }
 
@@ -85,6 +111,7 @@ class AddEditViewModel @Inject constructor(
     private val getTransaction: GetTransactionUseCase,
     private val markTransactionPaid: MarkTransactionPaidUseCase,
     private val unmarkTransactionPaid: UnmarkTransactionPaidUseCase,
+    private val getFrequentShortcuts: GetFrequentShortcutsUseCase,
     private val categoryRepository: CategoryRepository,
     private val paymentMethodRepository: PaymentMethodRepository,
     private val accountRepository: AccountRepository,
@@ -106,6 +133,45 @@ class AddEditViewModel @Inject constructor(
 
     /** Once the user picks a category by hand, description typing stops overriding it. */
     private var categoryManuallyChosen = false
+
+    /**
+     * The user-editable fields as they stood once loading finished — what "unsaved changes"
+     * is measured against for the exit guard. Null until the initial load resolves, so a
+     * back press during loading never counts as dirty.
+     */
+    private var initialSnapshot: Snapshot? = null
+
+    private data class Snapshot(
+        val title: String,
+        val amountText: String,
+        val type: TransactionType,
+        val status: TransactionStatus,
+        val categoryId: String?,
+        val paymentMethodId: String?,
+        val accountId: String?,
+        val date: LocalDate,
+        val notes: String,
+        val isRecurring: Boolean,
+        val recurrence: RecurrenceValue,
+    )
+
+    private fun snapshotOf(state: AddEditUiState) = Snapshot(
+        title = state.title,
+        amountText = state.amountText,
+        type = state.type,
+        status = state.status,
+        categoryId = state.categoryId,
+        paymentMethodId = state.paymentMethodId,
+        accountId = state.accountId,
+        date = state.date,
+        notes = state.notes,
+        isRecurring = state.isRecurring,
+        recurrence = state.recurrence,
+    )
+
+    /** True when leaving now would discard something the user actually changed. */
+    val isDirty: Boolean
+        get() = initialSnapshot?.let { it != snapshotOf(_uiState.value) } == true
 
     init {
         viewModelScope.launch {
@@ -142,7 +208,34 @@ class AddEditViewModel @Inject constructor(
                 )
             }
             editingId?.let { loadTransaction(it) } ?: applyDefaultCategory()
+            initialSnapshot = snapshotOf(_uiState.value)
+
+            // Predictions fill the form; they never save. Same source as the dashboard's
+            // "De un toque" row: onboarding picks first, inferred frequency as fallback.
+            if (editingId == null) {
+                val predictions = prefs.shortcuts
+                    .ifEmpty { getFrequentShortcuts().first() }
+                    .take(PREDICTION_COUNT)
+                _uiState.update { it.copy(predictions = predictions) }
+            }
         }
+    }
+
+    /** Fills every field the shortcut carries — the user still confirms with Guardar. */
+    fun applyPrediction(shortcut: QuickShortcut) = _uiState.update { state ->
+        categoryManuallyChosen = true
+        val method = state.paymentMethods.firstOrNull { it.id == shortcut.paymentMethodId }
+        val categoryId = shortcut.categoryId
+            ?.takeIf { id -> state.categories.any { it.id == id } }
+            ?: state.categoryId
+        state.copy(
+            title = shortcut.label,
+            amountText = plainAmountText(shortcut.amountMinor),
+            categoryId = categoryId,
+            paymentMethodId = method?.id ?: state.paymentMethodId,
+            cardKind = method?.cardKind ?: state.cardKind,
+            accountId = method?.accountId ?: state.accountId,
+        )
     }
 
     private fun applyDefaultCategory() {
@@ -158,7 +251,9 @@ class AddEditViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 title = tx.title,
-                amountText = Money.formatPlain(tx.amountMinor),
+                // Plain buffer, no separators: the keypad edits with dropLast, so a loaded
+                // "1,234.56" would strand a comma the user can only delete digit by digit.
+                amountText = plainAmountText(tx.amountMinor),
                 type = tx.type,
                 status = tx.status,
                 priority = tx.priority,
@@ -242,7 +337,7 @@ class AddEditViewModel @Inject constructor(
         val isPending = state.status == TransactionStatus.PENDING
         val transaction = Transaction(
             id = editingId ?: UUID.randomUUID().toString(),
-            title = state.title.trim(),
+            title = state.effectiveTitle,
             amountMinor = amount,
             categoryId = state.categoryId,
             paymentMethodId = state.paymentMethodId,
@@ -291,7 +386,7 @@ class AddEditViewModel @Inject constructor(
         val days = state.recurrence.days
         val template = RecurringExpense(
             id = UUID.randomUUID().toString(),
-            title = state.title.trim(),
+            title = state.effectiveTitle,
             amountMinor = amount,
             categoryId = state.categoryId,
             paymentMethodId = state.paymentMethodId,
@@ -311,5 +406,16 @@ class AddEditViewModel @Inject constructor(
             generateDueRecurring()
             _uiState.update { it.copy(saved = true) }
         }
+    }
+
+    private companion object {
+        const val PREDICTION_COUNT = 3
+
+        /**
+         * Minor units as a keypad buffer: plain digits, dot separator, no grouping, and whole
+         * amounts without the ".00" tail ("1800" → "18", "1850" → "18.50").
+         */
+        fun plainAmountText(amountMinor: Long): String =
+            Money.formatPlain(amountMinor).replace(",", "").removeSuffix(".00")
     }
 }
