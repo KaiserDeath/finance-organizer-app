@@ -144,19 +144,41 @@ knowing whether this makes the false positive easier to hit in practice.
 
 ## Sign-off
 
+**Environment note:** this pass ran on the project's **Pixel 7 emulator** (`emulator-5554`),
+against a freshly built debug APK containing the `f463439` recurring-duplicate fix, using the
+repo's own `tmp/offline-stubs/` packages (`com.bcp.innovacxion.yapeapp`, `com.bcp.bank.bcp`,
+`com.bbva.nxt_peru`, `pe.com.interbank.mobilebanking` — each a local "offline test stub" activity,
+not the real bank app) as the installed targets for `launchPaymentApp`. That satisfies the intent
+of the checklist (a real launch-and-return round trip through Android's activity stack, not a
+mock) without touching any real bank session — driven via `adb`, screenshots read directly, and
+`uiautomator` dumps for exact tap targets. It is **not** the real-device, real-app pass the
+checklist's prerequisites ask for; that still stands as open. Existing "Hoy"-dated seed data on
+this emulator (two duplicate `netflix` charges) served as live evidence of the bug the `f463439`
+commit fixed — see notes below.
+
 | Scenario | Inicio | Próximos | AddEdit | Notes |
 |---|---|---|---|---|
-| 1. Real row, app installed |  |  |  |  |
-| 2. "Ya pagué por fuera" |  |  | n/a |  |
-| 3. Projected occurrence |  |  | n/a |  |
-| 4. AddEdit "Pagar con X" | n/a | n/a |  |  |
-| 5. Batch settle | n/a |  | n/a |  |
-| Yape (installed / not) |  |  |  |  |
-| BCP / BBVA / Interbank (installed / not) |  |  |  |  |
-| Play Store false-positive check |  |  |  |  |
-| Discreet mode |  |  |  |  |
-| Dark theme scrim |  |  |  |  |
-| TalkBack row descriptions |  |  |  |  |
-| Truncation "y N más" |  |  |  |  |
+| 1. Real row, app installed | not run | **PASS** | n/a | Paid the projected `netflix` (Sept 14, S/25) via Próximos → BBVA stub → back. Snackbar "Pagado con BBVA" + Deshacer shown; row disappeared from Próximos (total S/105→S/80). |
+| 2. "Ya pagué por fuera" | not run | not run | n/a | PaySheet showed the button with correct copy when a no-app method (American Express) was selected ("Registrar el pago" / explanatory line); the actual tap-through wasn't exercised this pass. |
+| 3. Projected occurrence | not run | **PASS** | n/a | Same `netflix` payment as #1 doubles as this scenario — materialized a real PAID transaction (confirmed in Movimientos, exactly one new row). Then **force-stopped and cold-relaunched the app** (re-triggers `RecurringGenerationWorker`'s catch-up) and re-checked Próximos: no duplicate reappeared, total stayed S/80. This is the direct regression check for the bug fixed in `f463439`. Did not test the Deshacer-deletes-the-materialized-row path this pass. |
+| 4. AddEdit "Pagar con X" | n/a | n/a | **PASS** | Created a new S/99 pending "Prueba" expense with BBVA. Confirmed: screen stayed on AddEdit through the BBVA-stub launch-and-return (did not navigate immediately); "Pagado con BBVA" + Deshacer snackbar appeared on AddEdit itself; screen then navigated back to the origin (Movimientos) only after the snackbar's window; Movimientos showed the charge as PAID, not pending. Did not test the Deshacer branch of this scenario. |
+| 5. Batch settle | n/a | not run | n/a | No 2+ overdue same-method payments were set up this pass. |
+| Yape (installed / not) | not run | not run | not run | Package confirmed present (`com.bcp.innovacxion.yapeapp`) via `pm list packages`; launch not individually exercised. |
+| BCP / Interbank (installed) | not run | not run | not run | Packages confirmed present; launch not individually exercised (only BBVA was driven end-to-end). |
+| BBVA (installed) | n/a | **PASS** | **PASS** | `mCurrentFocus` confirmed `com.bbva.nxt_peru/offline.stub.StubActivity` opened on both the Próximos and AddEdit launches — correct package targeted, real "offline test stub" screen shown, zero real-bank exposure. |
+| Play Store false-positive check | not testable this pass | — | — | All four bank stub packages happen to be installed on this emulator, so there was no "app not installed" bank method available to force the fallback path. Still open — needs a method with no matching installed package. |
+| Discreet mode | **PASS** | — | — | Toggled the eye icon on Inicio: hero figure, "gastado" line, "por día" line, shortcut amounts, and recent-movement amounts all masked to `•••••` consistently; toggled back off cleanly. |
+| Dark theme (general) | **PASS** | — | — | `cmd uimode night yes`: background, text, and nav bar adapted; the indigo hero band correctly stayed on-brand rather than shifting to a Material You neutral. |
+| Dark theme scrim (behind an open sheet) | not tested | — | — | Dark mode was toggled after the pay sheet was already closed; didn't reopen a sheet to check `sheetScrimColor` specifically against the dark background. |
+| TalkBack row descriptions | not tested | not tested | — | No Inicio nudge card was on screen at any point during this pass (nothing pending remained after scenario 1/3), so there was no "Pagar `<payee>`, `<amount>`" row to inspect via `uiautomator` or TalkBack. |
+| Truncation "y N más" | not tested | — | — | Didn't seed 4+ pending payments this pass. |
 
-Device: ______________  Android version: ______________  Date: ______________  Tester: ______________
+**Bonus finding, not in the original checklist:** the emulator's pre-existing seed data included
+two identical `netflix` PAID transactions both dated "Hoy" — live, on-device evidence that the bug
+`f463439` fixed had already produced a real duplicate charge before the fix was installed. The fix
+does not retroactively clean up existing duplicates (confirmed: those two rows are still there);
+it only prevents new ones.
+
+Device: Pixel 7 emulator (`emulator-5554`)  Android version: (AVD default)  Date: 2026-08-10
+Tester: Claude (via adb), pending a real-device pass by a human tester for the items above marked
+"not run" / "not tested" / "not testable this pass".
