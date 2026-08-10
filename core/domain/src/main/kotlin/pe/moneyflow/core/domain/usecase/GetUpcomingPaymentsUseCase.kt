@@ -56,11 +56,20 @@ class GetUpcomingPaymentsUseCase @Inject constructor(
                 )
             }
 
-        // Every occurrence already in the ledger — paid ones included, so a bill settled early does
-        // not reappear as a projection.
+        // Every occurrence already in the ledger — paid ones included, so a bill settled early or
+        // late does not reappear as a projection.
+        //
+        // Keyed on `estimatedDate` (the occurrence's scheduled due date), not `effectiveDate`.
+        // Settling a projection stamps `actualDate` with *today*, and `effectiveDate` prefers that —
+        // so on any bill not paid exactly on its due date, this set held (recurringId, today)
+        // instead of (recurringId, dueDate), the projection generator kept producing the same
+        // occurrence, and a paid bill reappeared as a duplicate "pending" row. `estimatedDate` is
+        // set by both generators of a recurring row (`GenerateDueRecurringUseCase` and
+        // `SettleUpcomingPaymentUseCase`'s materialization) and never changes once written, so it is
+        // the stable key the due date was actually projected under.
         val alreadyInLedger = transactions.mapNotNullTo(mutableSetOf()) { tx ->
             val recurringId = tx.recurringId ?: return@mapNotNullTo null
-            val date = tx.effectiveDate ?: return@mapNotNullTo null
+            val date = tx.estimatedDate ?: tx.effectiveDate ?: return@mapNotNullTo null
             recurringId to date
         }
 

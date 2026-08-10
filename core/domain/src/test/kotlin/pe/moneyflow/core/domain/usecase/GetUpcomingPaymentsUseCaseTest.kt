@@ -106,6 +106,31 @@ class GetUpcomingPaymentsUseCaseTest {
         assertTrue(result.isEmpty())
     }
 
+    /**
+     * Regression for the "pending payment gets counted as an expense but never disappears from
+     * Próximos/Inicio" bug: settling a *projected* occurrence stamps `actualDate` with the day it
+     * was actually paid, which is rarely the due date itself. The dedup used to key off
+     * `effectiveDate` (`actualDate ?: estimatedDate`), so a bill paid on a different day than it was
+     * due produced a ledger key the projector's own due-date output never matched, and the same
+     * "pending" occurrence kept reappearing next to the real, already-paid row.
+     */
+    @Test
+    fun `does not project an occurrence paid on a different date than it was due`() = runTest {
+        val paidNineDaysEarly = pending("t1", LocalDate.of(2026, 8, 20), recurringId = "r1").copy(
+            status = TransactionStatus.PAID,
+            actualDate = LocalDate.of(2026, 8, 11),
+        )
+        val result = useCase(
+            transactions = listOf(paidNineDaysEarly),
+            templates = listOf(monthly("r1", 20, LocalDate.of(2026, 8, 20))),
+        ).invoke().first()
+
+        assertTrue(
+            "a bill paid ahead of its due date must not reappear as a duplicate projection for it",
+            result.isEmpty(),
+        )
+    }
+
     @Test
     fun `end date truncates the projection`() = runTest {
         val result = useCase(

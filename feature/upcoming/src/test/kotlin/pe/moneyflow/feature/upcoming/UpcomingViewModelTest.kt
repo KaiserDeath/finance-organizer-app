@@ -75,6 +75,7 @@ class UpcomingViewModelTest {
             markTransactionPaid = MarkTransactionPaidUseCase(repo, clock),
             saveTransaction = SaveTransactionUseCase(repo),
             deleteTransaction = DeleteTransactionUseCase(repo),
+            recurringExpenseRepository = FakeRecurringExpenseRepository(),
             clock = clock,
         ),
         saveTransaction = SaveTransactionUseCase(repo),

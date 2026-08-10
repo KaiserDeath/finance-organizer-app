@@ -103,11 +103,10 @@ class DashboardViewModelTest {
         ),
     ): DashboardViewModel {
         val catRepo = FakeCategoryRepository(listOf(comida))
+        val recurringRepo = FakeRecurringExpenseRepository(recurringExpenses)
         return DashboardViewModel(
             getDashboard = GetDashboardUseCase(repo, catRepo, settings, clock),
-            getUpcoming = GetUpcomingPaymentsUseCase(
-                repo, catRepo, FakeRecurringExpenseRepository(recurringExpenses), clock,
-            ),
+            getUpcoming = GetUpcomingPaymentsUseCase(repo, catRepo, recurringRepo, clock),
             getInsights = GetInsightsUseCase(FakeSmartInsights()),
             getBudgetsProgress = GetBudgetsProgressUseCase(
                 FakeBudgetRepository(), repo, catRepo, settings, clock,
@@ -122,6 +121,7 @@ class DashboardViewModelTest {
                 markTransactionPaid = MarkTransactionPaidUseCase(repo, clock),
                 saveTransaction = SaveTransactionUseCase(repo),
                 deleteTransaction = DeleteTransactionUseCase(repo),
+                recurringExpenseRepository = recurringRepo,
                 clock = clock,
             ),
             clock = clock,

@@ -1,6 +1,8 @@
 package pe.moneyflow.core.domain.usecase
 
 import pe.moneyflow.core.domain.model.UpcomingPayment
+import pe.moneyflow.core.domain.repository.RecurringExpenseRepository
+import pe.moneyflow.core.model.RecurringExpense
 import pe.moneyflow.core.model.TransactionStatus
 import java.time.Clock
 import java.time.Instant
@@ -28,6 +30,7 @@ class SettleUpcomingPaymentUseCase @Inject constructor(
     private val markTransactionPaid: MarkTransactionPaidUseCase,
     private val saveTransaction: SaveTransactionUseCase,
     private val deleteTransaction: DeleteTransactionUseCase,
+    private val recurringExpenseRepository: RecurringExpenseRepository,
     private val clock: Clock,
 ) {
     operator fun invoke(payment: UpcomingPayment, methodId: String? = null): PaymentSettlement {
@@ -47,6 +50,13 @@ class SettleUpcomingPaymentUseCase @Inject constructor(
                         updatedAt = now,
                     ),
                 )
+                // A projection has no row of its own until this call — its template's schedule is
+                // the only place that "remembers" the occurrence is still owed. Advance it past what
+                // was just paid, the same way GenerateDueRecurringUseCase does when it materializes a
+                // due occurrence on its own. Skipping this left nextRunDate untouched, so the next
+                // cold start or daily worker run (RecurringGenerationWorker) saw the template still
+                // "due" and materialized a second, duplicate PENDING transaction for the same date.
+                tx.recurringId?.let { advanceScheduleAfter(it, tx.estimatedDate) }
             }
             PaymentSettlement(apply = apply, undo = { deleteTransaction(newId) })
         } else {
@@ -55,5 +65,33 @@ class SettleUpcomingPaymentUseCase @Inject constructor(
             val apply: suspend () -> Unit = { markTransactionPaid(tx.id, methodId) }
             PaymentSettlement(apply = apply, undo = { saveTransaction(tx) })
         }
+    }
+
+    /**
+     * Moves a template's [RecurringExpense.nextRunDate] to the first occurrence strictly after
+     * [settledDate], mirroring [GenerateDueRecurringUseCase]'s own advance loop.
+     *
+     * A no-op if the template is gone, [settledDate] is null, or the schedule has already moved
+     * past it (a projection can be paid out of order, and this must never walk the schedule
+     * backwards over occurrences it has already accounted for).
+     */
+    private suspend fun advanceScheduleAfter(recurringId: String, settledDate: LocalDate?) {
+        val date = settledDate ?: return
+        val template = recurringExpenseRepository.getById(recurringId) ?: return
+        if (date.isBefore(template.nextRunDate)) return
+
+        var runDate = template.nextRunDate
+        var guard = 0
+        while (!runDate.isAfter(date) && guard++ < MAX_ADVANCE_STEPS) {
+            runDate = template.advance(runDate)
+        }
+        recurringExpenseRepository.upsert(
+            template.copy(nextRunDate = runDate, lastGeneratedDate = LocalDate.now(clock)),
+        )
+    }
+
+    private companion object {
+        /** Guard against a pathological schedule (interval <= 0) never advancing past [date]. */
+        const val MAX_ADVANCE_STEPS = 400
     }
 }
