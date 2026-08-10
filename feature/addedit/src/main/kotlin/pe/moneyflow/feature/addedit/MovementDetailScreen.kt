@@ -1,13 +1,18 @@
 package pe.moneyflow.feature.addedit
 
+import android.os.Build
+import android.view.WindowManager
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -38,15 +43,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,9 +65,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pe.moneyflow.core.designsystem.icon.iconForKey
@@ -97,7 +103,6 @@ fun MovementDetailScreen(
     viewModel: MovementDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
 
@@ -106,33 +111,53 @@ fun MovementDetailScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showPaidPrompt by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDone,
-        sheetState = sheetState,
-        modifier = modifier,
+    ConfigurePopupWindow()
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDone,
+            ),
     ) {
         val tx = uiState.transaction
-        Column(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .imePadding()
-                .navigationBarsPadding()
-                .padding(horizontal = Spacing.lg)
-                .padding(bottom = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                .align(Alignment.BottomCenter)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                ),
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            tonalElevation = 1.dp,
+            shadowElevation = 8.dp,
         ) {
-            if (tx == null) {
-                Text(
-                    text = if (uiState.loading) "Cargando…" else "Este movimiento ya no existe.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = Spacing.xl),
-                )
-                return@Column
-            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .padding(top = Spacing.md)
+                    .padding(horizontal = Spacing.lg)
+                    .padding(bottom = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                if (tx == null) {
+                    Text(
+                        text = if (uiState.loading) "Cargando…" else "Este movimiento ya no existe.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = Spacing.xl),
+                    )
+                    return@Column
+                }
 
-            when (mode) {
+                when (mode) {
                 SheetMode.DETAIL -> DetailContent(
                     state = uiState,
                     onTogglePaid = {
@@ -184,6 +209,7 @@ fun MovementDetailScreen(
                     onBack = { mode = SheetMode.DETAIL },
                     onSelect = { id -> viewModel.setAccount(id); mode = SheetMode.DETAIL },
                 )
+                }
             }
         }
     }
@@ -237,6 +263,31 @@ fun MovementDetailScreen(
             },
             dismissButton = { TextButton(onClick = { showPaidPrompt = false }) { Text("Todavía no") } },
         )
+    }
+}
+
+/**
+ * Uses Android's window-level blur so the screen beneath the modal remains recognizable without
+ * competing with the movement details. Android 11 and older retain Material's translucent scrim.
+ */
+@Composable
+private fun ConfigurePopupWindow() {
+    val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window ?: return
+    DisposableEffect(dialogWindow) {
+        val previousAnimations = dialogWindow.attributes.windowAnimations
+        dialogWindow.setWindowAnimations(0)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            dialogWindow.attributes = dialogWindow.attributes.apply {
+                blurBehindRadius = 28.dp.value.toInt()
+            }
+        }
+        onDispose {
+            dialogWindow.setWindowAnimations(previousAnimations)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                dialogWindow.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            }
+        }
     }
 }
 
