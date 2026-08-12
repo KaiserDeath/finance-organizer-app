@@ -1,6 +1,7 @@
 package pe.moneyflow.core.domain.usecase
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import pe.moneyflow.core.domain.repository.CategoryRepository
 import pe.moneyflow.core.domain.repository.PaymentMethodRepository
@@ -42,11 +43,35 @@ internal class FakeRecurringRepo(private val items: List<RecurringExpense>) : Re
     override suspend fun delete(id: String) = Unit
 }
 
-internal class FakePmRepo(private val items: List<PaymentMethod>) : PaymentMethodRepository {
-    override fun observeAll(): Flow<List<PaymentMethod>> = flowOf(items)
-    override suspend fun getById(id: String): PaymentMethod? = items.firstOrNull { it.id == id }
-    override suspend fun upsert(paymentMethod: PaymentMethod) = Unit
-    override suspend fun delete(id: String) = Unit
+/**
+ * Stateful, following [FakeSavingsRepo]: which method is the default is a fact about the whole set
+ * that only a write can change, so a no-op `upsert` could not tell a use case that sets one default
+ * from one that leaves two behind.
+ *
+ * Order is preserved on update rather than moving the row to the end, because the defect being
+ * guarded against is a reader falling back to `firstOrNull { it.isDefault }` and answering by
+ * position.
+ */
+internal class FakePmRepo(initial: List<PaymentMethod> = emptyList()) : PaymentMethodRepository {
+    private val state = MutableStateFlow(initial)
+
+    fun all(): List<PaymentMethod> = state.value
+
+    override fun observeAll(): Flow<List<PaymentMethod>> = state
+    override suspend fun getById(id: String): PaymentMethod? = state.value.firstOrNull { it.id == id }
+
+    override suspend fun upsert(paymentMethod: PaymentMethod) {
+        val at = state.value.indexOfFirst { it.id == paymentMethod.id }
+        state.value = if (at >= 0) {
+            state.value.toMutableList().also { it[at] = paymentMethod }
+        } else {
+            state.value + paymentMethod
+        }
+    }
+
+    override suspend fun delete(id: String) {
+        state.value = state.value.filterNot { it.id == id }
+    }
 }
 
 internal class FakeSettings(

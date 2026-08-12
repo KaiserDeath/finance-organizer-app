@@ -14,6 +14,7 @@ import pe.moneyflow.core.domain.usecase.DeletePaymentMethodUseCase
 import pe.moneyflow.core.domain.usecase.ObservePaymentMethodsUseCase
 import pe.moneyflow.core.domain.usecase.SaveAccountUseCase
 import pe.moneyflow.core.domain.usecase.SavePaymentMethodUseCase
+import pe.moneyflow.core.domain.usecase.SetDefaultPaymentMethodUseCase
 import pe.moneyflow.core.model.Account
 import pe.moneyflow.core.model.PaymentMethod
 import pe.moneyflow.core.ui.preset.accountTypeFor
@@ -39,6 +40,7 @@ class PaymentMethodsViewModel @Inject constructor(
     private val savePaymentMethod: SavePaymentMethodUseCase,
     private val saveAccount: SaveAccountUseCase,
     private val deletePaymentMethod: DeletePaymentMethodUseCase,
+    private val setDefaultPaymentMethod: SetDefaultPaymentMethodUseCase,
 ) : ViewModel() {
 
     private var recentlyDeleted: PaymentMethod? = null
@@ -62,7 +64,23 @@ class PaymentMethodsViewModel @Inject constructor(
         )
 
     fun save(method: PaymentMethod) {
-        viewModelScope.launch { savePaymentMethod(method) }
+        viewModelScope.launch {
+            savePaymentMethod(method)
+            // Saving a method *as* the default is still a change to the whole set, so it goes
+            // through the same one-default rule as the explicit action below.
+            if (method.isDefault) setDefaultPaymentMethod(method.id)
+        }
+    }
+
+    /**
+     * Makes [id] the default, immediately — no form to submit.
+     *
+     * The default used to be a Switch inside the edit sheet, so changing it meant opening an editor
+     * on a method you did not want to edit and remembering to save. It is one fact about one
+     * method; it gets one tap.
+     */
+    fun setDefault(id: String) {
+        viewModelScope.launch { setDefaultPaymentMethod(id) }
     }
 
     /**
@@ -88,6 +106,9 @@ class PaymentMethodsViewModel @Inject constructor(
                 linkedAccountId = accountId
             }
             savePaymentMethod(method.copy(accountId = linkedAccountId))
+            // Same one-default rule as [save]: this is the path the sheet actually takes, so
+            // leaving it out here would let creating a method as the default produce two.
+            if (method.isDefault) setDefaultPaymentMethod(method.id)
         }
     }
 

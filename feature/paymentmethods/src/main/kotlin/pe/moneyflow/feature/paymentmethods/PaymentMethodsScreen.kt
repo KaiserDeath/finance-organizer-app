@@ -33,7 +33,9 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CreditCard
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.StarOutline
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material3.Button
@@ -89,6 +91,7 @@ import pe.moneyflow.core.designsystem.component.animatedItem
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.icon.iconForKey
 import pe.moneyflow.core.designsystem.theme.IconSize
+import pe.moneyflow.core.designsystem.theme.moneyColors
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.designsystem.util.colorFromHex
 import pe.moneyflow.core.ui.legal.LegalText
@@ -266,6 +269,7 @@ fun PaymentMethodsScreen(
                 }
                 showSheet = false
             },
+            onSetDefault = viewModel::setDefault,
         )
     }
 }
@@ -304,6 +308,57 @@ private fun SwipeablePaymentMethod(
                 PaymentMethodRow(method = method, onClick = onClick, onLaunch = onLaunch)
             }
         }
+    }
+}
+
+/**
+ * The default-method control for a method that already exists: one tap, applied immediately.
+ *
+ * Two states, and only one of them is tappable. Already the default is a **statement**, not a
+ * control that would do nothing — a disabled-looking button that still invites a press is the
+ * thing the handoff's rules call out, and the honest form of "nothing to do here" is a sentence.
+ */
+@Composable
+private fun DefaultMethodAction(isDefault: Boolean, onSetDefault: () -> Unit) {
+    if (isDefault) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.moneyColors.positive,
+                modifier = Modifier.size(IconSize.sm),
+            )
+            Spacer(Modifier.width(Spacing.sm))
+            Column {
+                Text(
+                    text = "Ya es tu método predeterminado",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Se selecciona solo al registrar un movimiento y al pagar",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        return
+    }
+
+    OutlinedButton(
+        onClick = onSetDefault,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.StarOutline,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        Text("Usar como predeterminado")
     }
 }
 
@@ -371,11 +426,13 @@ private fun PaymentMethodRow(method: PaymentMethod, onClick: () -> Unit, onLaunc
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun AddEditPaymentMethodSheet(
+internal fun AddEditPaymentMethodSheet(
     existing: PaymentMethod?,
     accounts: List<Account>,
     onDismiss: () -> Unit,
     onConfirm: (PaymentMethod, alsoCreateAccount: Boolean) -> Unit,
+    /** Applies immediately, without waiting for [onConfirm]. Only reachable for an existing method. */
+    onSetDefault: (String) -> Unit = {},
 ) {
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var type by remember { mutableStateOf(existing?.type ?: PaymentMethodType.CASH) }
@@ -521,20 +578,39 @@ private fun AddEditPaymentMethodSheet(
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Predeterminado",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = "Se selecciona solo al registrar un movimiento",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            // For a method that already exists, this is an action, not a form field: it applies on
+            // tap and needs no save. It used to be a Switch whose effect only landed if you
+            // remembered to submit the form — so changing your default meant opening an editor on a
+            // method you had no intention of editing.
+            //
+            // A method being created has no id to point at yet, so there the toggle stays and the
+            // flag rides along with the save.
+            if (existing != null) {
+                DefaultMethodAction(
+                    isDefault = isDefault,
+                    onSetDefault = {
+                        onSetDefault(existing.id)
+                        // Keep the local flag in step, so a later "Guardar cambios" writes the
+                        // state the user just chose rather than the one the sheet opened with.
+                        isDefault = true
+                    },
+                )
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Predeterminado",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = "Se selecciona solo al registrar un movimiento",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = isDefault, onCheckedChange = { isDefault = it })
                 }
-                Switch(checked = isDefault, onCheckedChange = { isDefault = it })
             }
 
             // Advanced: personalization + app link, hidden by default so the common path is just
