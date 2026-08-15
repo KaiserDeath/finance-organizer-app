@@ -13,8 +13,8 @@ fun NavController.navigateToAddEdit(transactionId: String? = null) {
     navigate(AddEditRoute(transactionId))
 }
 
-fun NavGraphBuilder.addEditScreen(onDone: () -> Unit) {
+fun NavGraphBuilder.addEditScreen(onDone: () -> Unit, onSaved: () -> Unit = {}) {
     composable<AddEditRoute> {
-        AddEditScreen(onDone = onDone)
+        AddEditScreen(onDone = onDone, onSaved = onSaved)
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import pe.moneyflow.core.ui.safearea.safeArea
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,6 +87,7 @@ fun PaySheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
+        modifier = Modifier.safeArea("sheet_payment"),
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         scrimColor = MaterialTheme.sheetScrimColor,
@@ -224,6 +226,7 @@ fun PayBatchSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
+        modifier = Modifier.safeArea("sheet_payment_completion"),
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         scrimColor = MaterialTheme.sheetScrimColor,

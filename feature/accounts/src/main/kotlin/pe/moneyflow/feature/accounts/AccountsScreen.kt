@@ -40,6 +40,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
+import pe.moneyflow.core.ui.safearea.safeArea
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -314,6 +315,7 @@ private fun AddAccountSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
+        modifier = Modifier.safeArea("sheet_account_editor"),
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
@@ -467,6 +469,7 @@ private fun TransferSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
+        modifier = Modifier.safeArea("sheet_account_transfer"),
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {

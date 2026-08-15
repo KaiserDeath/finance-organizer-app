@@ -1,0 +1,315 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Castor master rig source</title>
+  <desc>
+    Layered vector source for the Rive artboard "Castor".
+
+    Artboard origin convention: bottom-center between the feet = (256, 499).
+    Proportions traced from docs/pet-companion-assets/castor-rig-construction-v1.png
+    (neutral master pose), which castor-rive-handoff.md designates as the canonical model.
+
+    Every part is a COMPLETE closed shape underneath its overlaps, so bone deformation
+    never reveals cropped artwork. Transparent background; no speech bubble, no floor.
+
+    Model notes:
+      * The wrap is SLEEVELESS - arms are bare fur. The construction sheet's indigo
+        arm parts belong to an alternate sleeved variant and are not used here.
+      * `mouth` sits behind the incisors so the teeth always read in front.
+      * Legs/feet sit behind the garment so their complete tops stay hidden.
+    Layer ids match docs/castor-rive-handoff.md.
+  </desc>
+
+  <defs>
+    <radialGradient id="furGrad" cx="38%" cy="26%" r="78%">
+      <stop offset="0%" stop-color="#C97A3E"/>
+      <stop offset="60%" stop-color="#B4602C"/>
+      <stop offset="100%" stop-color="#8E441D"/>
+    </radialGradient>
+    <radialGradient id="furGradLimb" cx="34%" cy="26%" r="82%">
+      <stop offset="0%" stop-color="#BE7135"/>
+      <stop offset="100%" stop-color="#95491F"/>
+    </radialGradient>
+    <linearGradient id="hoodGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2C2670"/>
+      <stop offset="55%" stop-color="#242056"/>
+      <stop offset="100%" stop-color="#191540"/>
+    </linearGradient>
+    <linearGradient id="muzzleGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8D2A4"/>
+      <stop offset="100%" stop-color="#DFA46B"/>
+    </linearGradient>
+    <linearGradient id="tailGrad" x1="0.15" y1="0" x2="0.9" y2="1">
+      <stop offset="0%" stop-color="#7E4822"/>
+      <stop offset="100%" stop-color="#52280C"/>
+    </linearGradient>
+
+    <clipPath id="clipTailBase"><ellipse cx="358" cy="358" rx="33" ry="37" transform="rotate(38 358 358)"/></clipPath>
+    <clipPath id="clipTailMid"><ellipse cx="400" cy="388" rx="38" ry="40" transform="rotate(38 400 388)"/></clipPath>
+    <clipPath id="clipTailTip"><ellipse cx="436" cy="424" rx="38" ry="38" transform="rotate(38 436 424)"/></clipPath>
+  </defs>
+
+  <g id="Castor" fill="none" stroke="none">
+
+    <!-- ============================ SHADOW ============================ -->
+    <ellipse id="shadow" cx="256" cy="497" rx="122" ry="15" fill="#3E1F0B" opacity="0.20"/>
+
+    <!-- ============================= TAIL =============================
+         One broad paddle built from three complete overlapping segments.
+         The inner end stays a full ellipse behind the body. -->
+    <g id="tail">
+      <g id="tail_base">
+        <ellipse cx="358" cy="358" rx="33" ry="37" transform="rotate(38 358 358)"
+                 fill="url(#tailGrad)" stroke="#35190A" stroke-width="3.5"/>
+        <g clip-path="url(#clipTailBase)" stroke="#3A1C09" stroke-width="2" opacity="0.40">
+          <path d="M330 340 L406 386 M320 364 L396 410 M348 320 L418 362"/>
+          <path d="M400 330 L346 404 M420 358 L366 432"/>
+        </g>
+      </g>
+      <g id="tail_mid">
+        <ellipse cx="400" cy="388" rx="38" ry="40" transform="rotate(38 400 388)"
+                 fill="url(#tailGrad)" stroke="#35190A" stroke-width="3.5"/>
+        <g clip-path="url(#clipTailMid)" stroke="#3A1C09" stroke-width="2" opacity="0.40">
+          <path d="M372 370 L452 418 M362 396 L442 444 M392 348 L464 392"/>
+          <path d="M446 360 L390 438 M466 390 L410 468"/>
+        </g>
+      </g>
+      <g id="tail_tip">
+        <ellipse cx="436" cy="424" rx="38" ry="38" transform="rotate(38 436 424)"
+                 fill="url(#tailGrad)" stroke="#35190A" stroke-width="3.5"/>
+        <g clip-path="url(#clipTailTip)" stroke="#3A1C09" stroke-width="2" opacity="0.40">
+          <path d="M410 406 L490 454 M400 432 L480 480 M430 384 L502 428"/>
+          <path d="M484 396 L428 474 M504 426 L448 504"/>
+        </g>
+      </g>
+    </g>
+
+    <!-- ======================= LEGS AND FEET =========================
+         Drawn BEFORE the body so the complete leg tops tuck behind the hem. -->
+    <g id="leg_left">
+      <path d="M146 392 L146 470 Q146 486 174 486 Q202 486 202 470 L202 392 Z"
+            fill="url(#furGradLimb)" stroke="#3E1F0B" stroke-width="3.5"/>
+    </g>
+    <g id="foot_left">
+      <ellipse cx="174" cy="482" rx="47" ry="16" fill="url(#furGradLimb)" stroke="#3E1F0B" stroke-width="3.5"/>
+      <g stroke="#71360F" stroke-width="2.4" stroke-linecap="round" opacity="0.7">
+        <path d="M153 471 L150 480"/><path d="M174 469 L174 479"/><path d="M195 471 L198 480"/>
+      </g>
+    </g>
+    <g id="leg_right">
+      <path d="M310 392 L310 470 Q310 486 338 486 Q366 486 366 470 L366 392 Z"
+            fill="url(#furGradLimb)" stroke="#3E1F0B" stroke-width="3.5"/>
+    </g>
+    <g id="foot_right">
+      <ellipse cx="338" cy="482" rx="47" ry="16" fill="url(#furGradLimb)" stroke="#3E1F0B" stroke-width="3.5"/>
+      <g stroke="#71360F" stroke-width="2.4" stroke-linecap="round" opacity="0.7">
+        <path d="M317 471 L314 480"/><path d="M338 469 L338 479"/><path d="M359 471 L362 480"/>
+      </g>
+    </g>
+
+    <!-- ============================= BODY ============================= -->
+    <g id="body">
+      <!-- Complete torso: runs up behind the head and down behind the hem. -->
+      <path id="torso"
+            d="M256 196
+               C190 196 138 242 130 304
+               C122 362 126 420 136 450
+               C156 486 356 486 376 450
+               C386 420 390 362 382 304
+               C374 242 322 196 256 196 Z"
+            fill="url(#furGrad)" stroke="#3E1F0B" stroke-width="4"/>
+
+      <!-- Full garment silhouette behind the front panel. -->
+      <path id="hoodie_back"
+            d="M256 228
+               C186 228 130 258 118 318
+               C108 358 110 396 124 418
+               C154 442 358 442 388 418
+               C402 396 404 358 394 318
+               C382 258 326 228 256 228 Z"
+            fill="#1A1640" stroke="#0E0C24" stroke-width="3.5"/>
+
+      <g id="hoodie_front">
+        <path id="hoodie_panel"
+              d="M122 238 L256 280 L390 238
+                 C402 286 404 358 394 388
+                 C380 416 342 428 256 428
+                 C170 428 132 416 118 388
+                 C108 358 110 286 122 238 Z"
+              fill="url(#hoodGrad)" stroke="#0E0C24" stroke-width="3.5"/>
+        <!-- Crossing wrap bands; Band B reads over Band A, matching the master pose. -->
+        <path id="hoodie_collar_under"
+              d="M112 240 C122 212 156 200 184 212 L346 296
+                 C368 308 370 336 350 348 C332 358 314 352 300 344
+                 L126 276 C108 268 104 252 112 240 Z"
+              fill="#221E54" stroke="#0E0C24" stroke-width="3.5"/>
+        <path id="hoodie_collar_over"
+              d="M400 240 C390 212 356 200 328 212 L166 296
+                 C144 308 142 336 162 348 C180 358 198 352 212 344
+                 L386 276 C404 268 408 252 400 240 Z"
+              fill="#2A2568" stroke="#0E0C24" stroke-width="3.5"/>
+      </g>
+
+      <path id="pocket"
+            d="M192 344 L320 344 L314 386 Q312 392 305 392 L207 392 Q200 392 198 386 Z"
+            fill="#241F58" stroke="#0E0C24" stroke-width="3.5"/>
+
+      <g id="leaf_badge" transform="translate(291 304) rotate(14)">
+        <path d="M0 -24 C15 -12 17 10 0 24 C-17 10 -15 -12 0 -24 Z"
+              fill="#57A894" stroke="#2F6B59" stroke-width="2.6"/>
+        <path d="M0 -18 L0 18" stroke="#2F6B59" stroke-width="2" stroke-linecap="round"/>
+        <g stroke="#2F6B59" stroke-width="1.5" stroke-linecap="round" opacity="0.75">
+          <path d="M0 -9 L8 -3"/><path d="M0 1 L9 6"/><path d="M0 -9 L-8 -3"/><path d="M0 1 L-9 6"/>
+        </g>
+      </g>
+    </g>
+
+    <!-- ======================== ARMS AND HANDS ========================
+         Bare fur - the wrap is sleeveless in the canonical master pose.
+         Both are complete blobs so the shoulder end never shows a cut edge. -->
+    <g id="arm_left">
+      <path d="M164 282 C186 282 202 300 202 324
+               C202 350 186 366 162 366
+               C140 366 128 348 128 322
+               C128 300 142 282 164 282 Z"
+            fill="url(#furGradLimb)" stroke="#3E1F0B" stroke-width="3.5"/>
+    </g>
+    <g id="hand_left">
+      <!-- Paw rides on top of the arm silhouette; no outline of its own so the
+           arm-to-paw mass reads continuous. Complete shape for rigging. -->
+      <ellipse cx="166" cy="336" rx="33" ry="27" transform="rotate(-10 166 336)" fill="url(#furGradLimb)"/>
+      <path d="M136 330 C142 356 156 366 168 364" stroke="#8C441C" stroke-width="2" fill="none" opacity="0.45"/>
+      <g stroke="#71360F" stroke-width="2.6" stroke-linecap="round" opacity="0.72">
+        <path d="M149 330 L145 346"/><path d="M165 327 L163 346"/><path d="M181 331 L184 345"/>
+      </g>
+    </g>
+    <g id="arm_right">
+      <path d="M348 282 C326 282 310 300 310 324
+               C310 350 326 366 350 366
+               C372 366 384 348 384 322
+               C384 300 370 282 348 282 Z"
+            fill="url(#furGradLimb)" stroke="#3E1F0B" stroke-width="3.5"/>
+    </g>
+    <g id="hand_right">
+      <ellipse cx="346" cy="336" rx="33" ry="27" transform="rotate(10 346 336)" fill="url(#furGradLimb)"/>
+      <path d="M376 330 C370 356 356 366 344 364" stroke="#8C441C" stroke-width="2" fill="none" opacity="0.45"/>
+      <g stroke="#71360F" stroke-width="2.6" stroke-linecap="round" opacity="0.72">
+        <path d="M363 330 L367 346"/><path d="M347 327 L349 346"/><path d="M331 331 L328 345"/>
+      </g>
+    </g>
+
+    <!-- ============================= HEAD ============================= -->
+    <g id="head">
+      <!-- Ears first: complete circles, partly hidden behind the face. -->
+      <g id="ear_left">
+        <circle cx="150" cy="76" r="28" fill="#9C4E22" stroke="#3E1F0B" stroke-width="3.5"/>
+        <circle cx="154" cy="78" r="15" fill="#6B3212"/>
+      </g>
+      <g id="ear_right">
+        <circle cx="362" cy="76" r="28" fill="#9C4E22" stroke="#3E1F0B" stroke-width="3.5"/>
+        <circle cx="358" cy="78" r="15" fill="#6B3212"/>
+      </g>
+
+      <g id="head_tuft">
+        <path d="M247 56 C250 40 260 32 268 36 C262 42 264 49 271 47
+                 C278 45 283 38 286 42 C288 51 278 58 266 60 Z"
+              fill="#9C4E22" stroke="#3E1F0B" stroke-width="3"/>
+      </g>
+
+      <!-- Head: 240 wide x 181 tall, deliberately broader than tall. -->
+      <path id="face"
+            d="M256 55
+               C202 55 160 76 147 110
+               C136 141 140 178 164 202
+               C188 226 226 236 256 236
+               C286 236 324 226 348 202
+               C372 178 376 141 365 110
+               C352 76 310 55 256 55 Z"
+            fill="url(#furGrad)" stroke="#3E1F0B" stroke-width="4"/>
+
+      <!-- Whiskers: separate strokes, tucked under the muzzle edge. -->
+      <g id="whisker_left" stroke="#E9BA83" stroke-width="2.6" stroke-linecap="round" fill="none">
+        <path d="M208 150 C180 141 148 135 114 133"/>
+        <path d="M208 165 C178 162 146 160 110 161"/>
+        <path d="M208 180 C180 188 152 196 120 203"/>
+      </g>
+      <g id="whisker_right" stroke="#E9BA83" stroke-width="2.6" stroke-linecap="round" fill="none">
+        <path d="M304 150 C332 141 364 135 398 133"/>
+        <path d="M304 165 C334 162 366 160 402 161"/>
+        <path d="M304 180 C332 188 360 196 392 203"/>
+      </g>
+
+      <!-- Eyes: full ellipses behind independent lids. -->
+      <ellipse id="eye_left" cx="204" cy="138" rx="20" ry="23.5" fill="#FFFFFF" stroke="#3E1F0B" stroke-width="3"/>
+      <ellipse id="pupil_left" cx="207" cy="141" rx="13" ry="16.5" fill="#17110B"/>
+      <path id="lid_left" d="M184 138 C184 124 193 114 204 114 C215 114 224 124 224 138 C224 129 215 122 204 122 C193 122 184 129 184 138 Z"
+            fill="#9C4E22"/>
+
+      <ellipse id="eye_right" cx="308" cy="138" rx="20" ry="23.5" fill="#FFFFFF" stroke="#3E1F0B" stroke-width="3"/>
+      <ellipse id="pupil_right" cx="305" cy="141" rx="13" ry="16.5" fill="#17110B"/>
+      <path id="lid_right" d="M288 138 C288 124 297 114 308 114 C319 114 328 124 328 138 C328 129 319 122 308 122 C297 122 288 129 288 138 Z"
+            fill="#9C4E22"/>
+
+      <path id="brow_left" d="M188 101 C196 92 210 89 219 92"
+            stroke="#48260F" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <path id="brow_right" d="M324 101 C316 92 302 89 293 92"
+            stroke="#48260F" stroke-width="7" stroke-linecap="round" fill="none"/>
+
+      <!-- Mouth swap-group: exactly one child visible at a time.
+           Sits BEFORE the incisors so the teeth always read in front. -->
+      <g id="mouth">
+        <path id="mouth_closed" d="M236 203 Q256 215 276 203"
+              stroke="#48260F" stroke-width="4" stroke-linecap="round" fill="none"/>
+        <g id="mouth_open_smile" opacity="0">
+          <path d="M230 200 Q256 202 282 200 Q280 229 256 231 Q232 229 230 200 Z" fill="#5A2318"/>
+          <path d="M241 219 Q256 213 271 219 Q267 230 256 230 Q245 230 241 219 Z" fill="#E0796C"/>
+        </g>
+        <g id="mouth_speak" opacity="0">
+          <ellipse cx="256" cy="212" rx="18" ry="13" fill="#5A2318"/>
+          <ellipse cx="256" cy="218" rx="11" ry="6.5" fill="#E0796C"/>
+        </g>
+      </g>
+
+      <path id="muzzle"
+            d="M256 166
+               C236 159 211 165 206 182
+               C201 199 218 211 238 209
+               C248 208 252 201 256 196
+               C260 201 264 208 274 209
+               C294 211 311 199 306 182
+               C301 165 276 159 256 166 Z"
+            fill="url(#muzzleGrad)" stroke="#BB7B41" stroke-width="2.8"/>
+      <g id="muzzle_freckles" fill="#CB8D53" opacity="0.85">
+        <circle cx="223" cy="183" r="2.6"/><circle cx="215" cy="193" r="2.4"/><circle cx="229" cy="195" r="2.2"/>
+        <circle cx="289" cy="183" r="2.6"/><circle cx="297" cy="193" r="2.4"/><circle cx="283" cy="195" r="2.2"/>
+      </g>
+
+      <!-- Nose: 55 x 36, noticeably broad - a key beaver read. -->
+      <path id="nose"
+            d="M256 184 C234 184 228 170 229 159 C231 147 244 144 256 150
+               C268 144 281 147 283 159 C284 170 278 184 256 184 Z"
+            fill="#4A2710" stroke="#2E1608" stroke-width="2.4"/>
+      <g id="nostrils" fill="#2A1408" opacity="0.9">
+        <ellipse cx="246" cy="165" rx="3.6" ry="4.8"/>
+        <ellipse cx="266" cy="165" rx="3.6" ry="4.8"/>
+      </g>
+
+      <path id="tooth_left" d="M240 204 L254 204 L254 224 Q254 231 247 231 Q240 231 240 224 Z"
+            fill="#FDF6E8" stroke="#C9B392" stroke-width="2.2"/>
+      <path id="tooth_right" d="M258 204 L272 204 L272 224 Q272 231 265 231 Q258 231 258 224 Z"
+            fill="#FDF6E8" stroke="#C9B392" stroke-width="2.2"/>
+    </g>
+
+    <!-- ========================== HIGHLIGHTS ==========================
+         Non-deforming sparkle pass. In Rive this rides the head bone
+         rather than deforming with it. -->
+    <g id="highlights">
+      <circle cx="200" cy="130" r="5.2" fill="#FFFFFF" opacity="0.95"/>
+      <circle cx="212" cy="150" r="2.4" fill="#FFFFFF" opacity="0.6"/>
+      <circle cx="301" cy="130" r="5.2" fill="#FFFFFF" opacity="0.95"/>
+      <circle cx="313" cy="150" r="2.4" fill="#FFFFFF" opacity="0.6"/>
+      <ellipse cx="196" cy="88" rx="32" ry="18" transform="rotate(-24 196 88)" fill="#FFFFFF" opacity="0.09"/>
+      <ellipse cx="150" cy="300" rx="11" ry="24" transform="rotate(12 150 300)" fill="#FFFFFF" opacity="0.06"/>
+      <ellipse cx="250" cy="157" rx="7" ry="4" transform="rotate(-18 250 157)" fill="#FFFFFF" opacity="0.30"/>
+    </g>
+
+  </g>
+</svg>

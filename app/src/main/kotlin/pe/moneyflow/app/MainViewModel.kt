@@ -22,7 +22,18 @@ data class MainUiState(
     val showOnboarding: Boolean get() = !isLoading && !preferences.onboardingComplete
     val showLock: Boolean
         get() = !isLoading && preferences.onboardingComplete && preferences.appLockEnabled && !unlocked
+
+    /** MoneyFlowApp (and therefore Castor) is composed only for [MainRootDestination.APP]. */
+    val rootDestination: MainRootDestination
+        get() = when {
+            isLoading -> MainRootDestination.LOADING
+            showOnboarding -> MainRootDestination.ONBOARDING
+            showLock -> MainRootDestination.LOCK
+            else -> MainRootDestination.APP
+        }
 }
+
+enum class MainRootDestination { LOADING, ONBOARDING, LOCK, APP }
 
 @HiltViewModel
 class MainViewModel @Inject constructor(

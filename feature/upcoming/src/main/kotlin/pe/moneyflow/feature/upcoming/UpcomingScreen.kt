@@ -31,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import pe.moneyflow.core.ui.safearea.safeArea
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -158,7 +159,7 @@ fun UpcomingScreen(
                 },
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.safeArea("snackbar_upcoming")) },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             if (uiState.isLoading) {
@@ -315,7 +316,9 @@ private fun BatchSettleCard(count: Int, onPayAll: () -> Unit, modifier: Modifier
             )
             TextButton(
                 onClick = onPayAll,
-                modifier = Modifier.heightIn(min = 48.dp),
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .safeArea("action_pay_all"),
             ) { Text("Pagar todos") }
         }
     }
@@ -472,6 +475,7 @@ internal fun UpcomingRow(
             Box(
                 modifier = Modifier
                     .height(48.dp)
+                    .safeArea("action_pay_${tx.id}")
                     .clip(RoundedCornerShape(24.dp))
                     .clickable(role = Role.Button) {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)

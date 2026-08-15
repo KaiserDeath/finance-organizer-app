@@ -39,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import pe.moneyflow.core.ui.safearea.safeArea
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -150,7 +151,7 @@ private fun AnalyticsContent(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.safeArea("snackbar_analytics")) },
         // No topBar: as a bottom-nav destination the shell supplies the collapsing app bar. A back
         // arrow only makes sense if this screen is ever pushed, which the graph doesn't currently do.
         topBar = {
@@ -266,7 +267,7 @@ fun MonthlyReportScreen(
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.safeArea("snackbar_monthly_report")) },
         topBar = {
             TopAppBar(
                 title = { Text("Reporte mensual") },
@@ -592,7 +593,9 @@ private fun MonthlyTrendCard(data: AnalyticsData) {
             },
             contentDescription = "Gasto por mes.",
             valueLabel = { Money.format(it.value, data.currencyCode, hidden = hidden) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .safeArea("chart_monthly_trend"),
         )
     }
 }
@@ -602,7 +605,10 @@ private fun CategoryBreakdownCard(data: AnalyticsData) {
     MoneyCard(modifier = Modifier.fillMaxWidth()) {
         SectionHeader(title = "Por categoría", modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(Spacing.lg))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.safeArea("chart_category_breakdown"),
+        ) {
             val slices = data.categoryBreakdown.mapIndexed { index, spend ->
                 DonutSlice(
                     fraction = spend.fraction,
@@ -722,7 +728,9 @@ private fun WeekdayCard(data: AnalyticsData) {
             contentDescription = "Gasto por día de la semana.",
             valueLabel = { Money.format(it.value, data.currencyCode, hidden = hidden) },
             barColor = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .safeArea("chart_weekday_spend"),
             barHeight = 110.dp,
         )
     }

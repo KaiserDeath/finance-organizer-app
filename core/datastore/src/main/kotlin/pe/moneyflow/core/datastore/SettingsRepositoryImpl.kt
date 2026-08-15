@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -15,6 +16,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import pe.moneyflow.core.domain.repository.SettingsRepository
 import pe.moneyflow.core.model.QuickShortcut
+import pe.moneyflow.core.model.PetSpeechFrequency
 import pe.moneyflow.core.model.ThemeMode
 import pe.moneyflow.core.model.UserPreferences
 import java.io.IOException
@@ -48,6 +50,16 @@ class SettingsRepositoryImpl @Inject constructor(
         val ACTIVE_METHOD_IDS = stringPreferencesKey("active_method_ids")
         val SHORTCUTS = stringPreferencesKey("shortcuts_json")
         val AMOUNTS_HIDDEN = booleanPreferencesKey("amounts_hidden")
+        val PET_ENABLED = booleanPreferencesKey("pet_enabled")
+        val PET_SPEECH_ENABLED = booleanPreferencesKey("pet_speech_enabled")
+        val PET_SPEECH_FREQUENCY = stringPreferencesKey("pet_speech_frequency")
+        val PET_INTRODUCTION_COMPLETE = booleanPreferencesKey("pet_introduction_complete")
+        val PET_GESTURE_ONBOARDING_COMPLETE = booleanPreferencesKey("pet_gesture_onboarding_complete")
+        val PET_REDUCED_MOTION = booleanPreferencesKey("pet_reduced_motion")
+        val PET_ANCHOR_END = booleanPreferencesKey("pet_anchor_end")
+        val PET_POSITION_X = floatPreferencesKey("pet_position_x")
+        val PET_POSITION_Y = floatPreferencesKey("pet_position_y")
+        val PET_LAST_TRANSACTION_REACTION_AT = longPreferencesKey("pet_last_transaction_reaction_at")
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -77,6 +89,21 @@ class SettingsRepositoryImpl @Inject constructor(
                     }.getOrNull()
                 } ?: emptyList(),
                 amountsHidden = prefs[Keys.AMOUNTS_HIDDEN] ?: false,
+                petEnabled = prefs[Keys.PET_ENABLED] ?: false,
+                petSpeechEnabled = prefs[Keys.PET_SPEECH_ENABLED] ?: true,
+                petSpeechFrequency = prefs[Keys.PET_SPEECH_FREQUENCY]
+                    ?.let { runCatching { PetSpeechFrequency.valueOf(it) }.getOrNull() }
+                    ?: if (prefs[Keys.PET_SPEECH_ENABLED] == false) PetSpeechFrequency.SILENT
+                    else PetSpeechFrequency.NORMAL,
+                petIntroductionComplete = prefs[Keys.PET_INTRODUCTION_COMPLETE] ?: false,
+                petGestureOnboardingComplete = prefs[Keys.PET_GESTURE_ONBOARDING_COMPLETE] ?: false,
+                petReducedMotion = prefs[Keys.PET_REDUCED_MOTION] ?: false,
+                // Existing prototype installs stored only an edge. Use it once as the X fallback;
+                // every new drag writes the continuous normalized coordinate.
+                petPositionX = (prefs[Keys.PET_POSITION_X]
+                    ?: if (prefs[Keys.PET_ANCHOR_END] ?: true) 1f else 0f).coerceIn(0f, 1f),
+                petPositionY = (prefs[Keys.PET_POSITION_Y] ?: 1f).coerceIn(0f, 1f),
+                petLastTransactionReactionAt = prefs[Keys.PET_LAST_TRANSACTION_REACTION_AT],
             )
         }
 
@@ -126,5 +153,50 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setAmountsHidden(hidden: Boolean) {
         dataStore.edit { it[Keys.AMOUNTS_HIDDEN] = hidden }
+    }
+
+    override suspend fun setPetEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.PET_ENABLED] = enabled }
+    }
+
+    override suspend fun setPetSpeechEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.PET_SPEECH_ENABLED] = enabled }
+    }
+
+    override suspend fun setPetSpeechFrequency(frequency: PetSpeechFrequency) {
+        dataStore.edit {
+            it[Keys.PET_SPEECH_FREQUENCY] = frequency.name
+            it[Keys.PET_SPEECH_ENABLED] = frequency != PetSpeechFrequency.SILENT
+        }
+    }
+
+    override suspend fun setPetIntroductionComplete(complete: Boolean) {
+        dataStore.edit { it[Keys.PET_INTRODUCTION_COMPLETE] = complete }
+    }
+
+    override suspend fun setPetGestureOnboardingComplete(complete: Boolean) {
+        dataStore.edit { it[Keys.PET_GESTURE_ONBOARDING_COMPLETE] = complete }
+    }
+
+    override suspend fun setPetReducedMotion(reduced: Boolean) {
+        dataStore.edit { it[Keys.PET_REDUCED_MOTION] = reduced }
+    }
+
+    override suspend fun setPetPlacement(normalizedX: Float, normalizedY: Float) {
+        dataStore.edit {
+            it[Keys.PET_POSITION_X] = normalizedX.coerceIn(0f, 1f)
+            it[Keys.PET_POSITION_Y] = normalizedY.coerceIn(0f, 1f)
+            it.remove(Keys.PET_ANCHOR_END)
+        }
+    }
+
+    override suspend fun setPetLastTransactionReactionAt(timestampMillis: Long?) {
+        dataStore.edit { prefs ->
+            if (timestampMillis == null) {
+                prefs.remove(Keys.PET_LAST_TRANSACTION_REACTION_AT)
+            } else {
+                prefs[Keys.PET_LAST_TRANSACTION_REACTION_AT] = timestampMillis
+            }
+        }
     }
 }

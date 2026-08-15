@@ -54,6 +54,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import pe.moneyflow.core.ui.safearea.safeArea
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
@@ -144,7 +145,7 @@ fun PaymentMethodsScreen(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.safeArea("snackbar_payment_methods")) },
         topBar = {
             TopAppBar(
                 title = { Text("Métodos de pago") },
@@ -354,7 +355,9 @@ private fun PaymentMethodRow(method: PaymentMethod, onClick: () -> Unit, onLaunc
             // handoff's 48 dp floor, and this is the row's one non-row-wide tap target.
             OutlinedButton(
                 onClick = onLaunch,
-                modifier = Modifier.heightIn(min = 48.dp),
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .safeArea("action_launch_payment_${method.id}"),
                 contentPadding = PaddingValues(horizontal = Spacing.md),
             ) {
                 Icon(
@@ -391,7 +394,11 @@ private fun AddEditPaymentMethodSheet(
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = Modifier.safeArea("sheet_payment_method_editor"),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

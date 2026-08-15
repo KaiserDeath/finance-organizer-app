@@ -79,6 +79,14 @@ class SettingsRepositoryTest {
         assertEquals(false, prefs.biometricEnabled)
         // Discreet mode is off until asked for; a store that came up masked would look broken.
         assertEquals(false, prefs.amountsHidden)
+        assertEquals(false, prefs.petEnabled)
+        assertEquals(true, prefs.petSpeechEnabled)
+        assertEquals(pe.moneyflow.core.model.PetSpeechFrequency.NORMAL, prefs.petSpeechFrequency)
+        assertEquals(false, prefs.petIntroductionComplete)
+        assertEquals(false, prefs.petGestureOnboardingComplete)
+        assertEquals(false, prefs.petReducedMotion)
+        assertEquals(1f, prefs.petPositionX)
+        assertEquals(1f, prefs.petPositionY)
         assertNull(prefs.pinHash)
         assertNull(prefs.monthlyBudgetMinor)
         // null and empty mean different things here: null is "no restriction", so it must not
@@ -96,6 +104,13 @@ class SettingsRepositoryTest {
         repository.setBiometricEnabled(true)
         repository.setMonthlyBudget(400_000)
         repository.setAmountsHidden(true)
+        repository.setPetEnabled(false)
+        repository.setPetSpeechEnabled(false)
+        repository.setPetIntroductionComplete(true)
+        repository.setPetSpeechFrequency(pe.moneyflow.core.model.PetSpeechFrequency.LOW)
+        repository.setPetGestureOnboardingComplete(true)
+        repository.setPetReducedMotion(true)
+        repository.setPetPlacement(normalizedX = 0.42f, normalizedY = 0.35f)
 
         val prefs = reread()
 
@@ -107,6 +122,14 @@ class SettingsRepositoryTest {
         assertEquals(400_000L, prefs.monthlyBudgetMinor)
         // The whole point of persisting the mask: a masked screen stays masked across launches.
         assertEquals(true, prefs.amountsHidden)
+        assertEquals(false, prefs.petEnabled)
+        assertEquals(true, prefs.petSpeechEnabled)
+        assertEquals(pe.moneyflow.core.model.PetSpeechFrequency.LOW, prefs.petSpeechFrequency)
+        assertEquals(true, prefs.petIntroductionComplete)
+        assertEquals(true, prefs.petGestureOnboardingComplete)
+        assertEquals(true, prefs.petReducedMotion)
+        assertEquals(0.42f, prefs.petPositionX)
+        assertEquals(0.35f, prefs.petPositionY)
     }
 
     @Test
@@ -170,6 +193,15 @@ class SettingsRepositoryTest {
         repository.setShortcuts(emptyList())
 
         assertTrue(reread().shortcuts.isEmpty())
+    }
+
+    @Test
+    fun petTransactionCooldownTimestamp_persistsAndClears() = runTest {
+        repository.setPetLastTransactionReactionAt(123_456L)
+        assertEquals(123_456L, reread().petLastTransactionReactionAt)
+
+        repository.setPetLastTransactionReactionAt(null)
+        assertNull(reread().petLastTransactionReactionAt)
     }
 
     // ---------------------------------------------------------------------------------------

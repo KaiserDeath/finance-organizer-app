@@ -62,25 +62,27 @@ class MainActivity : FragmentActivity() {
                 amountsHidden = state.preferences.amountsHidden,
             ) {
                 Surface(color = MaterialTheme.colorScheme.background) {
-                    when {
+                    when (state.rootDestination) {
                         // The system splash is still on screen for this branch (see
                         // setKeepOnScreenCondition above), so there is nothing to draw underneath it.
-                        state.isLoading -> Unit
-                        state.showOnboarding -> OnboardingScreen(
+                        MainRootDestination.LOADING -> Unit
+                        MainRootDestination.ONBOARDING -> OnboardingScreen(
                             onFinish = { openAddTransaction ->
                                 justOnboarded = openAddTransaction
                                 viewModel.completeOnboarding()
                             },
                         )
 
-                        state.showLock -> LockScreen(
+                        MainRootDestination.LOCK -> LockScreen(
                             onUnlocked = viewModel::unlock,
                             onBiometric = {
                                 activity.showBiometricPrompt(onSuccess = viewModel::unlock)
                             },
                         )
 
-                        else -> MoneyFlowApp(startInAddTransaction = justOnboarded)
+                        MainRootDestination.APP -> MoneyFlowApp(
+                            startInAddTransaction = justOnboarded,
+                        )
                     }
                 }
             }

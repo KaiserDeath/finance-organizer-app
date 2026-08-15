@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import pe.moneyflow.core.ui.safearea.safeArea
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -197,6 +198,7 @@ private fun AddRateDialog(
     val valid = !base.equals(quote, ignoreCase = true) && rate > 0.0
 
     AlertDialog(
+        modifier = Modifier.safeArea("dialog_exchange_rate"),
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(

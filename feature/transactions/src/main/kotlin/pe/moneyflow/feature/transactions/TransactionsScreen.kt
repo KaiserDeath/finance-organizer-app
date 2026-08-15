@@ -38,6 +38,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import pe.moneyflow.core.ui.safearea.safeArea
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
@@ -100,7 +101,7 @@ fun TransactionsScreen(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.safeArea("snackbar_transactions")) },
     ) { innerPadding ->
         // Search and filters live in a fixed header above the list, never inside it: a filter
         // whose state scrolls out of view is a filter the user believes they didn't apply.
@@ -302,7 +303,11 @@ private fun FilterSheet(
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = Modifier.safeArea("sheet_transaction_filters"),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

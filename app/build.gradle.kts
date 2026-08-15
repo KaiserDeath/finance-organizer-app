@@ -50,6 +50,7 @@ dependencies {
     implementation(project(":feature:accounts"))
     implementation(project(":feature:savings"))
     implementation(project(":feature:currency"))
+    implementation(project(":feature:pet"))
 
     // Android / Compose
     implementation(libs.androidx.core.ktx)

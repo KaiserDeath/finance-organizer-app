@@ -33,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import pe.moneyflow.core.ui.safearea.safeArea
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -135,7 +136,7 @@ fun DashboardScreen(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.safeArea("snackbar_dashboard")) },
     ) { innerPadding ->
         DashboardContent(
             state = uiState,
@@ -480,9 +481,11 @@ private fun UpcomingNudgeCard(
                         )
                         TextButton(
                             onClick = { onPay(payment) },
-                            modifier = Modifier.semantics {
-                                contentDescription = "Pagar $payeeLabel, $amountLabel"
-                            },
+                            modifier = Modifier
+                                .safeArea("action_pay_${payment.transaction.id}")
+                                .semantics {
+                                    contentDescription = "Pagar $payeeLabel, $amountLabel"
+                                },
                         ) { Text("Pagar") }
                     }
                 }

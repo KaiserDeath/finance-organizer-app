@@ -176,6 +176,41 @@ class FakeSettingsRepository(
     override suspend fun setAmountsHidden(hidden: Boolean) {
         store.value = store.value.copy(amountsHidden = hidden)
     }
+
+    override suspend fun setPetEnabled(enabled: Boolean) {
+        store.value = store.value.copy(petEnabled = enabled)
+    }
+
+    override suspend fun setPetSpeechEnabled(enabled: Boolean) {
+        store.value = store.value.copy(petSpeechEnabled = enabled)
+    }
+
+    override suspend fun setPetIntroductionComplete(complete: Boolean) {
+        store.value = store.value.copy(petIntroductionComplete = complete)
+    }
+
+    override suspend fun setPetSpeechFrequency(frequency: pe.moneyflow.core.model.PetSpeechFrequency) {
+        store.value = store.value.copy(
+            petSpeechFrequency = frequency,
+            petSpeechEnabled = frequency != pe.moneyflow.core.model.PetSpeechFrequency.SILENT,
+        )
+    }
+
+    override suspend fun setPetGestureOnboardingComplete(complete: Boolean) {
+        store.value = store.value.copy(petGestureOnboardingComplete = complete)
+    }
+
+    override suspend fun setPetReducedMotion(reduced: Boolean) {
+        store.value = store.value.copy(petReducedMotion = reduced)
+    }
+
+    override suspend fun setPetPlacement(normalizedX: Float, normalizedY: Float) {
+        store.value = store.value.copy(petPositionX = normalizedX, petPositionY = normalizedY)
+    }
+
+    override suspend fun setPetLastTransactionReactionAt(timestampMillis: Long?) {
+        store.value = store.value.copy(petLastTransactionReactionAt = timestampMillis)
+    }
 }
 
 class FakeAccountRepository(private val items: List<Account> = emptyList()) : AccountRepository {

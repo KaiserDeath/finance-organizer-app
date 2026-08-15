@@ -39,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import pe.moneyflow.core.ui.safearea.safeArea
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
@@ -104,7 +105,7 @@ fun SavingsScreen(
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.safeArea("snackbar_savings")) },
         topBar = {
             TopAppBar(
                 title = { Text("Ahorros") },
@@ -286,7 +287,10 @@ private fun GoalCard(
                         color = if (goal.isComplete) MaterialTheme.moneyColors.positive else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = onDelete) {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.safeArea("action_delete_savings_${goal.id}"),
+                ) {
                     Icon(
                         Icons.Rounded.DeleteOutline,
                         contentDescription = "Eliminar",
@@ -330,6 +334,7 @@ private fun AddGoalSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
+        modifier = Modifier.safeArea("sheet_savings_goal_editor"),
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
@@ -386,6 +391,7 @@ private fun ContributeDialog(
     val amountMinor = Money.parseToMinor(amountText) ?: 0L
 
     AlertDialog(
+        modifier = Modifier.safeArea("dialog_savings_adjustment"),
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(

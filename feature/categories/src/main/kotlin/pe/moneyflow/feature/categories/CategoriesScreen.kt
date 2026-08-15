@@ -45,6 +45,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import pe.moneyflow.core.ui.safearea.safeArea
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -119,7 +120,7 @@ fun CategoriesScreen(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.safeArea("snackbar_categories")) },
         topBar = {
             TopAppBar(
                 title = { Text("Categorías") },
@@ -275,7 +276,10 @@ private fun CategoryRow(
                 label = { Text("Fijo") },
             )
         }
-        IconButton(onClick = onDelete) {
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier.safeArea("action_delete_category_${category.id}"),
+        ) {
             Icon(
                 Icons.Rounded.DeleteOutline,
                 contentDescription = "Eliminar",
@@ -300,6 +304,7 @@ private fun AddCategorySheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
+        modifier = Modifier.safeArea("sheet_category_editor"),
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {

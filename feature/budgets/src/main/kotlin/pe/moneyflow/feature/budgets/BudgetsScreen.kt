@@ -49,6 +49,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import pe.moneyflow.core.ui.safearea.safeArea
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -123,7 +124,7 @@ fun BudgetsScreen(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.safeArea("snackbar_budgets")) },
         topBar = {
             TopAppBar(
                 title = { Text("Presupuestos") },
@@ -531,7 +532,11 @@ private fun MonthBudgetSheet(
     val amountMinor = Money.parseToMinor(amountText)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = Modifier.safeArea("sheet_budget_editor"),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -600,6 +605,7 @@ private fun BudgetEditorSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
+        modifier = Modifier.safeArea("sheet_budget_reallocation"),
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {

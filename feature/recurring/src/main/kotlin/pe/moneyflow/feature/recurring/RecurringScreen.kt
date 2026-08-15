@@ -46,6 +46,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import pe.moneyflow.core.ui.safearea.safeArea
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
@@ -132,7 +133,7 @@ fun RecurringScreen(
         modifier = modifier,
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.safeArea("snackbar_recurring")) },
         topBar = {
             TopAppBar(
                 title = { Text("Recurrentes") },
@@ -328,7 +329,10 @@ private fun RecurringCard(
             // Primary status action: a self-describing labeled toggle, so tapping to settle (or
             // un-settle) this month reads clearly instead of relying on a bare icon.
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.sm)
+                    .safeArea("action_recurring_status_${template.id}"),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 if (item.paidThisMonth) {
@@ -366,7 +370,10 @@ private fun RecurringCard(
             // Secondary: pay this month's charge with a different method (opens the tx editor).
             OutlinedButton(
                 onClick = onPayThisMonth,
-                modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.sm)
+                    .safeArea("action_recurring_pay_${template.id}"),
             ) {
                 Icon(Icons.Rounded.Payments, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(Spacing.xs))
@@ -457,6 +464,7 @@ private fun AddEditRecurringSheet(
     val canSave = title.isNotBlank() && amountMinor > 0 && recurrence.isValid
 
     ModalBottomSheet(
+        modifier = Modifier.safeArea("sheet_recurring_editor"),
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {

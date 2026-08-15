@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pe.moneyflow.core.designsystem.component.MoneyCard
 import pe.moneyflow.core.designsystem.theme.Spacing
 import pe.moneyflow.core.model.ThemeMode
+import pe.moneyflow.feature.pet.PetSettingsCard
 
 private data class SettingsItem(
     val icon: ImageVector,
@@ -70,6 +71,7 @@ fun SettingsScreen(
     onOpenBackup: () -> Unit,
     onOpenSecurity: () -> Unit,
     onOpenLegal: () -> Unit,
+    onOpenPet: () -> Unit,
     modifier: Modifier = Modifier,
     appearanceViewModel: AppearanceViewModel = hiltViewModel(),
 ) {
@@ -155,6 +157,7 @@ fun SettingsScreen(
                         selected = appearance.themeMode,
                         onSelect = appearanceViewModel::setThemeMode,
                     )
+                    PetSettingsCard(onOpenSettings = onOpenPet)
                     SettingsCard(items = appItems)
                 }
             }

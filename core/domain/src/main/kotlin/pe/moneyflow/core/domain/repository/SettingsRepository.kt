@@ -3,6 +3,7 @@ package pe.moneyflow.core.domain.repository
 import kotlinx.coroutines.flow.Flow
 import pe.moneyflow.core.model.QuickShortcut
 import pe.moneyflow.core.model.ThemeMode
+import pe.moneyflow.core.model.PetSpeechFrequency
 import pe.moneyflow.core.model.UserPreferences
 
 interface SettingsRepository {
@@ -29,4 +30,20 @@ interface SettingsRepository {
 
     /** Discreet mode. Persists, so a masked screen stays masked across launches. */
     suspend fun setAmountsHidden(hidden: Boolean)
+
+    suspend fun setPetEnabled(enabled: Boolean)
+
+    suspend fun setPetSpeechEnabled(enabled: Boolean) = Unit
+
+    suspend fun setPetSpeechFrequency(frequency: PetSpeechFrequency) = Unit
+
+    suspend fun setPetIntroductionComplete(complete: Boolean) = Unit
+
+    suspend fun setPetGestureOnboardingComplete(complete: Boolean) = Unit
+
+    suspend fun setPetReducedMotion(reduced: Boolean)
+
+    suspend fun setPetPlacement(normalizedX: Float, normalizedY: Float)
+
+    suspend fun setPetLastTransactionReactionAt(timestampMillis: Long?) = Unit
 }

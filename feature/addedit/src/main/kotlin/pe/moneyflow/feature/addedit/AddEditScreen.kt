@@ -140,6 +140,7 @@ private const val GridCategoryCount = 7
 @Composable
 fun AddEditScreen(
     onDone: () -> Unit,
+    onSaved: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: AddEditViewModel = hiltViewModel(),
 ) {
@@ -157,6 +158,7 @@ fun AddEditScreen(
     // On save: the docked button morphs to "Guardado", dwells long enough to read, then we leave.
     LaunchedEffect(uiState.saved) {
         if (uiState.saved) {
+            onSaved()
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             delay(SaveConfirmationDwellMs)
             val method = uiState.paymentMethods.firstOrNull { it.id == uiState.paymentMethodId }

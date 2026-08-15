@@ -618,3 +618,94 @@ Version 1 is complete when:
 ## 20. Recommended immediate next step
 
 Create a short character brief and produce exactly three visual directions. Select one direction before choosing the final animation runtime or beginning production character rigging.
+
+## 21. Current character direction
+
+The selected direction is the warm pocket-animal family, refined into a small companion family:
+
+- **Beaver:** the primary MoneyFlow companion. It should be unmistakably beaver-like, with a broad flat tail, rounded ears, prominent front teeth, compact paws, and a calm woodland personality.
+- **Weather companion:** a small rounded cloud-and-leaf companion whose form communicates mood: storm cloud with rain and lightning when angry, sun breaking through when happy, soft gray cloud when sad, and a swirling miniature hurricane when hasty or restless.
+- **Calico angora cat:** a fluffy, elegant companion with long soft fur, pointed tufted ears, expressive feline eyes, and a large plume-like tail. Its coat uses irregular warm orange, deep charcoal/black, and white patches so its silhouette and palette are immediately distinct from the Samoyed.
+- **Samoyed puppy:** a friendly white, fluffy puppy with small triangular ears, cream shading, and a curled plume tail.
+
+All four should share:
+
+- The same deep-indigo clothing/accessory language.
+- A shared accessory language with deliberately different character palettes.
+- Consistent eye and facial-expression language.
+- Separable limbs and clear silhouettes for one shared 2D animation system.
+
+The pets should not share one generic animation set. They share the behavior contract, but each character gets signature movement:
+
+- **Beaver:** tail thump, cheeky toothy grin, wood-chopping pantomime, belly rest, and slow sleepy curl.
+- **Calico angora cat:** elegant stretch, tail plume swish, ear flick, grooming, graceful pounce, and curled fluffy-ball sleep.
+- **Samoyed puppy:** happy bounce, play bow, head tilt, paw wave, excited tail wag, and puppy flop.
+- **Weather companion:** hover bob, cloud puff, rain release, lightning flash, wind spiral, and cloud-to-sun transformation.
+
+All pets still support shared interaction intents such as tap, drag, speak, dismiss, and settle, but the visual response is character-specific.
+
+The weather companion adds a mood-state layer rather than a separate personality system:
+
+| Pet mood | Weather form |
+|---|---|
+| Angry or urgent | Dark storm cloud, rain, and small lightning accents |
+| Happy or celebrating | Bright sun peeking through the cloud |
+| Sad or reflective | Soft gray cloud with gentle drizzle |
+| Hasty or restless | Compact swirling hurricane/tornado form |
+
+The weather companion must remain airborne during normal behavior. A soft elliptical shadow may appear below it to communicate height, but it must never sit on a pot, bed, platform, or floor object. The happy state is a real transformation: the cloud thins and disperses, then the sun emerges from it; it is not a separate static character swap.
+
+## 22. Deferred character animation backlog
+
+These ideas are intentionally deferred until the base interaction system and tone are validated. They should be designed as character-specific animations rather than generic reactions shared by every pet.
+
+### Beaver-specific
+
+- Woodworking: gathers small pieces of wood and builds a tiny useful object.
+- Construction progress: adds a piece to a small project after a positive savings or consistency milestone.
+- Satisfied inspection: steps back, checks the work, and gives a proud nod.
+
+### Contextual financial reactions
+
+- Overspending concern: a gentle disappointed or worried reaction when spending is materially above the user's budget or normal plan.
+- Recovery/support: returns to a constructive posture and points toward a useful next action.
+- Positive correction: celebrates when the user adjusts course, rather than celebrating spending itself.
+
+These reactions must never shame the user or imply moral judgment. “Disappointed” should read as caring concern about the situation, not disappointment in the person. The behavior should be based on meaningful thresholds and cooldowns, not on every individual transaction.
+
+### Relationship reactions
+
+- Chase-away response: a brief sad reaction when the user dismisses or sends the pet away.
+- Respectful retreat: the pet leaves promptly and does not immediately reappear.
+- Return welcome: a quiet, non-guilt-inducing greeting when the user enables or invites the pet back.
+
+The chase-away reaction should remain short and optional. It must not punish dismissal, block navigation, or create emotional pressure to keep the companion enabled.
+
+### Design rule for future reactions
+
+Every special animation should answer at least one of these questions before production:
+
+1. What product state does it communicate?
+2. What feeling should it create?
+3. Why is this character uniquely suited to the reaction?
+4. What is the cooldown and opt-out behavior?
+
+## 23. Design assets and handoff
+
+The approved visual reference is stored in the repository so future chats and computers do not depend on the Codex image cache:
+
+- [Current family direction — calico angora, Samoyed, beaver, and floating weather companion](pet-companion-assets/pet-family-v3-calico-samoyed-weather.png)
+- [Previous family direction](pet-companion-assets/pet-family-v2.png)
+
+### Current decisions
+
+- Default pet: beaver.
+- Companion family: beaver, calico angora cat, white Samoyed puppy, and floating weather companion.
+- Rendering direction: 2D rigged character animation with 3D-style depth, shadows, particles, and transitions.
+- Weather companion: airborne with a soft shadow; cloud-to-sun is an animated transformation.
+- Animation direction: each pet gets its own signature animations; shared interaction intents do not imply identical motion.
+- Current implementation stage: technical prototype architecture, before final production animation assets.
+
+This document and the `docs/pet-companion-assets/` folder are the source of truth for continuing the work in a new chat.
+
+Version 1 should ship with the beaver as the default and treat the plant, cat, and dog as selectable variants only after the base behavior system is stable. This keeps the art direction richer without multiplying the initial behavioral scope.

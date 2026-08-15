@@ -3,6 +3,7 @@ package pe.moneyflow.app
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
@@ -33,8 +34,10 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -67,6 +70,8 @@ import pe.moneyflow.app.settings.ShortcutsScreen
 import pe.moneyflow.feature.accounts.AccountsRoute
 import pe.moneyflow.feature.accounts.accountsScreen
 import pe.moneyflow.feature.addedit.addEditScreen
+import pe.moneyflow.feature.addedit.AddEditRoute
+import pe.moneyflow.feature.addedit.MovementDetailRoute
 import pe.moneyflow.feature.addedit.movementDetailScreen
 import pe.moneyflow.feature.addedit.navigateToAddEdit
 import pe.moneyflow.feature.addedit.navigateToMovementDetail
@@ -92,6 +97,13 @@ import pe.moneyflow.feature.transactions.TransactionsRoute
 import pe.moneyflow.feature.transactions.transactionsScreen
 import pe.moneyflow.feature.upcoming.UpcomingRoute
 import pe.moneyflow.feature.upcoming.upcomingScreen
+import pe.moneyflow.feature.pet.PetOverlayHost
+import pe.moneyflow.feature.pet.PetEventBus
+import pe.moneyflow.feature.pet.PetProductEvent
+import pe.moneyflow.feature.pet.PetSettingsScreen
+import pe.moneyflow.core.ui.safearea.LocalSafeAreaRegistry
+import pe.moneyflow.core.ui.safearea.SafeAreaRegistry
+import pe.moneyflow.core.ui.safearea.safeArea
 
 @Serializable
 data object MoneyRoute
@@ -110,6 +122,9 @@ data object ShortcutsRoute
 
 @Serializable
 data object LegalRoute
+
+@Serializable
+data object PetSettingsRoute
 
 internal enum class TopLevelDestination(
     val route: Any,
@@ -146,6 +161,8 @@ fun MoneyFlowApp(
     val haptics = LocalHapticFeedback.current
     val backStackEntry by navController.currentBackStackEntryAsState()
     val overdueCount by shellViewModel.overdueCount.collectAsStateWithLifecycle()
+    val petSafeAreaRegistry = remember { SafeAreaRegistry() }
+    val petEventBus = remember { PetEventBus() }
 
     // Right after onboarding, drop the user straight into logging their first movement.
     LaunchedEffect(Unit) {
@@ -183,6 +200,12 @@ fun MoneyFlowApp(
         NavigationSuiteType.None
     }
 
+    LaunchedEffect(isTopLevel) {
+        if (!isTopLevel) petSafeAreaRegistry.clear()
+    }
+
+    CompositionLocalProvider(LocalSafeAreaRegistry provides petSafeAreaRegistry) {
+    Box(Modifier.fillMaxSize()) {
     NavigationSuiteScaffold(
         layoutType = navSuiteType,
         navigationSuiteItems = {
@@ -191,6 +214,10 @@ fun MoneyFlowApp(
                 val badgeCount =
                     if (destination == TopLevelDestination.DASHBOARD) overdueCount else 0
                 item(
+                    modifier = Modifier.safeArea(
+                        "navigation_${destination.name}",
+                        petSafeAreaRegistry,
+                    ),
                     selected = currentDestination.isRouteInHierarchy(destination.route),
                     onClick = { navController.navigateToTopLevel(destination.route) },
                     icon = {
@@ -223,6 +250,7 @@ fun MoneyFlowApp(
                 )
                 if (destination == TopLevelDestination.TRANSACTIONS) {
                     item(
+                        modifier = Modifier.safeArea("navigation_add", petSafeAreaRegistry),
                         selected = false,
                         onClick = {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -388,6 +416,7 @@ fun MoneyFlowApp(
                     onOpenBackup = { navController.navigate(BackupRoute) },
                     onOpenSecurity = { navController.navigate(SecurityRoute) },
                     onOpenLegal = { navController.navigate(LegalRoute) },
+                    onOpenPet = { navController.navigate(PetSettingsRoute) },
                 )
             }
             accountsScreen(onBack = { navController.popBackStack() })
@@ -408,12 +437,26 @@ fun MoneyFlowApp(
             composable<BackupRoute> { BackupScreen(onBack = { navController.popBackStack() }) }
             composable<SecurityRoute> { SecurityScreen(onBack = { navController.popBackStack() }) }
             composable<LegalRoute> { LegalScreen(onBack = { navController.popBackStack() }) }
-            addEditScreen(onDone = { navController.popBackStack() })
+            composable<PetSettingsRoute> {
+                PetSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            addEditScreen(
+                onDone = { navController.popBackStack() },
+                onSaved = { petEventBus.publish(PetProductEvent.TransactionSaved) },
+            )
             movementDetailScreen(
                 onEditAll = { id -> navController.navigateToAddEdit(id) },
                 onDone = { navController.popBackStack() },
             )
         }
+    }
+    }
+        // Focused entry, payment/detail sheets, and security surfaces win over the companion.
+        // Hiding here also removes the pet from semantics, so it cannot steal TalkBack focus.
+        val petAllowed = !currentDestination.isRouteInHierarchy(SecurityRoute) &&
+            !currentDestination.isRouteInHierarchy(AddEditRoute()) &&
+            !currentDestination.isRouteInHierarchy(MovementDetailRoute(""))
+        if (petAllowed) PetOverlayHost(eventBus = petEventBus)
     }
     }
 }
