@@ -23,7 +23,7 @@ data class MainUiState(
     val showLock: Boolean
         get() = !isLoading && preferences.onboardingComplete && preferences.appLockEnabled && !unlocked
 
-    /** MoneyFlowApp (and therefore Castor) is composed only for [MainRootDestination.APP]. */
+    /** MoneyFlowApp is composed only for [MainRootDestination.APP]. */
     val rootDestination: MainRootDestination
         get() = when {
             isLoading -> MainRootDestination.LOADING
