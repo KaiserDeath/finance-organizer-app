@@ -227,3 +227,48 @@ discussed and liked, but is its own project — permission, per-app parsers, and
 a bank's notification format changes are not a screen redesign. The preview card is built so that
 capture, when it lands, opens this same screen pre-filled as its confirmation step rather than a
 new surface. `MovementDetailScreen`'s autosave sheet is untouched.
+
+
+## The companion is a guest on every screen, not a feature of any
+
+> **Status:** the companion was unwired from the app shell on 2026-08-21 and is parked pending a
+> renderer decision. The module and its tests remain; nothing in `:app` mounts it. These decisions
+> are recorded because they are what the design is, and they apply again the moment it is rewired —
+> see `context.md` for the current state and how to bring it back.
+
+Compañero Castor was added as its own module (`:feature:pet`) with a single `PetOverlayHost` mounted
+above the navigation graph, rather than as something screens opt into. The decisions worth defending
+later:
+
+**Off by default.** `petEnabled = false`. A finance app is not a place to surprise someone with a
+cartoon beaver; a user who wants it turns it on from its own Ajustes destination. Everything else
+about the companion follows from it never being on a critical path.
+
+**Finance features do not depend on `:feature:pet`.** They publish to a buffered `PetEventBus`, and
+the dependency runs one way. If the pet were removed tomorrow, nothing in dashboard, transactions or
+upcoming would need editing. This is why the pet reacts to fewer things than it could — the seam was
+worth more than the reactivity.
+
+**`TransactionSaved` carries no financial detail.** Not the amount, not the category, not the payment
+method. The pet knows *that* something was saved. A visible character that can be seen by whoever is
+looking over the user's shoulder is exactly the wrong place to leak a number, and once an event
+carries a field, some future message will use it. Keep the payload empty.
+
+**Placement is the user's, and collision is the screen's job.** Drag is free, position persists as
+normalized X/Y, and the pet avoids interactive elements through a shared `SafeAreaRegistry` in
+`core:ui` that screens publish measured bounds to. (While parked, no registry is provided, so those
+`Modifier.safeArea` calls are inert — the modifier was written to short-circuit for exactly this
+reason, and the calls stay so rewiring stays cheap.) The alternative — a fixed corner — was rejected
+because there is no corner that is safe on fourteen surfaces at every font scale. **A new screen with
+important controls should publish its bounds**, or the companion may sit on them.
+
+**Hidden on focused entry and security surfaces.** Add/edit, movement detail and the app-lock flow
+render without it. Hiding it there also drops it from the semantics tree, so it cannot take TalkBack
+focus while someone is entering an amount or a PIN. This is one check in `app/MoneyFlowApp.kt`; add
+to it when you add a focused-entry surface.
+
+**The renderer is deliberately behind a runtime-neutral contract.** `PetAnimationIntent` names nine
+states plus `reducedMotion` and `speaking`, and knows nothing about what draws them. That is why the
+current flattened-PNG prototype, a Rive state machine, and a sprite-frame renderer are all
+substitutable without touching behaviour, placement, accessibility, or a single test. The animation
+runtime is still undecided; the contract is what makes it safe for it to stay that way.

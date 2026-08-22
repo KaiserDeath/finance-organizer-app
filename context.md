@@ -4,7 +4,8 @@ Orientation for someone picking this repo up cold — human or agent. The README
 and how to build it; this file says what you need to know *before* changing it: what is already
 settled, what has bitten people here, and what is genuinely still open.
 
-Current as of **2026-08-04**, at `db806b8` plus the UX audit and Phase 1 UI polish recorded below.
+Current as of **2026-08-21**, at `6993131` — the UX audit and Phase 1–3 UI polish recorded below,
+plus the Compañero Castor companion prototype.
 
 ---
 
@@ -13,7 +14,8 @@ Current as of **2026-08-04**, at `db806b8` plus the UX audit and Phase 1 UI poli
 MoneyFlow Peru is an offline-first personal-finance organizer for the Peru market: Kotlin, Jetpack
 Compose, Material 3, Room, Hilt, multi-module clean architecture. Product phases 0–6 are implemented
 and the *Propuesta C* redesign is applied — all six of its blocks have landed, and the five phases of
-`docs/audit-2026-08-01.md` are closed. The UI copy is Spanish; the code and docs are English.
+`docs/audit-2026-08-01.md` are closed. An optional pet companion (Compañero Castor) is built and
+tested but parked — not wired into the app. The UI copy is Spanish; the code and docs are English.
 
 ## Where things are
 
@@ -23,11 +25,13 @@ and the *Propuesta C* redesign is applied — all six of its blocks have landed,
 core/                 model · common · domain · database · datastore · data ·
                       designsystem · ui · testing
 feature/              dashboard · transactions · addedit · categories · paymentmethods ·
-                      budgets · upcoming · recurring · analytics · accounts · savings · currency
+                      budgets · upcoming · recurring · analytics · accounts · savings · currency ·
+                      pet (Compañero Castor — parked, not wired into :app)
 build-logic/          convention plugins — the only place build config is written
 gradle/libs.versions.toml   every version, no exceptions
 .github/              ci.yml (two jobs) and scripts/check_test_counts.py
-docs/                 the audit, the standing decisions, the design handoff as delivered
+docs/                 the audits, the standing decisions, the design handoff as delivered,
+                      the companion plan and its two animation paths
 ```
 
 Dependencies flow one way: `:app` → `:feature:*` → `:core:*`, and within core
@@ -36,8 +40,8 @@ Dependencies flow one way: `:app` → `:feature:*` → `:core:*`, and within cor
 ## Build and test
 
 ```bash
-./gradlew test                      # 171 unit tests, no device
-./gradlew connectedDebugAndroidTest # 51 instrumented tests, needs a device
+./gradlew test                      # 214 unit tests, no device
+./gradlew connectedDebugAndroidTest # 60 instrumented tests, needs a device
 ```
 
 The wrapper (Gradle 8.13) is committed. Point `JAVA_HOME` at a JDK 17–21 — the JBR bundled with
@@ -121,7 +125,7 @@ Not hypotheticals. Each of these shipped or nearly shipped.
   `python3 .github/scripts/check_test_counts.py unit` (or `instrumented`). CI runs this and fails on
   a module that has test sources and no results.
 - **Use `test`, not `testDebugUnitTest`.** The latter is Android-only, so it silently skips
-  `core:common` and `core:domain` — 97 of the 171 unit tests.
+  `core:common` and `core:domain` — 104 of the 214 unit tests.
 - **`compileDebugKotlin` does not build `androidTest`.** Add a parameter to a composable and the main
   sources stay green while every UI test constructing it fails to compile — discovered at the next
   device run, which is the slow job. That happened twice on 2026-08-02; CI now compiles instrumented
@@ -214,12 +218,61 @@ And the meta-rule the spec states about itself: **a decision whose premise break
 decision.** Stop and ask rather than half-implementing it. That is how the Apariencia divergence was
 taken, and why it is written down instead of being drift.
 
+## The companion — parked, not deleted
+
+Compañero Castor was added 2026-08-15 in `6993131` and **unwired from the app shell on 2026-08-21**.
+It is finished apart from production animation, and it was parked rather than finished because the
+renderer path was never chosen.
+
+**What that means concretely.** `:feature:pet` is still in the build and its 24 unit + 7 instrumented
+tests still run, so the code cannot rot. Nothing in `:app` references it: no `PetOverlayHost` mount,
+no Ajustes entry, no settings destination, no event publish. A user cannot reach it by any route,
+including flipping the stored preference.
+
+**What is still lying around, on purpose:**
+
+- The pet preferences in `UserPreferences` / DataStore. Harmless, and deleting them would mean a
+  migration on a feature that is coming back.
+- `Modifier.safeArea(...)` calls on fourteen surfaces. These are **genuine no-ops** while parked —
+  `safeArea` reads `LocalSafeAreaRegistry.current ?: return this`, and no registry is provided
+  anymore, so the `onGloballyPositioned` callback is never even attached. Leave them; they are what
+  makes bringing the pet back a two-file change.
+- `addEditScreen`'s `onSaved: () -> Unit = {}` hook. Defaulted and unused, and useful on its own.
+
+**To bring it back**, re-apply the shell wiring from the original commit:
+
+```bash
+git show 6993131 -- app/src/main/kotlin/pe/moneyflow/app/MoneyFlowApp.kt app/src/main/kotlin/pe/moneyflow/app/settings/SettingsScreen.kt | git apply
+```
+
+Before you do, read [docs/pet-prototype-audit-2026-08-11.md](docs/pet-prototype-audit-2026-08-11.md);
+the drag, bubble, lifecycle, settings and event-bus milestones are done and tested, and repeating
+them is the most likely way to waste a session. The standing architectural decisions — why the event
+payload is empty, why placement is user-owned, why the renderer sits behind a neutral contract — are
+in [docs/design-decisions.md](docs/design-decisions.md).
+
+**The open question is the renderer, and it is undecided:**
+[castor-rive-handoff.md](docs/castor-rive-handoff.md) (needs layered art and a `castor.riv`) versus
+[castor-sprite-animation-plan.md](docs/castor-sprite-animation-plan.md) (generated WebP frame strips
+and a `PetSpriteRenderer`; no external blocker). Both render behind `PetAnimationIntent`, so choosing
+one does not foreclose the other.
+
+**One thing to keep true if you touch the finance features:** they must not gain a dependency on
+`:feature:pet`. Today they have none at all — that is the property that made parking it a two-file
+change instead of a fourteen-screen revert.
+
 ## Still open
 
-- **The pay round trip has never been run on a real install.** Ten instrumented tests cover the pay
-  sheet, including that the primary action fires the launch intent and does not settle the payment
-  behind the user's back. No test can prove Yape actually opens and the user comes back to a recorded
-  payment. One manual pass on a device would close it.
+- **The pay round trip has still not been run on a real device against real bank apps.** It has now
+  been exercised on the Pixel 7 emulator against the repo's own `tmp/offline-stubs/` packages — a
+  genuine launch-and-return through Android's activity stack, with no real bank session touched.
+  Scenarios 1, 3 and 4 and both bank launches passed; the sign-off table in
+  [docs/manual-test-pay-roundtrip.md](docs/manual-test-pay-roundtrip.md) records exactly what ran and
+  what did not. Still open there: the "ya pagué por fuera" tap-through, batch settle, the Play Store
+  fallback (every stub happened to be installed, so it could not be forced), TalkBack row
+  descriptions, and the "y N más" truncation.
+- **The companion is parked on an undecided renderer.** See the section above. It is unwired from
+  the app, so it blocks nothing — but it also does not ship until the animation path is chosen.
 - **The 2026-08-02 audit is not in the repo.** Its eighteen items (D1–D9, U1–U9) live in pull request
   descriptions, which is why `design-decisions.md` cites U-numbers you cannot look up in `docs/`.
 - **Watch `DashboardViewModel`.** It combines six sources and derives nudge, insight, pace, budgets,
@@ -233,6 +286,12 @@ taken, and why it is written down instead of being drift.
 | this file | Orientation, settled decisions, traps, open work | Yes |
 | [docs/design-decisions.md](docs/design-decisions.md) | Standing decisions and the reasoning behind each | Yes — add an entry when you make one |
 | [docs/audit-2026-08-01.md](docs/audit-2026-08-01.md) | The audit, its five-phase plan, and what each phase shipped | Closed; kept as a record |
+| [docs/pet-companion-plan.md](docs/pet-companion-plan.md) | Companion product direction, principles, and character family | Yes |
+| [docs/pet-prototype-audit-2026-08-11.md](docs/pet-prototype-audit-2026-08-11.md) | What the companion prototype actually implements — the handoff to read first | Yes |
+| [docs/castor-rive-handoff.md](docs/castor-rive-handoff.md) | Rive artboard, layers, timelines, data-binding contract | Spec; unbuilt |
+| [docs/castor-sprite-animation-plan.md](docs/castor-sprite-animation-plan.md) | The sprite-frame alternative to Rive | Proposal; undecided |
+| [docs/manual-test-pay-roundtrip.md](docs/manual-test-pay-roundtrip.md) | Pay round-trip checklist and its sign-off table | Yes — update the table on each pass |
+| [docs/design-audit-2026-08-04.md](docs/design-audit-2026-08-04.md), [–0809](docs/design-audit-2026-08-09.md) | Dated UX/design audit records and their plans | Closed; kept as records |
 | [docs/design/](docs/design/) | The Propuesta C handoff **as delivered**: spec, navigable prototype, `TAREAS.md` | **No** — a historical artefact |
 
 `docs/design/` is deliberately frozen. Its `TAREAS.md` checkboxes are all unchecked and block 6 still

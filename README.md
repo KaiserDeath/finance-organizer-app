@@ -8,7 +8,9 @@ Material 3, and a clean multi‑module architecture designed to scale into a ful
 > upcoming payments and recurring templates, analytics, accounts and savings, multi-currency,
 > app lock, onboarding, the home-screen widget and the rule-based insight engine all ship. The
 > UI follows the Propuesta C redesign (`docs/design/`), whose six blocks are all landed, and the
-> five phases of `docs/audit-2026-08-01.md` are closed out.
+> five phases of `docs/audit-2026-08-01.md` are closed out. **Compañero Castor**, the optional pet
+> companion, is built and tested but **parked** — it is not wired into the app and cannot be reached
+> (see [The companion — parked](#the-companion--parked)).
 >
 > What remains open is the on-device pay round trip (opening a real bank app and coming back with
 > the payment recorded has never been run against a real install) and final real-device validation
@@ -62,7 +64,9 @@ core/
   :core:designsystem     theme, tokens, brandSurface/moneyColors/NoticeColors roles,
                          MoneyCard/StatTile/DonutChart/BarChart/EmptyState/…, LocalAmountsHidden
   :core:ui               AmountText, AmountKeypad, TransactionRow, PaymentStatusPill, InsightCard,
-                         money() (the discreet-mode formatter), date format, bank-app launcher
+                         money() (the discreet-mode formatter), date format, bank-app launcher,
+                         SafeAreaRegistry (dormant — no registry is provided while the pet is parked,
+                         so every Modifier.safeArea call is a no-op)
   :core:testing          MainDispatcherRule and the shared repository fakes
 feature/
   :feature:dashboard        hero band, pace, shortcuts, insights, streak
@@ -77,6 +81,8 @@ feature/
   :feature:accounts         accounts and balances
   :feature:savings          savings goals
   :feature:currency         exchange rates and multi-currency
+  :feature:pet              Compañero Castor — built, tested, and currently **not wired into
+                            the app**; see “The companion — parked” below
 ```
 
 ### Key design decisions
@@ -127,30 +133,66 @@ if an app is unavailable. "Plin" has no standalone app, so it has no deep link.
   spending spikes, top category, upcoming/overdue bills) ✅. LLM-backed variant can implement the
   same seam later.
 
+## The companion — parked
+
+**Compañero Castor** is an optional pet companion. It is **built and tested but deliberately not
+wired into the app**: there is no overlay, no Ajustes entry, and no way for a user to reach it. The
+module stays in the build so its 24 unit and 7 instrumented tests keep running and the code does not
+rot, but nothing in `:app` references it.
+
+What it costs while parked: the module compiles, and its 848 KB `beaver_prototype.png` still ships in
+the APK. Nothing runs.
+
+**To bring it back**, re-apply the shell wiring from the commit that added it — the two files below
+are the entire integration surface:
+
+```bash
+git show 6993131 -- app/src/main/kotlin/pe/moneyflow/app/MoneyFlowApp.kt app/src/main/kotlin/pe/moneyflow/app/settings/SettingsScreen.kt | git apply
+```
+
+That restores the `PetOverlayHost` mount, the `SafeAreaRegistry` provider, the Ajustes destination,
+and the single `TransactionSaved` publish. Everything else — the module, the preferences, and the
+inert `Modifier.safeArea` calls already present on fourteen surfaces — is still in place.
+
+The feature is complete apart from **production animation**, which is why it was parked rather than
+finished. The renderer is still a flattened PNG with scale and rotation feedback, so the nine states
+are not visually distinct in motion. Two paths are specified and neither has been chosen:
+
+| Path | Doc | Blocker |
+|---|---|---|
+| Rive state machine | [docs/castor-rive-handoff.md](docs/castor-rive-handoff.md) | needs layered source art and a `castor.riv`; the Rive dependency stays out of the build until that file exists |
+| Clippy-style sprite frames | [docs/castor-sprite-animation-plan.md](docs/castor-sprite-animation-plan.md) | none technical — 47 generated WebP frames plus a `PetSpriteRenderer`, not yet built |
+
+Product direction is [docs/pet-companion-plan.md](docs/pet-companion-plan.md); what the prototype
+actually implements is [docs/pet-prototype-audit-2026-08-11.md](docs/pet-prototype-audit-2026-08-11.md);
+the standing architectural decisions are in [docs/design-decisions.md](docs/design-decisions.md).
+
 ## Testing
 
 Two suites, both run by CI on every pull request.
 
 ```bash
-./gradlew test                      # 171 unit tests, no device needed
-./gradlew connectedDebugAndroidTest # 51 instrumented tests, needs a device or emulator
+./gradlew test                      # 214 unit tests, no device needed
+./gradlew connectedDebugAndroidTest # 60 instrumented tests, needs a device or emulator
 ```
 
 **Use `test`, not `testDebugUnitTest`.** The latter is an Android-only task, so it
-silently skips `core:common` and `core:domain` — which between them hold 97 of the 171
+silently skips `core:common` and `core:domain` — which between them hold 104 of the 214
 unit tests.
 
-Unit tests cover the use cases and domain models (`core:domain`, 90), money formatting
+Unit tests cover the use cases and domain models (`core:domain`, 97), money formatting
 (`core:common`), backup serialization (`core:data`), the pure-Kotlin UI helpers
 (`core:ui`) and the ViewModels, including focused filter/section/delete-and-undo coverage for
-`TransactionsViewModel`. `core:testing` holds the shared
+`TransactionsViewModel` and the companion's pure reducer, placement and safe-area maths
+(`feature:pet`, 24). `core:testing` holds the shared
 harness: `MainDispatcherRule` and the repository fakes, which are stateful, so a test
 can observe a write rather than just watch it disappear.
 
 Instrumented tests cover what a JVM test cannot see: Room migrations against real SQLite
 (`core:database`), the settings file surviving a round trip (`core:datastore`), and
 composition-level defects such as touch-target size, discreet mode and behaviour at 200%
-font scale (`core:ui`, `feature:dashboard`, `feature:upcoming`).
+font scale (`core:ui`, `feature:dashboard`, `feature:upcoming`), and that the companion
+overlay appears and hides on the right destinations (`feature:pet`).
 
 ### Read the count, not the build result
 
